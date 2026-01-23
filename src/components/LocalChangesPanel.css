@@ -1,0 +1,158 @@
+.local-changes-vertical-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #1e1e1e;
+  user-select: none;
+}
+
+.local-changes-top-section {
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  overflow: hidden;
+}
+
+.local-changes-file-lists {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.local-changes-diff-viewer {
+  height: 100%;
+  overflow: hidden;
+}
+
+.changes-split-panel {
+  overflow: auto;
+  position: relative;
+}
+
+.changes-splitter-handle {
+  height: 8px;
+  background-color: #2d2d2d;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.changes-splitter-handle:hover {
+  background-color: #3d3d3d;
+}
+
+.changes-splitter-line {
+  width: 100%;
+  height: 1px;
+  background-color: #1e1e1e;
+}
+
+.changes-horizontal-splitter-handle {
+  width: 8px;
+  background-color: #2d2d2d;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.changes-horizontal-splitter-handle:hover {
+  background-color: #3d3d3d;
+}
+
+.changes-horizontal-splitter-line {
+  width: 1px;
+  height: 100%;
+  background-color: #1e1e1e;
+}
+
+.changes-main-splitter-handle {
+  height: 8px;
+  background-color: #2d2d2d;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.changes-main-splitter-handle:hover {
+  background-color: #3d3d3d;
+}
+
+.changes-main-splitter-line {
+  width: 100%;
+  height: 1px;
+  background-color: #1e1e1e;
+}
+
+.commit-panel-bottom {
+  background-color: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.commit-panel-content {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.commit-message-input,
+.commit-description-input {
+  flex: 1;
+  padding: 6px 10px;
+  background-color: #252526;
+  border: 1px solid #3d3d3d;
+  border-radius: 3px;
+  color: #cccccc;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.commit-message-input:focus,
+.commit-description-input:focus {
+  border-color: #4ec9b0;
+}
+
+.commit-button {
+  padding: 6px 20px;
+  background-color: #4ec9b0;
+  color: #1e1e1e;
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.commit-button:hover:not(:disabled) {
+  background-color: #5fd9c0;
+}
+
+.commit-button:active:not(:disabled) {
+  background-color: #3eb9a0;
+}
+
+.commit-button:disabled {
+  background-color: #3d3d3d;
+  color: #888888;
+  cursor: not-allowed;
+}

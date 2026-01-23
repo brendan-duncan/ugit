@@ -1,0 +1,116 @@
+.branch-tree {
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.branch-tree h3 {
+  color: #ffffff;
+  font-size: 1.2rem;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.branch-tree-content {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.branch-tree-empty {
+  color: #888888;
+  font-style: italic;
+  padding: 20px;
+}
+
+.tree-node {
+  user-select: none;
+}
+
+.tree-node-content {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.tree-node-content:hover {
+  background-color: #2d2d2d;
+}
+
+.tree-node-content.current {
+  background-color: #264f78;
+}
+
+.tree-node-content.current:hover {
+  background-color: #2d5a8f;
+}
+
+.tree-node-icon {
+  width: 16px;
+  font-size: 10px;
+  color: #cccccc;
+  margin-right: 4px;
+  display: inline-block;
+  text-align: center;
+}
+
+.tree-node-spacer {
+  width: 16px;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+.current-branch-icon {
+  color: #4ec9b0;
+  font-size: 12px;
+  margin-right: 8px;
+  font-weight: bold;
+}
+
+.tree-node-name {
+  color: #cccccc;
+  flex: 1;
+}
+
+.tree-node-content.current .tree-node-name {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.tree-node-children {
+  margin-left: 0;
+}
+
+.tree-node-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-ahead {
+  color: #4ec9b0;
+}
+
+.status-behind {
+  color: #f48771;
+}
+
+.loading {
+  color: #888888;
+  padding: 20px;
+  font-style: italic;
+}
+
+.error {
+  color: #f48771;
+  padding: 20px;
+  background-color: #5a1d1d;
+  border-radius: 4px;
+  border-left: 4px solid #f48771;
+}
