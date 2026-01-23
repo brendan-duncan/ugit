@@ -160,6 +160,69 @@ class CliGitAdapter extends GitAdapter {
     this._execGit(['checkout', branchName]);
   }
 
+  async log(branchName, maxCount = 100) {
+    const result = this._execGit([
+      'log',
+      branchName,
+      `--max-count=${maxCount}`,
+      '--format=%H%n%ai%n%an%n%ae%n%s%n%b%n<COMMIT_END>'
+    ]);
+
+    if (!result.trim()) {
+      return [];
+    }
+
+    const commits = [];
+    const commitBlocks = result.split('<COMMIT_END>');
+
+    commitBlocks.forEach(block => {
+      const lines = block.trim().split('\n');
+      if (lines.length >= 5) {
+        const hash = lines[0];
+        const date = lines[1];
+        const author_name = lines[2];
+        const author_email = lines[3];
+        const message = lines[4];
+        const body = lines.slice(5).join('\n').trim();
+
+        commits.push({
+          hash,
+          date,
+          author_name,
+          author_email,
+          message,
+          body: body || ''
+        });
+      }
+    });
+
+    return commits;
+  }
+
+  async getCommitFiles(commitHash) {
+    try {
+      const result = this._execGit(['diff-tree', '--no-commit-id', '--name-status', '-r', commitHash]);
+
+      if (!result.trim()) {
+        return [];
+      }
+
+      const files = result.trim().split('\n').map(line => {
+        const parts = line.split('\t');
+        if (parts.length >= 2) {
+          const status = parts[0];
+          const path = parts[1];
+          return { status, path };
+        }
+        return null;
+      }).filter(Boolean);
+
+      return files;
+    } catch (error) {
+      return [];
+    }
+  }
+
   async createPatch(filePaths, outputPath, isStaged = false) {
     const fs = require('fs');
     let patchContent;

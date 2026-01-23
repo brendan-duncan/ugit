@@ -2,19 +2,28 @@
   background-color: #1e1e1e;
   border-radius: 4px;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .branch-tree h3 {
   color: #ffffff;
   font-size: 1.2rem;
+  margin: 0;
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 1px solid #3d3d3d;
+  flex-shrink: 0;
 }
 
 .branch-tree-content {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
 }
 
 .branch-tree-empty {
@@ -41,11 +50,19 @@
 }
 
 .tree-node-content.current {
-  background-color: #264f78;
+  /* Current branch indicated by bullet icon only */
 }
 
 .tree-node-content.current:hover {
-  background-color: #2d5a8f;
+  background-color: #37373d;
+}
+
+.tree-node-content.branch-selected {
+  background-color: #37373d;
+}
+
+.tree-node-content.branch-selected:hover {
+  background-color: #3d3d3d;
 }
 
 .tree-node-content.switchable {

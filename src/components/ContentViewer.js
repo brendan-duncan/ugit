@@ -1,6 +1,7 @@
 import React from 'react';
 import LocalChangesPanel from './LocalChangesPanel';
 import StashViewer from './StashViewer';
+import BranchView from './BranchView';
 import './ContentViewer.css';
 
 function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onRefresh }) {
@@ -31,7 +32,15 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onR
           repoPath={repoPath}
         />
       )}
-      {selectedItem.type !== 'local-changes' && selectedItem.type !== 'stash' && (
+      {selectedItem.type === 'branch' && (
+        <BranchView
+          branchName={selectedItem.branchName}
+          commits={selectedItem.commits}
+          repoPath={repoPath}
+          onRefresh={onRefresh}
+        />
+      )}
+      {selectedItem.type !== 'local-changes' && selectedItem.type !== 'stash' && selectedItem.type !== 'branch' && (
         <div className="content-viewer-placeholder">
           <p>Content for "{selectedItem.type}" will be displayed here</p>
         </div>

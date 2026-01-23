@@ -33,6 +33,19 @@ export function addRecentRepo(repoPath) {
   }
 }
 
+export function setRecentRepos(repoPaths) {
+  try {
+    // Limit to max and ensure no duplicates
+    const uniquePaths = [...new Set(repoPaths)];
+    const limited = uniquePaths.slice(0, MAX_RECENT_REPOS);
+    localStorage.setItem(RECENT_REPOS_KEY, JSON.stringify(limited));
+    return limited;
+  } catch (error) {
+    console.error('Error setting recent repos:', error);
+    return getRecentRepos();
+  }
+}
+
 export function clearRecentRepos() {
   try {
     localStorage.removeItem(RECENT_REPOS_KEY);

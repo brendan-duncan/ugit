@@ -1,0 +1,114 @@
+.commit-info {
+  background-color: #1e1e1e;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.commit-info-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.commit-info-header h4 {
+  color: #ffffff;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.commit-info-content {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.commit-info-empty {
+  color: #888888;
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.commit-info-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.commit-info-label {
+  color: #4ec9b0;
+  font-weight: 500;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.commit-info-value {
+  color: #cccccc;
+  word-break: break-word;
+}
+
+.commit-full-message {
+  white-space: pre-wrap;
+}
+
+.commit-body {
+  margin: 0;
+  padding: 8px;
+  background-color: #252526;
+  border-radius: 3px;
+  border-left: 3px solid #4ec9b0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.commit-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.commit-file-item {
+  display: flex;
+  gap: 12px;
+  padding: 4px 8px;
+  background-color: #252526;
+  border-radius: 3px;
+  align-items: center;
+}
+
+.commit-file-status {
+  font-weight: 600;
+  min-width: 70px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.commit-file-path {
+  flex: 1;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.commit-file-item.file-modified .commit-file-status {
+  color: #ce9178;
+}
+
+.commit-file-item.file-added .commit-file-status {
+  color: #89d185;
+}
+
+.commit-file-item.file-deleted .commit-file-status {
+  color: #f48771;
+}
+
+.commit-file-item.file-renamed .commit-file-status {
+  color: #4ec9b0;
+}
+
+.commit-file-item.file-copied .commit-file-status {
+  color: #9cdcfe;
+}

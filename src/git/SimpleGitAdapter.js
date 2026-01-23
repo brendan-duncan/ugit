@@ -151,6 +151,51 @@ class SimpleGitAdapter extends GitAdapter {
     this._logCommand(`git checkout ${branchName}`, startTime);
   }
 
+  async log(branchName, maxCount = 100) {
+    const startTime = performance.now();
+    const result = await this.git.log({
+      [branchName]: null,
+      maxCount: maxCount,
+      format: {
+        hash: '%H',
+        date: '%ai',
+        message: '%s',
+        body: '%b',
+        author_name: '%an',
+        author_email: '%ae'
+      }
+    });
+    this._logCommand(`git log ${branchName} --max-count=${maxCount}`, startTime);
+    return result.all;
+  }
+
+  async getCommitFiles(commitHash) {
+    const startTime = performance.now();
+    try {
+      const result = await this.git.raw(['diff-tree', '--no-commit-id', '--name-status', '-r', commitHash]);
+      this._logCommand(`git diff-tree --no-commit-id --name-status -r ${commitHash}`, startTime);
+
+      if (!result.trim()) {
+        return [];
+      }
+
+      const files = result.trim().split('\n').map(line => {
+        const parts = line.split('\t');
+        if (parts.length >= 2) {
+          const status = parts[0];
+          const path = parts[1];
+          return { status, path };
+        }
+        return null;
+      }).filter(Boolean);
+
+      return files;
+    } catch (error) {
+      this._logCommand(`git diff-tree --no-commit-id --name-status -r ${commitHash}`, startTime);
+      return [];
+    }
+  }
+
   async createPatch(filePaths, outputPath, isStaged = false) {
     const startTime = performance.now();
     const fs = require('fs');

@@ -31,6 +31,7 @@ function RepositoryView({ repoPath }) {
   const [showPullDialog, setShowPullDialog] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
   const [pullingBranch, setPullingBranch] = useState(null);
+  const [selectedBranch, setSelectedBranch] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const hasLoadedCache = useRef(false);
@@ -499,6 +500,25 @@ function RepositoryView({ repoPath }) {
     }
   };
 
+  const handleBranchSelect = async (branchName) => {
+    try {
+      const git = gitAdapter.current;
+      setSelectedBranch(branchName);
+
+      console.log(`Loading commits for branch: ${branchName}`);
+      const commits = await git.log(branchName);
+
+      setSelectedItem({
+        type: 'branch',
+        branchName,
+        commits
+      });
+    } catch (error) {
+      console.error('Error loading branch commits:', error);
+      setError(`Failed to load commits: ${error.message}`);
+    }
+  };
+
   return (
     <div className="repository-view">
       <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} refreshing={refreshing} />
@@ -530,7 +550,7 @@ function RepositoryView({ repoPath }) {
                 <div className="splitter-line"></div>
               </div>
               <div className="split-panel middle-panel" style={{ height: `${middleHeight}%` }}>
-                <BranchTree branches={branches} currentBranch={currentBranch} branchStatus={branchStatus} onBranchSwitch={handleBranchSwitch} pullingBranch={pullingBranch} />
+                <BranchTree branches={branches} currentBranch={currentBranch} branchStatus={branchStatus} onBranchSwitch={handleBranchSwitch} pullingBranch={pullingBranch} onBranchSelect={handleBranchSelect} selectedBranch={selectedBranch} />
               </div>
               <div
                 className="splitter-handle"

@@ -13,11 +13,20 @@
   padding: 8px 12px;
   background-color: #2d2d2d;
   border-right: 1px solid #1e1e1e;
-  cursor: pointer;
+  cursor: grab;
   user-select: none;
   min-width: 120px;
   max-width: 200px;
   transition: background-color 0.2s;
+}
+
+.tab.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.tab.drag-over {
+  border-left: 2px solid #007acc;
 }
 
 .tab:hover {
@@ -25,7 +34,7 @@
 }
 
 .tab.active {
-  background-color: #1e1e1e;
+  background-color: #4a4a4a;
   border-bottom: 2px solid #007acc;
 }
 

@@ -1,0 +1,92 @@
+import React, { useState, useRef } from 'react';
+import CommitList from './CommitList';
+import CommitInfo from './CommitInfo';
+import './BranchView.css';
+
+const GitFactory = window.require('./src/git/GitFactory');
+const { ipcRenderer } = window.require('electron');
+
+function BranchView({ branchName, commits, repoPath, onRefresh }) {
+  const [selectedCommit, setSelectedCommit] = useState(null);
+  const [commitFiles, setCommitFiles] = useState([]);
+  const [topHeight, setTopHeight] = useState(60);
+  const activeSplitter = useRef(null);
+  const gitAdapter = useRef(null);
+
+  const handleMouseDown = () => {
+    activeSplitter.current = true;
+  };
+
+  const handleMouseUp = () => {
+    activeSplitter.current = null;
+  };
+
+  const handleMouseMove = (e) => {
+    if (activeSplitter.current === null) return;
+
+    const container = e.currentTarget;
+    const rect = container.getBoundingClientRect();
+    const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
+
+    if (mouseY >= 30 && mouseY <= 80) {
+      setTopHeight(mouseY);
+    }
+  };
+
+  const handleCommitSelect = async (commit) => {
+    setSelectedCommit(commit);
+    setCommitFiles([]);
+
+    if (!commit) return;
+
+    try {
+      // Initialize git adapter if needed
+      if (!gitAdapter.current) {
+        const backend = await ipcRenderer.invoke('get-git-backend');
+        gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
+      }
+
+      const files = await gitAdapter.current.getCommitFiles(commit.hash);
+      setCommitFiles(files);
+    } catch (error) {
+      console.error('Error loading commit files:', error);
+      setCommitFiles([]);
+    }
+  };
+
+  return (
+    <div
+      className="branch-view"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
+      <div className="branch-view-header">
+        <h3>Branch: {branchName}</h3>
+      </div>
+
+      <div className="branch-view-content">
+        <div className="branch-view-top-panel" style={{ height: `${topHeight}%` }}>
+          <CommitList
+            commits={commits}
+            selectedCommit={selectedCommit}
+            onSelectCommit={handleCommitSelect}
+          />
+        </div>
+
+        <div
+          className="branch-view-splitter"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="branch-view-splitter-line"></div>
+        </div>
+
+        <div className="branch-view-bottom-panel" style={{ height: `${100 - topHeight}%` }}>
+          <CommitInfo commit={selectedCommit} files={commitFiles} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default BranchView;

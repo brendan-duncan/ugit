@@ -1,16 +1,29 @@
 import React, { useState } from 'react';
 import './BranchTree.css';
 
-function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch }) {
+function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch, onBranchSelect, selectedBranch }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
   const isCurrent = node.fullPath === currentBranch;
   const isPulling = node.fullPath === pullingBranch;
+  const isSelected = !hasChildren && selectedBranch === node.fullPath;
   const status = branchStatus && branchStatus[node.fullPath];
 
   const handleToggle = () => {
     if (hasChildren) {
       setIsExpanded(!isExpanded);
+    }
+  };
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (hasChildren) {
+      handleToggle();
+    } else {
+      // Single click on a branch selects it
+      if (onBranchSelect) {
+        onBranchSelect(node.fullPath);
+      }
     }
   };
 
@@ -25,9 +38,9 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   return (
     <div className="tree-node">
       <div
-        className={`tree-node-content ${isCurrent ? 'current' : ''} ${!hasChildren && !isCurrent ? 'switchable' : ''}`}
+        className={`tree-node-content ${isCurrent ? 'current' : ''} ${isSelected ? 'branch-selected' : ''} ${!hasChildren && !isCurrent ? 'switchable' : ''}`}
         style={{ paddingLeft: `${level * 20}px` }}
-        onClick={handleToggle}
+        onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       >
         {hasChildren && (
@@ -74,6 +87,8 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
               level={level + 1}
               onBranchSwitch={onBranchSwitch}
               pullingBranch={pullingBranch}
+              onBranchSelect={onBranchSelect}
+              selectedBranch={selectedBranch}
             />
           ))}
         </div>
@@ -82,7 +97,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   );
 }
 
-function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch }) {
+function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedBranch }) {
   if (!branches || branches.length === 0) {
     return <div className="branch-tree-empty">No branches found</div>;
   }
@@ -125,6 +140,8 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
             level={0}
             onBranchSwitch={onBranchSwitch}
             pullingBranch={pullingBranch}
+            onBranchSelect={onBranchSelect}
+            selectedBranch={selectedBranch}
           />
         ))}
       </div>

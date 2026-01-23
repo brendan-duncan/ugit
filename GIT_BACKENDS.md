@@ -2,6 +2,8 @@
 
 ugit now supports multiple git backend implementations that can be switched using command-line arguments.
 
+**Only simple-git currently works!**
+
 ## Available Backends
 
 ### 1. **simple-git** (Default)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
-import { getRecentRepos, addRecentRepo } from './utils/recentRepos';
+import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
 import './App.css';
 
 const { ipcRenderer } = window.require('electron');
@@ -110,14 +110,23 @@ function App() {
     }
   };
 
+  const handleTabReorder = (newTabs) => {
+    setTabs(newTabs);
+  };
+
   // Save open tabs to recent repos when tabs change
   useEffect(() => {
-    if (hasLoadedRecent && tabs.length > 0) {
-      // Update recent repos with current tabs (most recent first)
-      const tabPaths = tabs.map(tab => tab.path).reverse();
-      tabPaths.forEach(path => addRecentRepo(path));
-      const recent = getRecentRepos();
-      ipcRenderer.send('update-recent-repos', recent);
+    if (hasLoadedRecent) {
+      if (tabs.length > 0) {
+        // Set recent repos to exactly match current tabs (most recent first)
+        const tabPaths = tabs.map(tab => tab.path).reverse();
+        const recent = setRecentRepos(tabPaths);
+        ipcRenderer.send('update-recent-repos', recent);
+      } else {
+        // No tabs open, clear recent repos
+        const recent = setRecentRepos([]);
+        ipcRenderer.send('update-recent-repos', recent);
+      }
     }
   }, [tabs, hasLoadedRecent]);
 
@@ -138,6 +147,7 @@ function App() {
         activeTabId={activeTabId}
         onTabSelect={setActiveTabId}
         onTabClose={closeTab}
+        onTabReorder={handleTabReorder}
       />
       <div className="content">
         {tabs.length === 0 ? (

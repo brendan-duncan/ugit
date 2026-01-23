@@ -1,0 +1,82 @@
+.commit-list {
+  background-color: #1e1e1e;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.commit-list h4 {
+  color: #ffffff;
+  font-size: 1rem;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.commit-list-content {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.commit-list-empty {
+  color: #888888;
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.commit-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.commit-item:hover {
+  background-color: #2d2d2d;
+}
+
+.commit-item.selected {
+  background-color: #264f78;
+}
+
+.commit-item.selected:hover {
+  background-color: #2d5a8f;
+}
+
+.commit-message {
+  color: #cccccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-item.selected .commit-message {
+  color: #ffffff;
+}
+
+.commit-author {
+  color: #4ec9b0;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.commit-hash {
+  color: #ce9178;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.commit-date {
+  color: #888888;
+  white-space: nowrap;
+  font-size: 12px;
+}
