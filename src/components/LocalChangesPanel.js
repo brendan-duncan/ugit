@@ -1,17 +1,31 @@
 import React, { useState, useRef } from 'react';
-import simpleGit from 'simple-git';
 import FileList from './FileList';
 import DiffViewer from './DiffViewer';
 import './LocalChangesPanel.css';
 
+const GitFactory = window.require('./src/git/GitFactory');
+const { ipcRenderer } = window.require('electron');
+const path = window.require('path');
+
 function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) {
-  const [topSectionHeight, setTopSectionHeight] = useState(85);
+  const [topSectionHeight, setTopSectionHeight] = useState(92);
   const [fileListsHeight, setFileListsHeight] = useState(50);
   const [leftWidth, setLeftWidth] = useState(50);
   const [selectedFile, setSelectedFile] = useState(null);
   const [commitMessage, setCommitMessage] = useState('');
   const [commitDescription, setCommitDescription] = useState('');
+  const [isBusy, setIsBusy] = useState(false);
   const activeSplitter = useRef(null);
+  const gitAdapter = useRef(null);
+
+  // Initialize git adapter
+  const getGitAdapter = async () => {
+    if (!gitAdapter.current) {
+      const backend = await ipcRenderer.invoke('get-git-backend');
+      gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
+    }
+    return gitAdapter.current;
+  };
 
   const handleMouseDown = (splitterType) => {
     activeSplitter.current = splitterType;
@@ -50,26 +64,52 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
     }
   };
 
-  const handleFileDrop = async (file, sourceList, targetList) => {
-    try {
-      const git = simpleGit(repoPath);
+  const handleFileDrop = async (item, sourceList, targetList) => {
+    if (isBusy) {
+      console.log('Operation in progress, please wait...');
+      return;
+    }
 
-      if (sourceList === 'unstaged' && targetList === 'staged') {
-        // Stage the file
-        await git.add(file.path);
-        console.log(`Staged file: ${file.path}`);
-      } else if (sourceList === 'staged' && targetList === 'unstaged') {
-        // Unstage the file
-        await git.reset(['HEAD', file.path]);
-        console.log(`Unstaged file: ${file.path}`);
+    try {
+      setIsBusy(true);
+      const git = await getGitAdapter();
+
+      // Check if it's a folder or a single file
+      if (item.type === 'folder') {
+        // Handle folder drop - stage/unstage all files in the folder at once
+        const files = item.files;
+        const filePaths = files.map(f => f.path);
+
+        console.log(`${sourceList === 'unstaged' ? 'Staging' : 'Unstaging'} ${files.length} files in folder: ${item.folderPath}`);
+
+        if (sourceList === 'unstaged' && targetList === 'staged') {
+          await git.addMultiple(filePaths);
+        } else if (sourceList === 'staged' && targetList === 'unstaged') {
+          await git.resetMultiple(filePaths);
+        }
+
+        console.log(`${sourceList === 'unstaged' ? 'Staged' : 'Unstaged'} ${files.length} files from folder: ${item.folderPath}`);
+      } else {
+        // Handle single file drop
+        if (sourceList === 'unstaged' && targetList === 'staged') {
+          // Stage the file
+          await git.add(item.path);
+          console.log(`Staged file: ${item.path}`);
+        } else if (sourceList === 'staged' && targetList === 'unstaged') {
+          // Unstage the file
+          await git.reset(item.path);
+          console.log(`Unstaged file: ${item.path}`);
+        }
       }
 
       // Refresh the file lists
       if (onRefresh) {
-        onRefresh();
+        await onRefresh();
       }
     } catch (error) {
-      console.error('Error staging/unstaging file:', error);
+      console.error('Error staging/unstaging:', error);
+    } finally {
+      setIsBusy(false);
     }
   };
 
@@ -78,12 +118,13 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
   };
 
   const handleCommit = async () => {
-    if (!commitMessage.trim() || stagedFiles.length === 0) {
+    if (!commitMessage.trim() || stagedFiles.length === 0 || isBusy) {
       return;
     }
 
     try {
-      const git = simpleGit(repoPath);
+      setIsBusy(true);
+      const git = await getGitAdapter();
 
       // Construct commit message with optional description
       const fullMessage = commitDescription.trim()
@@ -99,10 +140,124 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
 
       // Refresh the file lists
       if (onRefresh) {
-        onRefresh();
+        await onRefresh();
       }
     } catch (error) {
       console.error('Error committing:', error);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleContextMenu = async (action, items, clickedItem, contextRepoPath, listType) => {
+    if (isBusy) {
+      console.log('Operation in progress, please wait...');
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+
+      // Get all file paths from selected items (including files within folders)
+      const allFilePaths = [];
+      items.forEach(item => {
+        if (item.type === 'file') {
+          allFilePaths.push(item.file.path);
+        } else if (item.type === 'folder') {
+          item.files.forEach(f => allFilePaths.push(f.path));
+        }
+      });
+
+      const git = await getGitAdapter();
+
+      switch (action) {
+        case 'show-in-explorer':
+          // Show the clicked item in file explorer
+          const itemPath = path.join(repoPath, clickedItem);
+          await ipcRenderer.invoke('show-item-in-folder', itemPath);
+          break;
+
+        case 'stage':
+          if (allFilePaths.length > 0) {
+            await git.addMultiple(allFilePaths);
+            console.log(`Staged ${allFilePaths.length} files`);
+            if (onRefresh) await onRefresh();
+          }
+          break;
+
+        case 'unstage':
+          if (allFilePaths.length > 0) {
+            await git.resetMultiple(allFilePaths);
+            console.log(`Unstaged ${allFilePaths.length} files`);
+            if (onRefresh) await onRefresh();
+          }
+          break;
+
+        case 'discard':
+          if (allFilePaths.length > 0) {
+            const confirmed = window.confirm(
+              `Are you sure you want to discard changes for ${allFilePaths.length} file(s)? This cannot be undone.`
+            );
+            if (confirmed) {
+              await git.discard(allFilePaths);
+              console.log(`Discarded changes for ${allFilePaths.length} files`);
+              if (onRefresh) await onRefresh();
+            }
+          }
+          break;
+
+        case 'stash':
+          if (allFilePaths.length > 0) {
+            const stashMessage = window.prompt('Enter stash message:', 'Stashed changes');
+            if (stashMessage) {
+              await git.stashPush(stashMessage, allFilePaths);
+              console.log(`Stashed ${allFilePaths.length} files`);
+              if (onRefresh) await onRefresh();
+            }
+          }
+          break;
+
+        case 'save-as-patch':
+          if (allFilePaths.length > 0) {
+            // Use electron's save dialog
+            const result = await ipcRenderer.invoke('show-save-dialog', {
+              title: 'Save Patch As',
+              defaultPath: path.join(repoPath, 'changes.patch'),
+              filters: [
+                { name: 'Patch Files', extensions: ['patch'] },
+                { name: 'All Files', extensions: ['*'] }
+              ]
+            });
+
+            if (!result.canceled && result.filePath) {
+              const isStaged = listType === 'staged';
+              await git.createPatch(allFilePaths, result.filePath, isStaged);
+              console.log(`Saved patch to ${result.filePath}`);
+            }
+          }
+          break;
+
+        case 'copy-path':
+          // Copy repo-relative path to clipboard
+          navigator.clipboard.writeText(clickedItem);
+          console.log(`Copied path: ${clickedItem}`);
+          break;
+
+        case 'copy-full-path':
+          // Copy full absolute path to clipboard
+          const fullPath = path.join(repoPath, clickedItem);
+          navigator.clipboard.writeText(fullPath);
+          console.log(`Copied full path: ${fullPath}`);
+          break;
+
+        default:
+          console.warn(`Unknown context menu action: ${action}`);
+      }
+    } catch (error) {
+      console.error(`Error handling context menu action '${action}':`, error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setIsBusy(false);
     }
   };
 
@@ -113,6 +268,14 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {/* Busy indicator overlay */}
+      {isBusy && (
+        <div className="busy-overlay">
+          <div className="busy-spinner"></div>
+          <div className="busy-message">Processing...</div>
+        </div>
+      )}
+
       {/* Top section: file lists on left, diff viewer on right */}
       <div className="local-changes-top-section" style={{ height: `${topSectionHeight}%` }}>
         <div className="local-changes-file-lists" style={{ width: `${leftWidth}%` }}>
@@ -124,6 +287,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
               onDrop={handleFileDrop}
               onSelectFile={handleSelectFile}
               selectedFile={selectedFile}
+              repoPath={repoPath}
+              onContextMenu={handleContextMenu}
             />
           </div>
           <div
@@ -140,6 +305,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
               onDrop={handleFileDrop}
               onSelectFile={handleSelectFile}
               selectedFile={selectedFile}
+              repoPath={repoPath}
+              onContextMenu={handleContextMenu}
             />
           </div>
         </div>
@@ -179,6 +346,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             placeholder="Commit message"
+            disabled={isBusy}
           />
           <input
             type="text"
@@ -186,11 +354,12 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
             value={commitDescription}
             onChange={(e) => setCommitDescription(e.target.value)}
             placeholder="Description (optional)"
+            disabled={isBusy}
           />
           <button
             className="commit-button"
             onClick={handleCommit}
-            disabled={stagedFiles.length === 0 || !commitMessage.trim()}
+            disabled={stagedFiles.length === 0 || !commitMessage.trim() || isBusy}
           >
             Commit
           </button>

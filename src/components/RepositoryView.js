@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import simpleGit from 'simple-git';
 import ChangesList from './ChangesList';
 import BranchTree from './BranchTree';
 import StashList from './StashList';
@@ -8,6 +7,10 @@ import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
 import PushDialog from './PushDialog';
 import './RepositoryView.css';
+
+const GitFactory = window.require('./src/git/GitFactory');
+const { ipcRenderer } = window.require('electron');
+const cacheManager = window.require('./src/utils/cacheManager');
 
 function RepositoryView({ repoPath }) {
   const [branches, setBranches] = useState([]);
@@ -21,23 +24,74 @@ function RepositoryView({ repoPath }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [topHeight, setTopHeight] = useState(20);
-  const [middleHeight, setMiddleHeight] = useState(40);
+  const [usingCache, setUsingCache] = useState(false);
+  const [topHeight, setTopHeight] = useState(12);
+  const [middleHeight, setMiddleHeight] = useState(48);
   const [leftWidth, setLeftWidth] = useState(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
+  const [pullingBranch, setPullingBranch] = useState(null);
   const activeSplitter = useRef(null);
+  const gitAdapter = useRef(null);
+  const hasLoadedCache = useRef(false);
+  const cacheInitialized = useRef(false);
+
+  // Initialize cache manager with user data path
+  useEffect(() => {
+    const initCache = async () => {
+      if (!cacheInitialized.current) {
+        const userDataPath = await ipcRenderer.invoke('get-user-data-path');
+        cacheManager.setCacheDir(userDataPath);
+        cacheInitialized.current = true;
+      }
+    };
+    initCache();
+  }, []);
 
   const loadRepoData = async (isRefresh = false) => {
     try {
+      // Wait for cache to be initialized
+      while (!cacheInitialized.current) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      // Load from cache first on initial load
+      if (!isRefresh && !hasLoadedCache.current) {
+        const cachedData = cacheManager.loadCache(repoPath);
+        if (cachedData) {
+          // Apply cached data immediately
+          setCurrentBranch(cachedData.currentBranch || '');
+          setUnstagedFiles(cachedData.unstagedFiles || []);
+          setStagedFiles(cachedData.stagedFiles || []);
+          setModifiedCount(cachedData.modifiedCount || 0);
+          setBranches(cachedData.branches || []);
+          setBranchStatus(cachedData.branchStatus || {});
+          setStashes(cachedData.stashes || []);
+          setUsingCache(true);
+          setLoading(false);
+          hasLoadedCache.current = true;
+
+          // Continue loading fresh data in background
+          setTimeout(() => loadRepoData(true), 100);
+          return;
+        }
+        hasLoadedCache.current = true;
+      }
+
       if (isRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
       }
       setError(null);
+      setUsingCache(false);
 
-      const git = simpleGit(repoPath);
+      // Initialize git adapter if needed
+      if (!gitAdapter.current) {
+        const backend = await ipcRenderer.invoke('get-git-backend');
+        gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
+      }
+      const git = gitAdapter.current;
 
       // Get current branch and modified files
       const status = await git.status();
@@ -88,26 +142,47 @@ function RepositoryView({ repoPath }) {
       const branchNames = branchSummary.all;
       setBranches(branchNames);
 
-      // Get ahead/behind status for each branch
-      const statusMap = {};
-      for (const branchName of branchNames) {
+      // Get ahead/behind status for each branch (parallel)
+      const statusPromises = branchNames.map(async (branchName) => {
         try {
           // Check if branch has a remote tracking branch
-          const result = await git.raw(['rev-list', '--left-right', '--count', `${branchName}...origin/${branchName}`]);
-          const [ahead, behind] = result.trim().split('\t').map(Number);
+          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
 
           if (ahead > 0 || behind > 0) {
-            statusMap[branchName] = { ahead, behind };
+            return { branchName, ahead, behind };
+          } else {
+            // Branch is in sync, don't include in status
+            return null;
           }
         } catch (error) {
           // Branch doesn't have a remote tracking branch, skip it
+          return null;
         }
-      }
+      });
+
+      const statusResults = await Promise.all(statusPromises);
+      const statusMap = {};
+      statusResults.forEach(result => {
+        if (result) {
+          statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
+        }
+      });
       setBranchStatus(statusMap);
 
       // Get stashes
       const stashList = await git.stashList();
       setStashes(stashList.all);
+
+      // Save to cache
+      cacheManager.saveCache(repoPath, {
+        currentBranch: status.current,
+        unstagedFiles: unstaged,
+        stagedFiles: staged,
+        modifiedCount: allPaths.size,
+        branches: branchNames,
+        branchStatus: statusMap,
+        stashes: stashList.all
+      });
 
       if (isRefresh) {
         setRefreshing(false);
@@ -132,7 +207,7 @@ function RepositoryView({ repoPath }) {
 
   const refreshFileStatus = async () => {
     try {
-      const git = simpleGit(repoPath);
+      const git = gitAdapter.current;
 
       // Get current branch and modified files
       const status = await git.status();
@@ -228,26 +303,39 @@ function RepositoryView({ repoPath }) {
 
   const handleFetchClick = async () => {
     try {
-      const git = simpleGit(repoPath);
+      const git = gitAdapter.current;
 
       console.log('Fetching from origin...');
       await git.fetch('origin');
       console.log('Fetch completed successfully');
 
-      // Refresh branch status after fetch
-      const statusMap = {};
-      for (const branchName of branches) {
+      // Refresh branch status after fetch (parallel, update UI incrementally)
+      branches.forEach(async (branchName) => {
         try {
-          const result = await git.raw(['rev-list', '--left-right', '--count', `${branchName}...origin/${branchName}`]);
-          const [ahead, behind] = result.trim().split('\t').map(Number);
+          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
           if (ahead > 0 || behind > 0) {
-            statusMap[branchName] = { ahead, behind };
+            setBranchStatus(prev => ({
+              ...prev,
+              [branchName]: { ahead, behind }
+            }));
+          } else {
+            // Remove status if branch is now in sync
+            setBranchStatus(prev => {
+              const newStatus = { ...prev };
+              delete newStatus[branchName];
+              return newStatus;
+            });
           }
         } catch (error) {
           // Branch doesn't have a remote tracking branch
+          // Remove status for this branch
+          setBranchStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[branchName];
+            return newStatus;
+          });
         }
-      }
-      setBranchStatus(statusMap);
+      });
 
     } catch (error) {
       console.error('Error during fetch:', error);
@@ -265,16 +353,17 @@ function RepositoryView({ repoPath }) {
 
   const handlePull = async (branch, stashAndReapply) => {
     setShowPullDialog(false);
+    setPullingBranch(branch);
 
     try {
-      const git = simpleGit(repoPath);
+      const git = gitAdapter.current;
       let stashCreated = false;
       let stashMessage = '';
 
       // Stash local changes if requested
       if (stashAndReapply && (unstagedFiles.length > 0 || stagedFiles.length > 0)) {
         stashMessage = `Auto-stash before pull at ${new Date().toISOString()}`;
-        await git.stash(['push', '-m', stashMessage]);
+        await git.stashPush(stashMessage);
         stashCreated = true;
         console.log('Created stash before pull');
       }
@@ -284,10 +373,13 @@ function RepositoryView({ repoPath }) {
       await git.pull('origin', branch);
       console.log('Pull completed successfully');
 
+      // Clear pulling indicator immediately after pull completes
+      setPullingBranch(null);
+
       // Reapply stash if it was created
       if (stashCreated) {
         try {
-          await git.stash(['pop']);
+          await git.stashPop();
           console.log('Stash applied and removed successfully');
         } catch (error) {
           console.error('Failed to apply stash, leaving it in stash list:', error);
@@ -306,24 +398,38 @@ function RepositoryView({ repoPath }) {
       const stashList = await git.stashList();
       setStashes(stashList.all);
 
-      // Refresh branch status
-      const statusMap = {};
-      for (const branchName of branches) {
+      // Refresh branch status (parallel, update UI incrementally)
+      branches.forEach(async (branchName) => {
         try {
-          const result = await git.raw(['rev-list', '--left-right', '--count', `${branchName}...origin/${branchName}`]);
-          const [ahead, behind] = result.trim().split('\t').map(Number);
+          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
           if (ahead > 0 || behind > 0) {
-            statusMap[branchName] = { ahead, behind };
+            setBranchStatus(prev => ({
+              ...prev,
+              [branchName]: { ahead, behind }
+            }));
+          } else {
+            // Remove status if branch is now in sync
+            setBranchStatus(prev => {
+              const newStatus = { ...prev };
+              delete newStatus[branchName];
+              return newStatus;
+            });
           }
         } catch (error) {
           // Branch doesn't have a remote tracking branch
+          // Remove status for this branch
+          setBranchStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[branchName];
+            return newStatus;
+          });
         }
-      }
-      setBranchStatus(statusMap);
+      });
 
     } catch (error) {
       console.error('Error during pull:', error);
       setError(`Pull failed: ${error.message}`);
+      setPullingBranch(null);
     }
   };
 
@@ -331,7 +437,7 @@ function RepositoryView({ repoPath }) {
     setShowPushDialog(false);
 
     try {
-      const git = simpleGit(repoPath);
+      const git = gitAdapter.current;
 
       console.log(`Pushing ${branch} to origin/${remoteBranch}...`);
 
@@ -343,20 +449,33 @@ function RepositoryView({ repoPath }) {
         console.log('Push completed successfully');
       }
 
-      // Refresh branch status after push
-      const statusMap = {};
-      for (const branchName of branches) {
+      // Refresh branch status after push (parallel, update UI incrementally)
+      branches.forEach(async (branchName) => {
         try {
-          const result = await git.raw(['rev-list', '--left-right', '--count', `${branchName}...origin/${branchName}`]);
-          const [ahead, behind] = result.trim().split('\t').map(Number);
+          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
           if (ahead > 0 || behind > 0) {
-            statusMap[branchName] = { ahead, behind };
+            setBranchStatus(prev => ({
+              ...prev,
+              [branchName]: { ahead, behind }
+            }));
+          } else {
+            // Remove status if branch is now in sync
+            setBranchStatus(prev => {
+              const newStatus = { ...prev };
+              delete newStatus[branchName];
+              return newStatus;
+            });
           }
         } catch (error) {
           // Branch doesn't have a remote tracking branch
+          // Remove status for this branch
+          setBranchStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[branchName];
+            return newStatus;
+          });
         }
-      }
-      setBranchStatus(statusMap);
+      });
 
     } catch (error) {
       console.error('Error during push:', error);
@@ -364,14 +483,24 @@ function RepositoryView({ repoPath }) {
     }
   };
 
+  const handleBranchSwitch = async (branchName) => {
+    try {
+      const git = gitAdapter.current;
+
+      console.log(`Switching to branch: ${branchName}`);
+      await git.checkoutBranch(branchName);
+      console.log('Branch switch completed successfully');
+
+      // Refresh all data after branch switch
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error switching branch:', error);
+      setError(`Branch switch failed: ${error.message}`);
+    }
+  };
+
   return (
     <div className="repository-view">
-      <div className="repo-header">
-        <h2>{repoPath}</h2>
-        {currentBranch && (
-          <p className="repo-status">Current branch: <strong>{currentBranch}</strong></p>
-        )}
-      </div>
       <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} refreshing={refreshing} />
       <div
         className="repo-content-horizontal"
@@ -386,9 +515,12 @@ function RepositoryView({ repoPath }) {
             <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
               <div className="split-panel top-panel" style={{ height: `${topHeight}%` }}>
                 <ChangesList
+                  repoPath={repoPath}
+                  currentBranch={currentBranch}
                   modifiedCount={modifiedCount}
                   selectedItem={selectedItem}
                   onSelectItem={setSelectedItem}
+                  usingCache={usingCache}
                 />
               </div>
               <div
@@ -398,7 +530,7 @@ function RepositoryView({ repoPath }) {
                 <div className="splitter-line"></div>
               </div>
               <div className="split-panel middle-panel" style={{ height: `${middleHeight}%` }}>
-                <BranchTree branches={branches} currentBranch={currentBranch} branchStatus={branchStatus} />
+                <BranchTree branches={branches} currentBranch={currentBranch} branchStatus={branchStatus} onBranchSwitch={handleBranchSwitch} pullingBranch={pullingBranch} />
               </div>
               <div
                 className="splitter-handle"

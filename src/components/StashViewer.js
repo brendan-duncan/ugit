@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import simpleGit from 'simple-git';
 import './StashViewer.css';
+
+const GitFactory = window.require('./src/git/GitFactory');
+const { ipcRenderer } = window.require('electron');
 
 function StashViewer({ stash, stashIndex, repoPath }) {
   const [diff, setDiff] = useState('');
@@ -10,10 +12,11 @@ function StashViewer({ stash, stashIndex, repoPath }) {
     const loadStashDiff = async () => {
       try {
         setLoading(true);
-        const git = simpleGit(repoPath);
+        const backend = await ipcRenderer.invoke('get-git-backend');
+        const git = await GitFactory.createAdapter(repoPath, backend);
 
         // Get the diff for the stash
-        const diffResult = await git.show([`stash@{${stashIndex}}`]);
+        const diffResult = await git.showStash(stashIndex);
         setDiff(diffResult);
         setLoading(false);
       } catch (error) {

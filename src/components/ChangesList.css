@@ -15,6 +15,34 @@
   border-bottom: 1px solid #3d3d3d;
 }
 
+.repo-info {
+  margin-bottom: 12px;
+  padding: 8px 0;
+}
+
+.repo-name {
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.repo-branch {
+  color: #cccccc;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.repo-branch strong {
+  color: #4ec9b0;
+}
+
+.cache-indicator {
+  color: #888888;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
 .changes-item {
   display: flex;
   align-items: center;

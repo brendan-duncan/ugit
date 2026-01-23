@@ -4,26 +4,6 @@
   flex-direction: column;
 }
 
-.repo-header {
-  padding: 8px 16px;
-  background-color: #252526;
-  border-bottom: 1px solid #1e1e1e;
-}
-
-.repo-header h2 {
-  font-size: 1.1rem;
-  margin: 0;
-  margin-bottom: 2px;
-  color: #ffffff;
-  word-break: break-all;
-}
-
-.repo-status {
-  color: #888888;
-  font-size: 0.8rem;
-  margin: 0;
-}
-
 .repo-content {
   flex: 1;
   padding: 20px;

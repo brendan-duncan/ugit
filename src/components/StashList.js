@@ -19,17 +19,15 @@ function StashList({ stashes, onSelectStash, selectedItem }) {
           const isSelected = selectedItem &&
                            selectedItem.type === 'stash' &&
                            selectedItem.index === index;
+          // Strip "On <branch>: " prefix from message
+          const displayMessage = stash.message.replace(/^On [^:]+:\s*/, '');
           return (
             <div
               key={index}
               className={`stash-item ${isSelected ? 'selected' : ''}`}
               onClick={() => onSelectStash && onSelectStash(stash, index)}
             >
-              <div className="stash-index">stash@{index}</div>
-              <div className="stash-message">{stash.message}</div>
-              {stash.hash && (
-                <div className="stash-hash">{stash.hash.substring(0, 7)}</div>
-              )}
+              <div className="stash-message">{displayMessage}</div>
             </div>
           );
         })}

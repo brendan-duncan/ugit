@@ -41,11 +41,11 @@
   margin-bottom: 2px;
   border-radius: 3px;
   transition: background-color 0.2s;
-  cursor: grab;
+  cursor: default;
   gap: 8px;
 }
 
-.file-item:active {
+.file-item.dragging {
   cursor: grabbing;
   opacity: 0.5;
 }
@@ -69,6 +69,7 @@
   font-weight: bold;
   min-width: 16px;
   text-align: center;
+  pointer-events: none;
 }
 
 .file-path {
@@ -77,4 +78,81 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  pointer-events: none;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  margin-bottom: 2px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+  cursor: default;
+  gap: 6px;
+  user-select: none;
+}
+
+.folder-item:hover {
+  background-color: #2d2d2d;
+}
+
+.folder-item.dragging {
+  cursor: grabbing;
+  opacity: 0.5;
+}
+
+.folder-icon {
+  font-size: 14px;
+  min-width: 18px;
+  display: inline-block;
+  pointer-events: none;
+}
+
+.folder-name {
+  color: #d4d4d4;
+  font-weight: 500;
+  flex: 1;
+  pointer-events: none;
+}
+
+.folder-item.selected {
+  background-color: #37373d;
+  border-left: 3px solid #4ec9b0;
+  padding-left: 5px;
+}
+
+.folder-item.selected:hover {
+  background-color: #3d3d3d;
+}
+
+.context-menu {
+  background-color: #252526;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  padding: 4px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  z-index: 10000;
+  position: fixed;
+}
+
+.context-menu-item {
+  padding: 6px 16px;
+  color: #cccccc;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s;
+}
+
+.context-menu-item:hover {
+  background-color: #2a2d2e;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: #454545;
+  margin: 4px 0;
 }

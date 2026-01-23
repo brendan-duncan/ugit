@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import simpleGit from 'simple-git';
 import './DiffViewer.css';
+
+const GitFactory = window.require('./src/git/GitFactory');
+const { ipcRenderer } = window.require('electron');
 
 function DiffViewer({ file, repoPath, isStaged }) {
   const [diff, setDiff] = useState('');
@@ -12,16 +14,10 @@ function DiffViewer({ file, repoPath, isStaged }) {
 
       try {
         setLoading(true);
-        const git = simpleGit(repoPath);
+        const backend = await ipcRenderer.invoke('get-git-backend');
+        const git = await GitFactory.createAdapter(repoPath, backend);
 
-        let diffResult;
-        if (isStaged) {
-          // Show diff between HEAD and staged changes
-          diffResult = await git.diff(['--cached', file.path]);
-        } else {
-          // Show diff between staged/HEAD and working directory
-          diffResult = await git.diff([file.path]);
-        }
+        const diffResult = await git.diff(file.path, isStaged);
 
         setDiff(diffResult);
         setLoading(false);

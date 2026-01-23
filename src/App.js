@@ -6,6 +6,8 @@ import './App.css';
 
 const { ipcRenderer } = window.require('electron');
 
+const ACTIVE_TAB_KEY = 'ugit-active-tab-path';
+
 function App() {
   const [tabs, setTabs] = useState([]);
   const [activeTabId, setActiveTabId] = useState(null);
@@ -21,16 +23,35 @@ function App() {
 
       // Auto-open last opened repos
       if (recent.length > 0) {
+        const newTabs = [];
+        let activeTabIdToSet = null;
+
+        // Get saved active tab path
+        const savedActiveTabPath = localStorage.getItem(ACTIVE_TAB_KEY);
+
         recent.forEach((repoPath, index) => {
+          const tabId = Date.now() + index;
           const newTab = {
-            id: Date.now() + index,
+            id: tabId,
             path: repoPath,
             name: repoPath.split(/[\\/]/).pop() || repoPath
           };
-          setTabs(prevTabs => [...prevTabs, newTab]);
+          newTabs.push(newTab);
+
+          // If this matches the saved active tab, remember its ID
+          if (repoPath === savedActiveTabPath) {
+            activeTabIdToSet = tabId;
+          }
         });
-        // Set the first one as active
-        setActiveTabId(Date.now());
+
+        setTabs(newTabs);
+
+        // Set active tab to saved one, or first one if not found
+        if (activeTabIdToSet !== null) {
+          setActiveTabId(activeTabIdToSet);
+        } else {
+          setActiveTabId(newTabs[0].id);
+        }
       }
 
       setHasLoadedRecent(true);
@@ -83,6 +104,8 @@ function App() {
         setActiveTabId(newTabs[newTabs.length - 1].id);
       } else {
         setActiveTabId(null);
+        // Clear saved active tab when no tabs remain
+        localStorage.removeItem(ACTIVE_TAB_KEY);
       }
     }
   };
@@ -97,6 +120,16 @@ function App() {
       ipcRenderer.send('update-recent-repos', recent);
     }
   }, [tabs, hasLoadedRecent]);
+
+  // Save active tab when it changes
+  useEffect(() => {
+    if (activeTabId !== null && tabs.length > 0) {
+      const activeTab = tabs.find(tab => tab.id === activeTabId);
+      if (activeTab) {
+        localStorage.setItem(ACTIVE_TAB_KEY, activeTab.path);
+      }
+    }
+  }, [activeTabId, tabs]);
 
   return (
     <div className="app">
