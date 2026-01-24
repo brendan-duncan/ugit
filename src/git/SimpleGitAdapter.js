@@ -89,28 +89,20 @@ class SimpleGitAdapter extends GitAdapter {
     this._logCommand('git stash pop', startTime);
   }
 
-  async add(filePath) {
+  async add(filePaths) {
     const startTime = performance.now();
-    await this.git.add(filePath);
-    this._logCommand(`git add ${filePath}`, startTime);
+    // Support both single string and array of file paths for backward compatibility
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    await this.git.add(paths);
+    this._logCommand(`git add ${paths.length === 1 ? paths[0] : paths.length + ' files'}`, startTime);
   }
 
-  async addMultiple(filePaths) {
+  async reset(filePaths) {
     const startTime = performance.now();
-    await this.git.add(filePaths);
-    this._logCommand(`git add ${filePaths.length} files`, startTime);
-  }
-
-  async reset(filePath) {
-    const startTime = performance.now();
-    await this.git.reset(['HEAD', filePath]);
-    this._logCommand(`git reset HEAD ${filePath}`, startTime);
-  }
-
-  async resetMultiple(filePaths) {
-    const startTime = performance.now();
-    await this.git.reset(['HEAD', ...filePaths]);
-    this._logCommand(`git reset HEAD ${filePaths.length} files`, startTime);
+    // Support both single string and array of file paths for backward compatibility
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    await this.git.reset(['HEAD', ...paths]);
+    this._logCommand(`git reset HEAD ${paths.length === 1 ? paths[0] : paths.length + ' files'}`, startTime);
   }
 
   async commit(message) {

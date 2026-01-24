@@ -72,32 +72,15 @@
   background-color: #1e1e1e;
 }
 
-.changes-main-splitter-handle {
-  height: 8px;
-  background-color: #2d2d2d;
-  cursor: ns-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background-color 0.2s;
-}
 
-.changes-main-splitter-handle:hover {
-  background-color: #3d3d3d;
-}
-
-.changes-main-splitter-line {
-  width: 100%;
-  height: 1px;
-  background-color: #1e1e1e;
-}
 
 .commit-panel-bottom {
   background-color: #1e1e1e;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 60px;
+  flex-shrink: 0;
 }
 
 .commit-panel-content {

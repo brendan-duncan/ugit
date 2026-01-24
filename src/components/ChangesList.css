@@ -1,7 +1,7 @@
 .changes-list {
   background-color: #1e1e1e;
   border-radius: 4px;
-  padding: 16px;
+  padding: 8px 16px 16px 16px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -16,8 +16,8 @@
 }
 
 .repo-info {
-  margin-bottom: 12px;
-  padding: 0 0 8px 0;
+  margin-bottom: 8px;
+  padding: 0;
 }
 
 .repo-name {

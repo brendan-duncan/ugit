@@ -118,20 +118,16 @@ class CliGitAdapter extends GitAdapter {
     this._execGit(['stash', 'pop']);
   }
 
-  async add(filePath) {
-    this._execGit(['add', filePath]);
+  async add(filePaths) {
+    // Support both single string and array of file paths for backward compatibility
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    this._execGit(['add', ...paths]);
   }
 
-  async addMultiple(filePaths) {
-    this._execGit(['add', ...filePaths]);
-  }
-
-  async reset(filePath) {
-    this._execGit(['reset', 'HEAD', filePath]);
-  }
-
-  async resetMultiple(filePaths) {
-    this._execGit(['reset', 'HEAD', ...filePaths]);
+  async reset(filePaths) {
+    // Support both single string and array of file paths for backward compatibility
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    this._execGit(['reset', 'HEAD', ...paths]);
   }
 
   async commit(message) {

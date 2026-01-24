@@ -590,7 +590,7 @@ function RepositoryView({ repoPath }) {
 
         if (newFiles.length > 0) {
           console.log(`Staging ${newFiles.length} new files before stash...`);
-          await git.addMultiple(newFiles.map(f => f.path));
+          await git.add(newFiles.map(f => f.path));
         }
       }
 
@@ -645,6 +645,12 @@ function RepositoryView({ repoPath }) {
               </div>
               <div className="split-panel middle-panel" style={{ height: `${middleHeight}%` }}>
                 <BranchTree branches={branches} currentBranch={currentBranch} branchStatus={branchStatus} onBranchSwitch={handleBranchSwitch} pullingBranch={pullingBranch} onBranchSelect={handleBranchSelect} selectedBranch={selectedBranch} />
+              </div>
+              <div
+                className="splitter-handle"
+                onMouseDown={() => handleMouseDown(1)}
+              >
+                <div className="splitter-line"></div>
               </div>
               <div
                 className="splitter-handle"

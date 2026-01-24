@@ -8,7 +8,7 @@ const { ipcRenderer } = window.require('electron');
 const path = window.require('path');
 
 function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) {
-  const [topSectionHeight, setTopSectionHeight] = useState(92);
+
   const [fileListsHeight, setFileListsHeight] = useState(50);
   const [leftWidth, setLeftWidth] = useState(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -55,13 +55,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
       if (relativeX >= 30 && relativeX <= 70) {
         setLeftWidth(relativeX);
       }
-    } else if (activeSplitter.current === 'horizontal-bottom') {
-      // Horizontal splitter - between top section and commit panel
-      const newHeight = ((e.clientY - rect.top) / rect.height) * 100;
-      if (newHeight >= 40 && newHeight <= 85) {
-        setTopSectionHeight(newHeight);
       }
-    }
   };
 
   const handleFileDrop = async (item, sourceList, targetList) => {
@@ -74,33 +68,41 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
       setIsBusy(true);
       const git = await getGitAdapter();
 
-      // Check if it's a folder or a single file
-      if (item.type === 'folder') {
-        // Handle folder drop - stage/unstage all files in the folder at once
-        const files = item.files;
-        const filePaths = files.map(f => f.path);
+      // Collect all files that need to be processed
+      const allFilePaths = [];
 
-        console.log(`${sourceList === 'unstaged' ? 'Staging' : 'Unstaging'} ${files.length} files in folder: ${item.folderPath}`);
-
-        if (sourceList === 'unstaged' && targetList === 'staged') {
-          await git.addMultiple(filePaths);
-        } else if (sourceList === 'staged' && targetList === 'unstaged') {
-          await git.resetMultiple(filePaths);
-        }
-
-        console.log(`${sourceList === 'unstaged' ? 'Staged' : 'Unstaged'} ${files.length} files from folder: ${item.folderPath}`);
+      if (item.type === 'multiple-files') {
+        // Handle multiple files drop
+        allFilePaths.push(...item.files.map(f => f.path));
+        console.log(`${sourceList === 'unstaged' ? 'Staging' : 'Unstaging'} ${item.files.length} files`);
+      } else if (item.type === 'multiple-items') {
+        // Handle multiple items (files and folders) drop
+        item.items.forEach(itemData => {
+          if (itemData.type === 'file') {
+            allFilePaths.push(itemData.file.path);
+          } else if (itemData.type === 'folder') {
+            allFilePaths.push(...itemData.files.map(f => f.path));
+          }
+        });
+        console.log(`${sourceList === 'unstaged' ? 'Staging' : 'Unstaging'} ${item.items.length} items`);
+      } else if (item.type === 'folder') {
+        // Handle folder drop - collect all files in folder
+        allFilePaths.push(...item.files.map(f => f.path));
+        console.log(`${sourceList === 'unstaged' ? 'Staging' : 'Unstaging'} ${item.files.length} files in folder: ${item.folderPath}`);
       } else {
         // Handle single file drop
-        if (sourceList === 'unstaged' && targetList === 'staged') {
-          // Stage the file
-          await git.add(item.path);
-          console.log(`Staged file: ${item.path}`);
-        } else if (sourceList === 'staged' && targetList === 'unstaged') {
-          // Unstage the file
-          await git.reset(item.path);
-          console.log(`Unstaged file: ${item.path}`);
-        }
+        allFilePaths.push(item.path);
+        console.log(`${sourceList === 'unstaged' ? 'Staging' : 'Unstaging'} file: ${item.path}`);
       }
+
+      // Process all files at once using consolidated add/reset methods
+      if (sourceList === 'unstaged' && targetList === 'staged') {
+        await git.add(allFilePaths);
+      } else if (sourceList === 'staged' && targetList === 'unstaged') {
+        await git.reset(allFilePaths);
+      }
+
+      console.log(`${sourceList === 'unstaged' ? 'Staged' : 'Unstaged'} ${allFilePaths.length} files`);
 
       // Refresh the file lists
       if (onRefresh) {
@@ -179,7 +181,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
 
         case 'stage':
           if (allFilePaths.length > 0) {
-            await git.addMultiple(allFilePaths);
+            await git.add(allFilePaths);
             console.log(`Staged ${allFilePaths.length} files`);
             if (onRefresh) await onRefresh();
           }
@@ -187,7 +189,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
 
         case 'unstage':
           if (allFilePaths.length > 0) {
-            await git.resetMultiple(allFilePaths);
+            await git.reset(allFilePaths);
             console.log(`Unstaged ${allFilePaths.length} files`);
             if (onRefresh) await onRefresh();
           }
@@ -277,7 +279,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
       )}
 
       {/* Top section: file lists on left, diff viewer on right */}
-      <div className="local-changes-top-section" style={{ height: `${topSectionHeight}%` }}>
+      <div className="local-changes-top-section" style={{ height: `calc(100% - 60px)` }}>
         <div className="local-changes-file-lists" style={{ width: `${leftWidth}%` }}>
           <div className="changes-split-panel" style={{ height: `${fileListsHeight}%` }}>
             <FileList
@@ -329,16 +331,10 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
         )}
       </div>
 
-      {/* Horizontal splitter between top section and commit panel */}
-      <div
-        className="changes-main-splitter-handle"
-        onMouseDown={() => handleMouseDown('horizontal-bottom')}
-      >
-        <div className="changes-main-splitter-line"></div>
-      </div>
+
 
       {/* Bottom section: commit panel spanning full width */}
-      <div className="commit-panel-bottom" style={{ height: `${100 - topSectionHeight}%` }}>
+      <div className="commit-panel-bottom">
         <div className="commit-panel-content">
           <input
             type="text"

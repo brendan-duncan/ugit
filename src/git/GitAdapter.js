@@ -111,39 +111,25 @@ class GitAdapter {
   }
 
   /**
-   * Stage a file
-   * @param {string} filePath - Path to file
+   * Stage files
+   * @param {string|string[]} filePaths - Path to file or array of file paths
    * @returns {Promise<void>}
    */
-  async add(filePath) {
+  async add(filePaths) {
+    // Support both single string and array of file paths for backward compatibility
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
     throw new Error('add() must be implemented');
   }
 
   /**
-   * Stage multiple files at once
-   * @param {string[]} filePaths - Array of file paths
+   * Unstage files
+   * @param {string|string[]} filePaths - Path to file or array of file paths
    * @returns {Promise<void>}
    */
-  async addMultiple(filePaths) {
-    throw new Error('addMultiple() must be implemented');
-  }
-
-  /**
-   * Unstage a file
-   * @param {string} filePath - Path to file
-   * @returns {Promise<void>}
-   */
-  async reset(filePath) {
+  async reset(filePaths) {
+    // Support both single string and array of file paths for backward compatibility
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
     throw new Error('reset() must be implemented');
-  }
-
-  /**
-   * Unstage multiple files at once
-   * @param {string[]} filePaths - Array of file paths
-   * @returns {Promise<void>}
-   */
-  async resetMultiple(filePaths) {
-    throw new Error('resetMultiple() must be implemented');
   }
 
   /**

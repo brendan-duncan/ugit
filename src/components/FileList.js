@@ -44,7 +44,7 @@ function FileList({
   const isDraggingEnabled = useRef(false);
   const lastSelectedItem = useRef(null);
 
-  console.log('FileList component rendered');
+
 
   // Build tree structure from files
   const tree = useMemo(() => buildTree(files), [files]);
@@ -166,9 +166,7 @@ function FileList({
     e.preventDefault();
     e.stopPropagation();
 
-    console.log('Context menu opening for:', itemPath, 'at', e.clientX, e.clientY);
-
-    // If the right-clicked item is not in the selection, replace selection with it
+    // If right-clicked item is not in selection, replace selection with it
     const currentSelection = selectedItems.has(itemPath) ? selectedItems : new Set([itemPath]);
     if (!selectedItems.has(itemPath)) {
       setSelectedItems(currentSelection);
@@ -187,8 +185,6 @@ function FileList({
       }
     });
 
-    console.log('Setting context menu with items:', items);
-
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -198,68 +194,100 @@ function FileList({
   };
 
   const handleMouseDown = (e) => {
-    console.log('>>> MouseDown event - button:', e.button, 'target:', e.currentTarget.className);
     lastMouseButton.current = e.button;
 
     // Only enable dragging for left-click
     if (e.button === 0) {
-      console.log('>>> Left-click detected, enabling drag');
       isDraggingEnabled.current = true;
       e.currentTarget.setAttribute('draggable', 'true');
     } else {
-      console.log('>>> Non-left-click detected, disabling drag');
       isDraggingEnabled.current = false;
       e.currentTarget.setAttribute('draggable', 'false');
     }
   };
 
   const handleMouseUp = (e) => {
-    console.log('>>> MouseUp event');
     isDraggingEnabled.current = false;
     e.currentTarget.setAttribute('draggable', 'false');
   };
 
   const handleFileDragStart = (e, file) => {
-    console.log('>>> FileDragStart event - isDraggingEnabled:', isDraggingEnabled.current);
     // Block drag if not enabled
     if (!isDraggingEnabled.current) {
-      console.log('>>> BLOCKING drag - not enabled');
       e.preventDefault();
       e.stopPropagation();
       return false;
     }
-    console.log('>>> Allowing file drag');
     // Add dragging class for visual feedback
     e.currentTarget.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('application/json', JSON.stringify({
-      type: 'file',
-      file,
-      sourceList: listType
-    }));
+    
+    // Check if this file is selected and there are multiple selected items
+    if (selectedItems.has(file.path) && selectedItems.size > 1) {
+      // Get all selected files
+      const selectedFiles = Array.from(selectedItems)
+        .filter(path => {
+          // Only include files (not folders) from selection
+          return files.find(f => f.path === path);
+        })
+        .map(path => files.find(f => f.path === path));
+      
+      e.dataTransfer.setData('application/json', JSON.stringify({
+        type: 'multiple-files',
+        files: selectedFiles,
+        sourceList: listType
+      }));
+    } else {
+      // Single file drag
+      e.dataTransfer.setData('application/json', JSON.stringify({
+        type: 'file',
+        file,
+        sourceList: listType
+      }));
+    }
   };
 
   const handleFolderDragStart = (e, folderPath) => {
-    console.log('>>> FolderDragStart event - isDraggingEnabled:', isDraggingEnabled.current);
     // Block drag if not enabled
     if (!isDraggingEnabled.current) {
-      console.log('>>> BLOCKING drag - not enabled');
       e.preventDefault();
       e.stopPropagation();
       return false;
     }
-    console.log('>>> Allowing folder drag');
     // Add dragging class for visual feedback
     e.currentTarget.classList.add('dragging');
     e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
-    const folderFiles = getAllFilesInFolder(folderPath);
-    e.dataTransfer.setData('application/json', JSON.stringify({
-      type: 'folder',
-      folderPath,
-      files: folderFiles,
-      sourceList: listType
-    }));
+    
+    // Check if this folder is selected and there are multiple selected items
+    if (selectedItems.has(folderPath) && selectedItems.size > 1) {
+      // Get all selected items (files and folders)
+      const selectedData = Array.from(selectedItems).map(path => {
+        const file = files.find(f => f.path === path);
+        if (file) {
+          return { type: 'file', file };
+        } else {
+          // It's a folder
+          const folderFiles = getAllFilesInFolder(path);
+          return { type: 'folder', folderPath: path, files: folderFiles };
+        }
+      });
+      
+      e.dataTransfer.setData('application/json', JSON.stringify({
+        type: 'multiple-items',
+        items: selectedData,
+        sourceList: listType
+      }));
+    } else {
+      // Single folder drag
+      const folderFiles = getAllFilesInFolder(folderPath);
+      e.dataTransfer.setData('application/json', JSON.stringify({
+        type: 'folder',
+        folderPath,
+        files: folderFiles,
+        sourceList: listType
+      }));
+    }
   };
 
   const handleDragEnd = (e) => {
@@ -295,6 +323,22 @@ function FileList({
         if (data.type === 'file') {
           // Single file drop
           onDrop(data.file, data.sourceList, listType);
+        } else if (data.type === 'multiple-files') {
+          // Multiple files drop - collect all file paths and call once
+          onDrop({
+            type: 'multiple-files',
+            files: data.files,
+            sourceList: data.sourceList,
+            targetList: listType
+          }, data.sourceList, listType);
+        } else if (data.type === 'multiple-items') {
+          // Multiple items (files and folders) drop - collect all items and call once
+          onDrop({
+            type: 'multiple-items',
+            items: data.items,
+            sourceList: data.sourceList,
+            targetList: listType
+          }, data.sourceList, listType);
         } else if (data.type === 'folder') {
           // Folder drop - pass all files
           onDrop(data, data.sourceList, listType);
