@@ -50,6 +50,17 @@ function RepositoryView({ repoPath }) {
       }
     };
     initCache();
+
+    // Add event listener for branch status refresh
+    const handleBranchStatusRefresh = () => {
+      refreshBranchStatus();
+    };
+    window.addEventListener('refresh-branch-status', handleBranchStatusRefresh);
+
+    // Cleanup event listener on unmount
+    return () => {
+      window.removeEventListener('refresh-branch-status', handleBranchStatusRefresh);
+    };
   }, []);
 
   const loadRepoData = async (isRefresh = false) => {
@@ -275,6 +286,45 @@ function RepositoryView({ repoPath }) {
       setModifiedCount(allPaths.size);
     } catch (err) {
       console.error('Error refreshing file status:', err);
+    }
+  };
+
+  const refreshBranchStatus = async () => {
+    try {
+      const git = gitAdapter.current;
+
+      // Get all local branches
+      const branchSummary = await git.branchLocal();
+      const branchNames = branchSummary.all;
+
+      // Get ahead/behind status for each branch (parallel)
+      const statusPromises = branchNames.map(async (branchName) => {
+        try {
+          // Check if branch has a remote tracking branch
+          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
+
+          if (ahead > 0 || behind > 0) {
+            return { branchName, ahead, behind };
+          } else {
+            // Branch is in sync, don't include in status
+            return null;
+          }
+        } catch (error) {
+          // Branch doesn't have a remote tracking branch, skip it
+          return null;
+        }
+      });
+
+      const statusResults = await Promise.all(statusPromises);
+      const statusMap = {};
+      statusResults.forEach(result => {
+        if (result) {
+          statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
+        }
+      });
+      setBranchStatus(statusMap);
+    } catch (error) {
+      console.error('Error refreshing branch status:', error);
     }
   };
 
