@@ -133,8 +133,39 @@ class SimpleGitAdapter extends GitAdapter {
 
   async discard(filePaths) {
     const startTime = performance.now();
-    await this.git.checkout(['--', ...filePaths]);
-    this._logCommand(`git checkout -- ${filePaths.length} files`, startTime);
+    const fs = require('fs');
+    const path = require('path');
+
+    // Get the current status to identify new vs modified files
+    const statusResult = await this.status();
+    
+    for (const filePath of filePaths) {
+      const fileStatus = statusResult.files.find(f => f.path === filePath);
+      const isStaged = fileStatus?.index !== ' ';
+      
+      if (fileStatus?.working_dir === '?' || (fileStatus?.index === 'A' && !isStaged)) {
+        // New untracked file or new staged file - delete it from filesystem
+        const fullPath = path.join(this.repoPath, filePath);
+        try {
+          if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+            console.log(`Deleted new file: ${filePath}`);
+          }
+        } catch (error) {
+          console.error(`Failed to delete file ${filePath}:`, error);
+        }
+      } else {
+        // Existing file - restore it from git
+        if (isStaged) {
+          // If staged, first unstage it
+          await this.git.reset(['HEAD', '--', filePath]);
+          this._logCommand(`git reset HEAD -- ${filePath}`, startTime);
+        }
+        // Then restore the file
+        await this.git.checkout(['--', filePath]);
+        this._logCommand(`git checkout -- ${filePath}`, startTime);
+      }
+    }
   }
 
   async checkoutBranch(branchName) {

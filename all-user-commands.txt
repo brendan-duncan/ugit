@@ -218,4 +218,6 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 
 127. in commit details panel, make files changed items a tree view item. the child of the item is a diff view for that file change. the items should be collapsed by dfault, and the diff view should be loaded on demand only when the item is opened.
 
-127. the diff2html viewer for commit detail files is empty
+128. the diff2html viewer for commit detail files is empty
+
+129. discard of a new file causes an error because it's not registered with git. new files should be deleted on discard.
