@@ -36,6 +36,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onR
         <BranchView
           branchName={selectedItem.branchName}
           commits={selectedItem.commits}
+          loading={selectedItem.loading}
           repoPath={repoPath}
           onRefresh={onRefresh}
         />

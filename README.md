@@ -1,6 +1,6 @@
 # U-Git
 
-Experiment writing a git client as an exercize of vibe coding. If it's wrong or buggy, blame Claude. Developed as a NodeJS Electron application.
+Experiment writing a git client as an exercize of vibe coding. If it's wrong or buggy, blame Claude. Use at your own risk. Developed as a NodeJS Electron application.
 
 ## Building
 

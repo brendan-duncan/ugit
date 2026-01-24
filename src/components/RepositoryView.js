@@ -6,6 +6,7 @@ import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
 import PushDialog from './PushDialog';
+import StashDialog from './StashDialog';
 import './RepositoryView.css';
 
 const GitFactory = window.require('./src/git/GitFactory');
@@ -30,12 +31,14 @@ function RepositoryView({ repoPath }) {
   const [leftWidth, setLeftWidth] = useState(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
+  const [showStashDialog, setShowStashDialog] = useState(false);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [selectedBranch, setSelectedBranch] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const hasLoadedCache = useRef(false);
   const cacheInitialized = useRef(false);
+  const currentBranchLoadId = useRef(0);
 
   // Initialize cache manager with user data path
   useEffect(() => {
@@ -205,6 +208,23 @@ function RepositoryView({ repoPath }) {
     loadRepoData(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only load once on mount - component instance is tied to a specific repo
+
+  // Periodic background check for local changes
+  useEffect(() => {
+    // Don't start checking until initial load is complete
+    if (loading) return;
+
+    // Check for changes every 5 seconds
+    const intervalId = setInterval(() => {
+      // Silently refresh file status in the background
+      refreshFileStatus();
+    }, 5000);
+
+    // Clean up interval on unmount
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [loading]); // Re-run if loading state changes
 
   const refreshFileStatus = async () => {
     try {
@@ -500,28 +520,102 @@ function RepositoryView({ repoPath }) {
     }
   };
 
+  const handleItemSelect = (item) => {
+    // If switching away from a branch, cancel any pending branch loads
+    if (item.type !== 'branch') {
+      currentBranchLoadId.current += 1;
+    }
+    setSelectedItem(item);
+  };
+
   const handleBranchSelect = async (branchName) => {
+    // Increment load ID to cancel any pending requests
+    currentBranchLoadId.current += 1;
+    const thisLoadId = currentBranchLoadId.current;
+
     try {
       const git = gitAdapter.current;
       setSelectedBranch(branchName);
 
-      console.log(`Loading commits for branch: ${branchName}`);
-      const commits = await git.log(branchName);
-
+      // Set loading state immediately
       setSelectedItem({
         type: 'branch',
         branchName,
-        commits
+        commits: [],
+        loading: true
       });
+
+      console.log(`Loading commits for branch: ${branchName}`);
+      const commits = await git.log(branchName);
+
+      // Only update state if this request is still current
+      if (thisLoadId === currentBranchLoadId.current) {
+        setSelectedItem({
+          type: 'branch',
+          branchName,
+          commits,
+          loading: false
+        });
+      }
     } catch (error) {
       console.error('Error loading branch commits:', error);
-      setError(`Failed to load commits: ${error.message}`);
+
+      // Only update error state if this request is still current
+      if (thisLoadId === currentBranchLoadId.current) {
+        setError(`Failed to load commits: ${error.message}`);
+        setSelectedItem({
+          type: 'branch',
+          branchName,
+          commits: [],
+          loading: false
+        });
+      }
     }
   };
 
+  const handleStashClick = () => {
+    setShowStashDialog(true);
+  };
+
+  const handleStash = async (message, stageNewFiles) => {
+    setShowStashDialog(false);
+
+    try {
+      const git = gitAdapter.current;
+
+      // If stageNewFiles is checked, stage all new (untracked) files
+      if (stageNewFiles) {
+        // Find files that are new (created) and unstaged
+        const newFiles = unstagedFiles.filter(file => file.status === 'created');
+
+        if (newFiles.length > 0) {
+          console.log(`Staging ${newFiles.length} new files before stash...`);
+          await git.addMultiple(newFiles.map(f => f.path));
+        }
+      }
+
+      // Create stash with optional message
+      const stashMessage = message || `Stash created at ${new Date().toISOString()}`;
+      console.log(`Creating stash: ${stashMessage}`);
+      await git.stashPush(stashMessage);
+      console.log('Stash created successfully');
+
+      // Refresh file status and stashes
+      await refreshFileStatus();
+      const stashList = await git.stashList();
+      setStashes(stashList.all);
+
+    } catch (error) {
+      console.error('Error creating stash:', error);
+      setError(`Stash failed: ${error.message}`);
+    }
+  };
+
+  const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
+
   return (
     <div className="repository-view">
-      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} refreshing={refreshing} />
+      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} refreshing={refreshing} />
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}
@@ -539,7 +633,7 @@ function RepositoryView({ repoPath }) {
                   currentBranch={currentBranch}
                   modifiedCount={modifiedCount}
                   selectedItem={selectedItem}
-                  onSelectItem={setSelectedItem}
+                  onSelectItem={handleItemSelect}
                   usingCache={usingCache}
                 />
               </div>
@@ -561,7 +655,7 @@ function RepositoryView({ repoPath }) {
               <div className="split-panel bottom-panel" style={{ height: `${100 - topHeight - middleHeight}%` }}>
                 <StashList
                   stashes={stashes}
-                  onSelectStash={(stash, index) => setSelectedItem({ type: 'stash', stash, index })}
+                  onSelectStash={(stash, index) => handleItemSelect({ type: 'stash', stash, index })}
                   selectedItem={selectedItem}
                 />
               </div>
@@ -598,6 +692,12 @@ function RepositoryView({ repoPath }) {
           onPush={handlePush}
           branches={branches}
           currentBranch={currentBranch}
+        />
+      )}
+      {showStashDialog && (
+        <StashDialog
+          onClose={() => setShowStashDialog(false)}
+          onStash={handleStash}
         />
       )}
     </div>

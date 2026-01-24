@@ -6,7 +6,7 @@ import './BranchView.css';
 const GitFactory = window.require('./src/git/GitFactory');
 const { ipcRenderer } = window.require('electron');
 
-function BranchView({ branchName, commits, repoPath, onRefresh }) {
+function BranchView({ branchName, commits, loading, repoPath, onRefresh }) {
   const [selectedCommit, setSelectedCommit] = useState(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [topHeight, setTopHeight] = useState(60);
@@ -65,26 +65,33 @@ function BranchView({ branchName, commits, repoPath, onRefresh }) {
         <h3>Branch: {branchName}</h3>
       </div>
 
-      <div className="branch-view-content">
-        <div className="branch-view-top-panel" style={{ height: `${topHeight}%` }}>
-          <CommitList
-            commits={commits}
-            selectedCommit={selectedCommit}
-            onSelectCommit={handleCommitSelect}
-          />
+      {loading ? (
+        <div className="branch-view-loading">
+          <span className="branch-view-loading-spinner">↻</span>
+          <span>Loading...</span>
         </div>
+      ) : (
+        <div className="branch-view-content">
+          <div className="branch-view-top-panel" style={{ height: `${topHeight}%` }}>
+            <CommitList
+              commits={commits}
+              selectedCommit={selectedCommit}
+              onSelectCommit={handleCommitSelect}
+            />
+          </div>
 
-        <div
-          className="branch-view-splitter"
-          onMouseDown={handleMouseDown}
-        >
-          <div className="branch-view-splitter-line"></div>
-        </div>
+          <div
+            className="branch-view-splitter"
+            onMouseDown={handleMouseDown}
+          >
+            <div className="branch-view-splitter-line"></div>
+          </div>
 
-        <div className="branch-view-bottom-panel" style={{ height: `${100 - topHeight}%` }}>
-          <CommitInfo commit={selectedCommit} files={commitFiles} />
+          <div className="branch-view-bottom-panel" style={{ height: `${100 - topHeight}%` }}>
+            <CommitInfo commit={selectedCommit} files={commitFiles} />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
