@@ -22,6 +22,7 @@ function RepositoryView({ repoPath }) {
   const [unstagedFiles, setUnstagedFiles] = useState([]);
   const [stagedFiles, setStagedFiles] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [lastContentPanel, setLastContentPanel] = useState('local-changes'); // Default to local changes
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -85,6 +86,31 @@ function RepositoryView({ repoPath }) {
           setUsingCache(true);
           setLoading(false);
           hasLoadedCache.current = true;
+
+          // Restore last content panel selection
+          const lastPanel = cachedData.lastContentPanel || 'local-changes';
+          setLastContentPanel(lastPanel);
+          
+          // Set appropriate selected item based on last content panel
+          if (lastPanel === 'local-changes') {
+            setSelectedItem({ type: 'local-changes' });
+          } else if (lastPanel === 'branch') {
+            // Auto-select the current branch
+            if (cachedData.currentBranch) {
+              setSelectedItem({
+                type: 'branch',
+                branchName: cachedData.currentBranch,
+                commits: [],
+                loading: false
+              });
+              setSelectedBranch(cachedData.currentBranch);
+            } else {
+              setSelectedItem(null);
+            }
+          } else if (lastPanel === 'stash') {
+            // Don't auto-select a stash
+            setSelectedItem(null);
+          }
 
           // Continue loading fresh data in background
           setTimeout(() => loadRepoData(true), 100);
@@ -188,6 +214,17 @@ function RepositoryView({ repoPath }) {
       const stashList = await git.stashList();
       setStashes(stashList.all);
 
+      // Auto-select current branch if branch panel is active and no branch is selected
+      if (lastContentPanel === 'branch' && !selectedItem && status.current) {
+        setSelectedItem({
+          type: 'branch',
+          branchName: status.current,
+          commits: [],
+          loading: false
+        });
+        setSelectedBranch(status.current);
+      }
+
       // Save to cache
       cacheManager.saveCache(repoPath, {
         currentBranch: status.current,
@@ -196,7 +233,8 @@ function RepositoryView({ repoPath }) {
         modifiedCount: allPaths.size,
         branches: branchNames,
         branchStatus: statusMap,
-        stashes: stashList.all
+        stashes: stashList.all,
+        lastContentPanel: lastContentPanel
       });
 
       if (isRefresh) {
@@ -576,6 +614,16 @@ function RepositoryView({ repoPath }) {
       currentBranchLoadId.current += 1;
     }
     setSelectedItem(item);
+    
+    // Save content panel type when selecting content panel items
+    if (item.type === 'local-changes' || item.type === 'branch' || item.type === 'stash') {
+      setLastContentPanel(item.type);
+      
+      // Save to cache manager for persistence
+      const cacheData = cacheManager.loadCache(repoPath) || {};
+      cacheData.lastContentPanel = item.type;
+      cacheManager.saveCache(repoPath, cacheData);
+    }
   };
 
   const handleBranchSelect = async (branchName) => {
@@ -724,7 +772,7 @@ function RepositoryView({ repoPath }) {
             </div>
             <div className="repo-content-viewer" style={{ width: `${100 - leftWidth}%` }}>
               <ContentViewer
-                selectedItem={selectedItem}
+                selectedItem={selectedItem || { type: lastContentPanel }}
                 unstagedFiles={unstagedFiles}
                 stagedFiles={stagedFiles}
                 repoPath={repoPath}

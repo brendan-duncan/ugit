@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import './DiffViewer.css';
+import 'diff2html/bundles/css/diff2html.min.css';
 
 const GitFactory = window.require('./src/git/GitFactory');
 const { ipcRenderer } = window.require('electron');
+const Diff2Html = window.require('diff2html');
 
 function DiffViewer({ file, repoPath, isStaged }) {
   const [diff, setDiff] = useState('');
   const [loading, setLoading] = useState(true);
+  const [diffHtml, setDiffHtml] = useState('');
 
   useEffect(() => {
     const loadDiff = async () => {
@@ -20,6 +23,19 @@ function DiffViewer({ file, repoPath, isStaged }) {
         const diffResult = await git.diff(file.path, isStaged);
 
         setDiff(diffResult);
+        
+        // Generate HTML using diff2html
+        if (diffResult && diffResult.trim()) {
+          const html = Diff2Html.html(diffResult, {
+            drawFileList: false,
+            matching: 'lines',
+            outputFormat: 'line-by-line'
+          });
+          setDiffHtml(html);
+        } else {
+          setDiffHtml('');
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error('Error loading diff:', error);
@@ -48,8 +64,11 @@ function DiffViewer({ file, repoPath, isStaged }) {
       <div className="diff-content">
         {loading ? (
           <div className="diff-loading">Loading diff...</div>
-        ) : diff ? (
-          <pre className="diff-text">{diff}</pre>
+        ) : diffHtml ? (
+          <div 
+            className="diff2html-container"
+            dangerouslySetInnerHTML={{ __html: diffHtml }}
+          />
         ) : (
           <div className="diff-empty">No changes to display</div>
         )}

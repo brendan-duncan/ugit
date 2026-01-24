@@ -15,9 +15,13 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onR
     );
   }
 
+  // Handle case where only type is provided (for restored state)
+  const item = selectedItem.type && !selectedItem.stash && !selectedItem.commits ? 
+    { type: selectedItem.type } : selectedItem;
+
   return (
     <div className="content-viewer">
-      {selectedItem.type === 'local-changes' && (
+      {item.type === 'local-changes' && (
         <LocalChangesPanel
           unstagedFiles={unstagedFiles}
           stagedFiles={stagedFiles}
@@ -25,25 +29,25 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onR
           onRefresh={onRefresh}
         />
       )}
-      {selectedItem.type === 'stash' && (
+      {item.type === 'stash' && (
         <StashViewer
           stash={selectedItem.stash}
           stashIndex={selectedItem.index}
           repoPath={repoPath}
         />
       )}
-      {selectedItem.type === 'branch' && (
+      {item.type === 'branch' && (
         <BranchView
           branchName={selectedItem.branchName}
-          commits={selectedItem.commits}
-          loading={selectedItem.loading}
+          commits={item.commits}
+          loading={item.loading}
           repoPath={repoPath}
           onRefresh={onRefresh}
         />
       )}
-      {selectedItem.type !== 'local-changes' && selectedItem.type !== 'stash' && selectedItem.type !== 'branch' && (
+      {item.type !== 'local-changes' && item.type !== 'stash' && item.type !== 'branch' && (
         <div className="content-viewer-placeholder">
-          <p>Content for "{selectedItem.type}" will be displayed here</p>
+          <p>Content for "{item.type}" will be displayed here</p>
         </div>
       )}
     </div>

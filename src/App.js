@@ -29,7 +29,10 @@ function App() {
         // Get saved active tab path
         const savedActiveTabPath = localStorage.getItem(ACTIVE_TAB_KEY);
 
-        recent.forEach((repoPath, index) => {
+        // Reverse recent repos to restore original tab order
+        const orderedRepos = [...recent].reverse();
+        
+        orderedRepos.forEach((repoPath, index) => {
           const tabId = Date.now() + index;
           const newTab = {
             id: tabId,

@@ -5,7 +5,7 @@ class GitFactory {
   /**
    * Create and open a Git adapter instance
    * @param {string} repoPath - Path to the git repository
-   * @param {string} backend - Backend to use: 'simple-git', 'cli-git', or 'es-git'
+   * @param {string} backend - Backend to use: 'simple-git' or 'es-git'
    * @returns {Promise<GitAdapter>} Git adapter instance (already opened)
    */
   static async createAdapter(repoPath, backend = 'simple-git') {
@@ -24,11 +24,7 @@ class GitFactory {
         adapter = new EsGitAdapter(repoPath);
         break;
 
-      case 'cli-git':
-      case 'cligit':
-        const CliGitAdapter = require('./CliGitAdapter');
-        adapter = new CliGitAdapter(repoPath);
-        break;
+
 
       default:
         console.warn(`Unknown git backend: ${backend}, defaulting to simple-git`);
@@ -47,7 +43,7 @@ class GitFactory {
    * @returns {string[]} List of available backend names
    */
   static getAvailableBackends() {
-    return ['simple-git', 'cli-git', 'es-git'];
+    return ['simple-git', 'es-git'];
   }
 }
 

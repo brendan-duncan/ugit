@@ -12,13 +12,7 @@ ugit now supports multiple git backend implementations that can be switched usin
 - Good balance of features and performance
 - Most tested and stable option
 
-### 2. **cli-git**
-- Uses git CLI commands directly via `execSync`
-- No additional dependencies required
-- Lightweight implementation
-- Good for environments with git installed
-
-### 3. **es-git**
+### 2. **es-git**
 - Uses the `es-git` npm package
 - Pure JavaScript implementation
 - Designed for browser and Node.js environments
@@ -34,9 +28,6 @@ npm start
 # Use simple-git (explicit)
 npm start -- --git-backend=simple-git
 
-# Use cli-git
-npm start -- --git-backend=cli-git
-
 # Use es-git
 npm start -- --git-backend=es-git
 ```
@@ -48,7 +39,6 @@ The implementation uses an adapter pattern with async initialization:
 ```
 GitAdapter (abstract base class)
 ├── SimpleGitAdapter (uses simple-git package)
-├── CliGitAdapter (uses git CLI commands directly)
 └── EsGitAdapter (uses es-git package)
 ```
 
@@ -71,7 +61,6 @@ All adapters follow a two-step initialization pattern:
 
 3. **Adapters** ([src/git/](src/git/))
    - SimpleGitAdapter.js
-   - CliGitAdapter.js
    - EsGitAdapter.js
 
 ### Supported Operations
@@ -89,7 +78,6 @@ All adapters support:
 ## Performance Notes
 
 - **simple-git**: Best overall performance after parallelization optimizations, wraps git CLI
-- **cli-git**: Direct git CLI execution, minimal overhead, no additional dependencies
 - **es-git**: Pure JavaScript implementation, may be slower for some operations
 
 All backends use parallelized branch status checks for improved performance with repositories containing many branches.

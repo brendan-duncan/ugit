@@ -64,3 +64,133 @@
   padding: 20px;
   text-align: center;
 }
+
+/* diff2html container styles */
+.diff2html-container {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Override diff2html colors for dark theme */
+:root {
+  --d2h-del-highlight-bg-color: #0d0707;
+}
+
+.diff2html-container .d2h-wrapper {
+  background: #1e1e1e;
+  color: #cccccc;
+  border: none;
+}
+
+.diff2html-container .d2h-file-header {
+  background: #252526;
+  border: 1px solid #3d3d3d;
+  color: #ffffff;
+}
+
+.diff2html-container .d2h-file-wrapper {
+  border: 1px solid #3d3d3d;
+  margin-bottom: 8px;
+}
+
+.diff2html-container .d2h-code-wrapper {
+  background: #1e1e1e;
+}
+
+.diff2html-container .d2h-code-line-ctn {
+  background: #1e1e1e;
+  color: #cccccc;
+}
+
+.diff2html-container .d2h-code-line {
+  background: #1e1e1e;
+}
+
+.diff2html-container .d2h-del {
+  background: #1a0e0e;
+}
+
+.diff2html-container .d2h-ins {
+  background: #0e1a0e;
+}
+
+.diff2html-container .d2h-ins {
+  background: #182a18;
+}
+
+.diff2html-container .d2h-info {
+  background: #252526;
+  color: #888888;
+}
+
+.diff2html-container .d2h-cntx {
+  background: #1e1e1e;
+  color: #cccccc;
+}
+
+.diff2html-container .d2h-code-line-prefix {
+  color: #666666;
+}
+
+.diff2html-container .d2h-code-line-del {
+  background: #1a0e0e;
+  color: #cccccc;
+}
+
+.diff2html-container .d2h-code-line del {
+  background: #79484b;
+}
+
+.diff2html-container .d2h-code-line ins {
+  background: #366d35;
+}
+
+.diff2html-container .d2h-code-line-ins {
+  background: #0e1a0e;
+  color: #cccccc;
+}
+
+.diff2html-container .d2h-code-line-ins {
+  background: #182a18;
+  color: #ccffcc;
+}
+
+/* Line numbers */
+.diff2html-container .line-num1,
+.diff2html-container .line-num2 {
+  background: #2d2d2d;
+  color: #cfcfcf;
+  border-right: 1px solid #3d3d3d;
+}
+
+/* Improve text contrast for added/removed content */
+.diff2html-container .d2h-del .d2h-code-line-ctn {
+  color: #ffcccc;
+}
+
+.diff2html-container .d2h-ins .d2h-code-line-ctn {
+  color: #ccffcc;
+}
+
+/* Fix file header text colors */
+.diff2html-container .d2h-file-header {
+  background: #252526;
+  border: 1px solid #3d3d3d;
+  color: #ffffff;
+}
+
+.diff2html-container .d2h-file-header .d2h-file-name {
+  color: #ffffff;
+}
+
+/* Fix info text */
+.diff2html-container .d2h-info {
+  background: #252526;
+  color: #aaaaaa;
+}
+
+/* Line number positioning */
+.diff2html-container .d2h-code-linenumber {
+  position: relative;
+}

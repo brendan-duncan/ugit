@@ -65,6 +65,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "diff2html": "^3.4.55",
     "electron-squirrel-startup": "^1.0.1",
     "es-git": "^0.6.0",
     "react": "^18.2.0",
