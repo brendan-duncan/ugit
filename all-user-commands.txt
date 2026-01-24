@@ -196,3 +196,4 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 105. in GitAdapter, consolidate add and addMultiple so that add just takes a list of files
 106. handleFileDrop is called for each selected item. I want it to access list of all selected items and not be called separately for each item
 107. Remove console.log lines that are prefixed with >>> to reduce log clutter
+108. the push and pull buttos should update their labels with the number of commits available to push and pull for the current branch, from the same information used by the branch list from status updates. when you do a commit, it should immediately update the push button label.

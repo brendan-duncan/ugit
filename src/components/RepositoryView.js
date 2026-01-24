@@ -615,7 +615,7 @@ function RepositoryView({ repoPath }) {
 
   return (
     <div className="repository-view">
-      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} refreshing={refreshing} />
+      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}

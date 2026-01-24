@@ -144,6 +144,13 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
       if (onRefresh) {
         await onRefresh();
       }
+
+      // Trigger immediate branch status refresh after commit to update push count
+      setTimeout(async () => {
+        if (onRefresh) {
+          await onRefresh();
+        }
+      }, 50);
     } catch (error) {
       console.error('Error committing:', error);
     } finally {
