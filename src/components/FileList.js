@@ -42,6 +42,7 @@ function FileList({
   const contextMenuRef = useRef(null);
   const lastMouseButton = useRef(0);
   const isDraggingEnabled = useRef(false);
+  const lastSelectedItem = useRef(null);
 
   console.log('FileList component rendered');
 
@@ -74,12 +75,67 @@ function FileList({
     return files.filter(file => file.path.startsWith(folderPath + '/'));
   };
 
+  // Get all items (files and folders) in display order
+  const getAllItemsInOrder = useMemo(() => {
+    const items = [];
+
+    const traverse = (node, path = '') => {
+      // Get folders first
+      const folderNames = Object.keys(node.children).sort();
+      folderNames.forEach(folderName => {
+        const folderPath = path ? `${path}/${folderName}` : folderName;
+        items.push(folderPath);
+
+        // If folder is expanded, traverse its children
+        if (expandedFolders[folderPath] !== false) {
+          traverse(node.children[folderName], folderPath);
+        }
+      });
+
+      // Then files
+      node.files.sort((a, b) => a.path.localeCompare(b.path)).forEach(file => {
+        items.push(file.path);
+      });
+    };
+
+    traverse(tree);
+    return items;
+  }, [tree, expandedFolders]);
+
+  // Get items between two paths (inclusive)
+  const getItemsBetween = (startPath, endPath) => {
+    const startIndex = getAllItemsInOrder.indexOf(startPath);
+    const endIndex = getAllItemsInOrder.indexOf(endPath);
+
+    if (startIndex === -1 || endIndex === -1) return [];
+
+    const minIndex = Math.min(startIndex, endIndex);
+    const maxIndex = Math.max(startIndex, endIndex);
+
+    return getAllItemsInOrder.slice(minIndex, maxIndex + 1);
+  };
+
   // Handle item selection (files or folders)
   const handleItemClick = (e, itemPath, isFolder) => {
     e.stopPropagation();
 
-    if (e.ctrlKey || e.metaKey) {
-      // Toggle selection
+    if (e.shiftKey && lastSelectedItem.current) {
+      // Shift-click: Select range
+      const itemsInRange = getItemsBetween(lastSelectedItem.current, itemPath);
+
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+Shift: Add range to selection
+        setSelectedItems(prev => {
+          const newSet = new Set(prev);
+          itemsInRange.forEach(item => newSet.add(item));
+          return newSet;
+        });
+      } else {
+        // Shift only: Replace selection with range
+        setSelectedItems(new Set(itemsInRange));
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      // Ctrl-click: Toggle selection
       setSelectedItems(prev => {
         const newSet = new Set(prev);
         if (newSet.has(itemPath)) {
@@ -89,9 +145,11 @@ function FileList({
         }
         return newSet;
       });
+      lastSelectedItem.current = itemPath;
     } else {
-      // Replace selection
+      // Normal click: Replace selection
       setSelectedItems(new Set([itemPath]));
+      lastSelectedItem.current = itemPath;
     }
 
     // If it's a file, also call the onSelectFile handler for the diff viewer
@@ -273,8 +331,8 @@ function FileList({
               if (e.button === 0) {
                 // Handle selection
                 handleItemClick(e, folderPath, true);
-                // Toggle folder if not using modifiers
-                if (!e.ctrlKey && !e.metaKey) {
+                // Toggle folder if not using modifiers (including shift for range selection)
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
                   toggleFolder(folderPath);
                 }
               }

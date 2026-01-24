@@ -175,3 +175,5 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 85. when you select a branch, it can take some time for the commit list to come back. put a "Loading..." panel with a spinning busy icon in the content panel so that it's clear the branch info is being worked on
 
 86. if you select a different item while a branch commit list request is still loading, cancel the  branch request and do the new item
+
+91. improve multi-selection in the filelist views. holding shift while clicking on an item will replece the selection from the last selected item to the selected item. holding control + shift will select from the last selected item to the selected item, appending to the selection. holding control and selecting an item will toggle that items selection.
