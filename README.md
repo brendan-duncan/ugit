@@ -1,4 +1,4 @@
-# U-Git
+# UGit
 
 Experiment writing a git client as an exercize of vibe coding. As this is both a learning experience, I have it record every command I give it to [all-user-commands.txt](all-user-commands.txt). I have been wanting a git client that is better tuned to my personal preferenecs and is reasonably fast for very large repositories, so I used that idea as my learning topic.
 
