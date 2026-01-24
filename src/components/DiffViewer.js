@@ -17,15 +17,23 @@ function DiffViewer({ file, repoPath, isStaged }) {
 
       try {
         setLoading(true);
-        const backend = await ipcRenderer.invoke('get-git-backend');
-        const git = await GitFactory.createAdapter(repoPath, backend);
-
-        const diffResult = await git.diff(file.path, isStaged);
+        
+        let diffResult;
+        
+        // If diff is already provided in the file object (for stashes), use it
+        if (file.diff) {
+          diffResult = file.diff;
+        } else {
+          // Otherwise fetch the diff from git
+          const backend = await ipcRenderer.invoke('get-git-backend');
+          const git = await GitFactory.createAdapter(repoPath, backend);
+          diffResult = await git.diff(file.path, isStaged);
+        }
 
         setDiff(diffResult);
         
         // Generate HTML using diff2html
-        if (diffResult && diffResult.trim()) {
+        if (diffResult && diffResult.trim() && !diffResult.startsWith('Error loading diff:')) {
           const html = Diff2Html.html(diffResult, {
             drawFileList: false,
             matching: 'lines',

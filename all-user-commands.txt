@@ -213,3 +213,5 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 122. add a css rule for .d2h-code-line del to DiffViewer.css changing the background color to #79484b
 123. add a css rule for .d2h-code-line ins to DiffViewer.css changing the background color to #366d35
 124. overwrite .d2h-code-linenumber in DiffViewer.css and change the position to relative
+125. StashViewer should use DiffViewer to view the stash diff
+126. Error loading diff: ReferenceError: error is not defined at loadDiff (DiffViewer.js:36:88)
