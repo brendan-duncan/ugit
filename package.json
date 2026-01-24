@@ -4,28 +4,68 @@
   "description": "A Git client built with Electron and React",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron-forge start",
     "build": "webpack --mode development",
-    "dev": "webpack --mode development --watch"
+    "dev": "webpack --mode development --watch",
+    "build:exe": "webpack --config webpack.prod.config.js && electron-builder",
+    "build:forge": "webpack --config webpack.prod.config.js && electron-forge make",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "keywords": [
     "git",
     "electron",
     "react"
   ],
-  "author": "",
+  "author": "ugit",
   "license": "ISC",
+  "build": {
+    "appId": "com.ugit.app",
+    "productName": "ugit",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "dist/**/*",
+      "src/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  },
   "devDependencies": {
     "@babel/core": "^7.23.0",
     "@babel/preset-react": "^7.22.0",
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron/fuses": "^1.8.0",
     "babel-loader": "^9.1.3",
     "css-loader": "^6.8.1",
     "electron": "^28.0.0",
+    "smart-buffer": "^4.2.0",
     "style-loader": "^3.3.3",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
     "es-git": "^0.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

@@ -177,3 +177,10 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 86. if you select a different item while a branch commit list request is still loading, cancel the  branch request and do the new item
 
 91. improve multi-selection in the filelist views. holding shift while clicking on an item will replece the selection from the last selected item to the selected item. holding control + shift will select from the last selected item to the selected item, appending to the selection. holding control and selecting an item will toggle that items selection.
+
+-- start using opencode here, I ran out of claude budget --
+
+92. add a build command to build ugit as an executable
+93. for every command I write here, excluding this command, append it to the text file all-user-commands.txt
+94. electron recommends using electron forge for packaging an exe over electron builder. add a build command that uses force so I can try it
+95. there's an error running build:force: Failed to locate module "smart-buffer" from "D:\src\ugit\node_modules\socks"
