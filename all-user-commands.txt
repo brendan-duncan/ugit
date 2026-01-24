@@ -1,0 +1,177 @@
+Complete User Command History - ugit Development
+======================================================
+
+1. create a electron app that will eventually be a git client. use react for the gui. it will support a multiple document interface with documents contained in tabs. a document will be an opened git repo. add a menu bar with a file menu that contains an "Open Repository..." and "Exit" menu items.
+
+2. when a repo is opened, get the list of local branches from the repo and list those in the document tab using a tree structure, splitting branch names using "/" to create the tree hierarchy. The current branch should be indicated with an icon.
+
+3. add a console log before and after git.branchLocal to print how long that function takes
+
+4. i don't see a devtools console when I press F12 or Ctrl+Shift+I
+
+5. create a vertical splitter for the window with the branches panel in the top and a new stashes panel in the botton. In the stashes panel, create a list of the git stashes
+
+6. make a third virtical split panel with the new panel at the top. this panel should have a list widget with an element, "Local Changes (#)". The # in the "Local Changes" element should be replaced with the number of files that are modified.
+
+7. add a horizontal split with the vertical splits on the left side and a new panel on the right. This new panel will be a content viewer that changes based on what you select from the left panels. When you select the Local Changes item, the content viewer will become a local changes panel. This panel will have a vertical split, with a list of unstaged files on the top and list of staged files on the botton.
+
+8. add a recently opened repository menu item that is persistent between program runs. Also, when the program starts, re-open the last open repos.
+
+9. in the local changes panel, allow drag and drop between the unstaged files and the staged files area, and vise versa. when dragging from the unstagged files to the staged files, it runs git add for those files. when dragging from staged to unstaged, it runs the git command to remove them from being staged.
+
+10. files that are staged are in the unstaged list
+
+11. selecting a file in the local changes panel, either staged or unstaged, will open a new panel, horizontally split from the local changes panel, with a diff view of that file. this same diff view will be re-used when a different file is selected from the local changes panel.
+
+12. when you select a stash, replace the content viewer panel to show the contents of the stash
+
+13. for each branch in the branches panel, on the right side of the panel include a status field that shows the number of pending commits to push or can be pulled from origin. use an up arrow or down arrow next to the number to indicate push or pull.
+
+14. don't show dev panel by default
+
+15. add a toolbar with buttons for Fetch, Pull, Push, and Stash. Don't have them do anything yet.
+
+16. make the repo title area take up less vertical space
+
+17. make Local Changes a regular element and not in a list
+
+18. implement the pull button. it should open a dialog, letting you select the branch to pull from origin, defaulting to the branch being tracked, and a checkbox for "Stash and reapply local changes". The buttons will be Pull and Cancel. Cancel will close the dialog without doing anything. Pull will do a git pull based on the dialog settings. If the checkbox is checked, the local changes will be stashed before doing the pull, and after the pull has finished, the stash will be applied. If the stash is able to be applied successfully, the stash is deleted. If not, the stash will be left. If the checkbox is not checked, the pull will be done without stashing any local changes.
+
+19. implement the fetch button by doing a git fetch. this should call git fetch.
+
+20. implement the push button. it should bring up a dialog with a "Branch:" selection field to select the branch to push. A "To:" selection field to select the remote origin branch to push to. A checkbox "Push all tags" when selected will push any tags that have been created. The buttons will be Push and Cancel. Push will execute the git push, and Cancel will close the dialog without doing anything.
+
+21. In the local changes panel, in a vertical splitter panel below the staged files, add controls for committing staged files. The controls should be "Message", for the commit message, "Description" for a longer description of the commit, and a "Commit" button to run git commit. The commit button should be grayed out if there are no files in the staged area.
+
+22. move the commit section below the stage/unstaged and diff panels so that it fills the local changes panel horizontally
+
+23. remove the Commit label. make the description field single line by default. make the vertical height of the commit area smaller by compacting the controls, and that the commit button is visible by default. Remove the field labels and use use the field default text visual instead.
+
+24. don't allow commit if the message is empty. and refresh the commit button state when files are dragged between staged and unstaged areas
+
+25. cache repo data to improve load times. Add a refresh button on the toolbar as the first button to force a check that the cached data is correct, updating the data as needed. While the data is being updated, have a spinning icon on the refresh button that goes away when the load is finished.
+
+26. cache repo data to improve load times. Add a refresh button on the toolbar as the first button to force a check that the cached data is correct, updating the data as needed. While the data is being updated, have a spinning icon on the refresh button that goes away when the load is finished.
+
+27. switching tabs is reloading the repository data. The data should be persistent when switching tabs.
+
+28. use thin scrollbars
+
+29. simple-git is slow for large repos. replace simple-git with es-git
+
+30. the package https://www.npmjs.com/package/es-git does not seem to be deprecated
+
+31. 1
+
+32. make a git abstraction class with implementations for simple-git, nodegit, and es-git, letting me switch witch backend to use based on a command-line argument
+
+33. Cannot find module '../git/GitFactory'
+
+34. cannot find module nodegit
+
+35. add nodegit and es-git to the npm dependencies
+
+36. in GitAdapter, move opening the repo from the constructor to an async open method
+
+37. the data cache isn't persistent when closing and re-opening the app. store and reload the cache so that startup time is fater
+
+38. opening the app a second time still has "Loading repository...", which is taking a long time for a large repo
+
+39. the console has an error Cache directory not initialized. Call setCacheDir first.
+
+40. add a console.log for every git command called, printing the git command and the time it took
+
+41. make the staged and unstaged lists a tree structure, splitting the file paths with "/"
+
+42. make the vertical height of the commit panel shorter
+
+43. save the window size and position state and restore than when openeing the app again
+
+44. add ability to drag a tree view folder between staged and unstaged panels, which will stage and unstage all files in that folder
+
+45. after dragging elements between staged and unstaged, refresh the panels so they reflect the current information. also, while the commands for staging and unstaging files are happening, prevent other commands from happening until that is finished using a busy indicator. also, dragging a large folder is quite slow, can the stage and unstage commands be called with all of the files at once instead of individually?
+
+46. for the items in the staging panel tree, add a context menu. the context menu items should be: "Show in File Explorer", separator, "Stage", "Discard", separator, "Stash", "Save as patch", separator, "Copy Path", "Copy Full Path".
+
+Stage will stage all selected nodes, including folder content. Discard will call discard on all selected files. Stash will create a stash for all selected content, including folders. Save as patch will create a patch from all selected content including folders. Copy path will copy the repo relative path of the item that was clicked on to the clipboard. Copy Full Path will copy the full file path of the item that was clicked on to the clipboard.
+
+47. right clicking on an item isn't bringing up the context menu
+
+48. the problem is that the right click is initiating a drag. that should only be done with the left button
+
+49. right clicking on an item in the staging tree is still initiating a drag
+
+50. the right mouse button context menu is still not working on unstaged tree items
+
+51. still not working. there is nothing printed to the console. right clicking on an item changes to the hand icon and starts a drag operation.
+
+52. it's still the same behavior, right button is initiating a drag
+
+53. same incorrect behavior
+
+54. it's still not working, dragging behavior is blocking context menu and it's not printing anything to the console
+
+55. i don't see the console output. can you change the build to not minimize the dist javascript so I can debug it.
+
+56. make the cursor for file view items default, and only switch to the hand grab cursor when a drag has started. Also, don't darken the item when right clicking on the item.
+
+57. when dragging items between staged and unstaged panels, the drop should happen for the entire panel and dropping on a tree item shouldn't have the same behavior as dropping anywhere on the panel. Dropping on the same panel should be a no-op.
+
+58. when dragging an item from the file list, if the mouse is over a tree item it will have a crossed out arrow icon and not be droppable. the drop behavior should be for the entire panel, so tree items shouldn't block the drop.
+
+59. there is a div parent of folder-item that has no class, which is blocking drops
+
+60. while dragging a file list item over the panel, some items in the panel are blocking tropping the item
+
+61. there's still something preventing drops, in the padding between elements
+
+62. save the state of which repo tab is selected and restore it when the app is re-opened
+
+63. For the stash list, only use the description for the label
+
+64. for the stash list, strip off the "On <Branch>: " part of the label, so that "On 6000.0/staging: textureformatstier2" is just "textureformatstier2"
+
+65. Remove the top repo directory and Current branch elements. Change the Changes panel to the Repo panel and change the Changes label to the repo directory and add the Current branch element under it
+
+66. Remove the "Repo" label
+
+67. reduce the vertical size of the repo panel so that branches gets more space
+
+68. double clicking on a branch should switch branches
+
+69. when pulling a branch, have a spinning busy icon next to the branch name indicating the pull is still happening, which goes away when the pull is finished
+
+70. make the busy sign go away when the pull git command itself finishes.
+instead of waiting for all rev-list commands to finish before updating the gui, update the gui as each one finishes
+
+71. when you select a branch from the branch tree, the content panel should show the branch view panel. this should consist of two panels split vertically. the top panel is the commit list. the bottom panel is commit info for when you select a commit from the commit list. the label for items in the commit list should be on a single line, with the commit message, author name, id, and date+time.
+
+72. don't use background color to indicate the active branch
+
+73. make the active tab background color brighter to make it more obvious which one is active
+
+74. in the Commit Details panel, include the list of files changed by the commit
+
+75. make the scrollbar for the Branches list not include the Branches title, just the tree view
+
+76. if you close a tab and then close the app, the tab will be back when re-opening the app
+
+77. allow re-ordering of the repo tabs with drag and drop
+
+78. implement the stash button. this should bring up a dialog that lets you set an optional Message for the stash, and a checkbox for "Stage new files", which is checked by default. If Stage new files is checked, then prior to doing the stash and new files that are unstaged and are new to the repository, are staged prior to running stash. There should be buttons for "Save stash" and "Cancel". Cancel will close and not do anything. Save stash will perform the stash, including the optional staging of new files.
+
+79. In the Create Stash dialog, move the "Message (optional):" label to the left of the input field, change the label to "Message:", and change the input field hint to "Stash message (optional)"
+
+80. Change the order of the buttons so "Save Stash" is first, followed by "Cancel"
+
+81. add a tooltip to "Stage new files" that says "By default stash ignores new files until you stage them"
+
+82. disable the stash button if there are no local changes
+
+83. add a periodic check to see if there are new local changes. make sure this happens silently in the background and not too frequently to use too much processing
+
+84. reduc the vertical spacing above the repo label in the ChangeList panel
+
+85. when you select a branch, it can take some time for the commit list to come back. put a "Loading..." panel with a spinning busy icon in the content panel so that it's clear the branch info is being worked on
+
+86. if you select a different item while a branch commit list request is still loading, cancel the  branch request and do the new item
