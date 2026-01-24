@@ -204,6 +204,20 @@ class SimpleGitAdapter extends GitAdapter {
     fs.writeFileSync(outputPath, patchContent, 'utf8');
   }
 
+  async show(commitHash, filePath) {
+    const startTime = performance.now();
+    try {
+      // Use git show with specific format to get the diff for this file
+      // This should produce the same format as git diff
+      const result = await this.git.raw(['show', '--format=', '--unified=3', `${commitHash}`, '--', filePath]);
+      this._logCommand(`git show --format= --unified=3 ${commitHash} -- ${filePath}`, startTime);
+      return result;
+    } catch (error) {
+      console.error(`Error loading diff for ${filePath} in commit ${commitHash}:`, error);
+      return `Error loading diff for ${filePath} in commit ${commitHash}: ${error.message}`;
+    }
+  }
+
   async raw(args) {
     const startTime = performance.now();
     const result = await this.git.raw(args);

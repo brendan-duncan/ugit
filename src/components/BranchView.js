@@ -88,7 +88,7 @@ function BranchView({ branchName, commits, loading, repoPath, onRefresh }) {
           </div>
 
           <div className="branch-view-bottom-panel" style={{ height: `${100 - topHeight}%` }}>
-            <CommitInfo commit={selectedCommit} files={commitFiles} />
+            <CommitInfo commit={selectedCommit} files={commitFiles} repoPath={repoPath} />
           </div>
         </div>
       )}

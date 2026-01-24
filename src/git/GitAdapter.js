@@ -152,6 +152,16 @@ class GitAdapter {
   }
 
   /**
+   * Show file contents from a specific commit
+   * @param {string} commitHash - The commit hash
+   * @param {string} filePath - Path to the file
+   * @returns {Promise<string>}
+   */
+  async show(commitHash, filePath) {
+    throw new Error('show() must be implemented');
+  }
+
+  /**
    * Show stash contents
    * @param {number} stashIndex - Stash index
    * @returns {Promise<string>}

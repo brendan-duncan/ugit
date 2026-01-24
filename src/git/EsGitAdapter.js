@@ -55,6 +55,10 @@ class EsGitAdapter extends GitAdapter {
   async diff(filePath, isStaged) {
   }
 
+  async show(commitHash, filePath) {
+    throw new Error('show() not implemented in EsGitAdapter');
+  }
+
   async showStash(stashIndex) {
   }
 

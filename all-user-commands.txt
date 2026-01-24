@@ -215,3 +215,7 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 124. overwrite .d2h-code-linenumber in DiffViewer.css and change the position to relative
 125. StashViewer should use DiffViewer to view the stash diff
 126. Error loading diff: ReferenceError: error is not defined at loadDiff (DiffViewer.js:36:88)
+
+127. in commit details panel, make files changed items a tree view item. the child of the item is a diff view for that file change. the items should be collapsed by dfault, and the diff view should be loaded on demand only when the item is opened.
+
+127. the diff2html viewer for commit detail files is empty
