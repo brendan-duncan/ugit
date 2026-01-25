@@ -63,6 +63,15 @@ class GitAdapter {
   }
 
   /**
+   * Hard reset local branch to match origin
+   * @param {string} branch - Branch name to reset
+   * @returns {Promise<void>}
+   */
+  async resetToOrigin(branch) {
+    throw new Error('resetToOrigin() must be implemented');
+  }
+
+  /**
    * Get list of stashes
    * @returns {Promise<{all: Array<{hash: string, message: string}>}>}
    */

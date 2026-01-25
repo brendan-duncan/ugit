@@ -54,6 +54,22 @@ class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async resetToOrigin(branch) {
+    const startTime = performance.now();
+    try {
+      // Fetch latest from origin
+      await this.git.fetch('origin');
+      this._logCommand('git fetch origin', startTime);
+      
+      // Hard reset to origin/branch
+      await this.git.raw(['reset', '--hard', `origin/${branch}`]);
+      this._logCommand(`git reset --hard origin/${branch}`, startTime);
+    } catch (error) {
+      this._logCommand(`git reset --hard origin/${branch}`, startTime);
+      throw error;
+    }
+  }
+
   async stashList() {
     const startTime = performance.now();
     const result = await this.git.stashList();

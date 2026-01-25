@@ -7,6 +7,7 @@ import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
 import PushDialog from './PushDialog';
 import StashDialog from './StashDialog';
+import ResetToOriginDialog from './ResetToOriginDialog';
 import './RepositoryView.css';
 
 const GitFactory = window.require('./src/git/GitFactory');
@@ -34,6 +35,7 @@ function RepositoryView({ repoPath }) {
   const [showPullDialog, setShowPullDialog] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
   const [showStashDialog, setShowStashDialog] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [selectedBranch, setSelectedBranch] = useState(null);
   const activeSplitter = useRef(null);
@@ -722,11 +724,29 @@ function RepositoryView({ repoPath }) {
     }
   };
 
+  const handleResetToOrigin = async () => {
+    setShowResetDialog(false);
+
+    try {
+      const git = gitAdapter.current;
+
+      console.log(`Resetting ${currentBranch} to origin...`);
+      await git.resetToOrigin(currentBranch);
+      console.log('Reset to origin completed successfully');
+
+      // Refresh all data after reset
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error resetting to origin:', error);
+      setError(`Reset to origin failed: ${error.message}`);
+    }
+  };
+
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
   return (
     <div className="repository-view">
-      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
+      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onResetToOrigin={() => setShowResetDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}
@@ -816,6 +836,12 @@ function RepositoryView({ repoPath }) {
         <StashDialog
           onClose={() => setShowStashDialog(false)}
           onStash={handleStash}
+        />
+      )}
+      {showResetDialog && (
+        <ResetToOriginDialog
+          onClose={() => setShowResetDialog(false)}
+          onReset={handleResetToOrigin}
         />
       )}
     </div>
