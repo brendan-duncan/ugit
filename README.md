@@ -24,5 +24,5 @@ I ran out of Claude budget for the month, so I'm trying [OpenCode](https://openc
 
 * Run the app with `npm start`.
 
-* You can build it as an executable with build:exe
-  * Alternatively you can build it as an executable with build:forge. This uses Electron Forge instead of Electron Builder, and I don't know which is better at this point.
+* You can build it as an executable with `npm run build:exe`
+  * Alternatively you can build it as an executable with `npm run build:forge`. This uses Electron Forge instead of Electron Builder, and I don't know which is better at this point.
