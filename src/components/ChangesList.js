@@ -1,11 +1,11 @@
 import React from 'react';
 import './ChangesList.css';
 
-function ChangesList({ repoPath, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache }) {
+function ChangesList({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache }) {
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
   // Extract the repository directory name from the full path
-  const repoName = repoPath.split(/[\\/]/).pop() || repoPath;
+  const repoName = gitAdapter?.repoPath?.split(/[\\/]/).pop() || 'Repository';
 
   return (
     <div className="changes-list">

@@ -4,7 +4,7 @@ import StashViewer from './StashViewer';
 import BranchView from './BranchView';
 import './ContentViewer.css';
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onRefresh }) {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh }) {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -25,7 +25,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onR
         <LocalChangesPanel
           unstagedFiles={unstagedFiles}
           stagedFiles={stagedFiles}
-          repoPath={repoPath}
+          gitAdapter={gitAdapter}
           onRefresh={onRefresh}
         />
       )}
@@ -33,7 +33,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onR
         <StashViewer
           stash={selectedItem.stash}
           stashIndex={selectedItem.index}
-          repoPath={repoPath}
+          gitAdapter={gitAdapter}
         />
       )}
       {item.type === 'branch' && (
@@ -41,7 +41,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, repoPath, onR
           branchName={selectedItem.branchName}
           commits={item.commits}
           loading={item.loading}
-          repoPath={repoPath}
+          gitAdapter={gitAdapter}
           onRefresh={onRefresh}
         />
       )}

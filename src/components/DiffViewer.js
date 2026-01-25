@@ -2,18 +2,17 @@ import React, { useState, useEffect } from 'react';
 import './DiffViewer.css';
 import 'diff2html/bundles/css/diff2html.min.css';
 
-const GitFactory = window.require('./src/git/GitFactory');
-const { ipcRenderer } = window.require('electron');
+
 const Diff2Html = window.require('diff2html');
 
-function DiffViewer({ file, repoPath, isStaged }) {
+function DiffViewer({ file, gitAdapter, isStaged }) {
   const [diff, setDiff] = useState('');
   const [loading, setLoading] = useState(true);
   const [diffHtml, setDiffHtml] = useState('');
 
   useEffect(() => {
     const loadDiff = async () => {
-      if (!file || !repoPath) return;
+      if (!file || !gitAdapter) return;
 
       try {
         setLoading(true);
@@ -25,9 +24,7 @@ function DiffViewer({ file, repoPath, isStaged }) {
           diffResult = file.diff;
         } else {
           // Otherwise fetch the diff from git
-          const backend = await ipcRenderer.invoke('get-git-backend');
-          const git = await GitFactory.createAdapter(repoPath, backend);
-          diffResult = await git.diff(file.path, isStaged);
+          diffResult = await gitAdapter.diff(file.path, isStaged);
         }
 
         setDiff(diffResult);
@@ -53,7 +50,7 @@ function DiffViewer({ file, repoPath, isStaged }) {
     };
 
     loadDiff();
-  }, [file, repoPath, isStaged]);
+  }, [file, gitAdapter, isStaged]);
 
   if (!file) {
     return (

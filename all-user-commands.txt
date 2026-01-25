@@ -291,3 +291,7 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 146. use delete hotkey for discard in local changes panel. add the hotkey to the discard item in the context menu
 
 147. add a button to end of repo toolbar after Stash that has label "Repository" and opens a dropdown menu. The first item in dropdown menu is "Reset to origin...". Reset to origin opens a dialog that has a message "Rset local repository to origin." with buttons "Reset" and "Cancel". Cancel will close dialog and do nothing. Reset will do a hard reset to origin branch, removing all local commits.
+
+148. instead of passing repoPath to the different panels from RepositoryView, pass gitAdapter.current, so that the panels can use that same GitAdapter
+
+149. in RepositoryView, move the initialization of the git adapter out of loadRepoData and to the top just before initCache

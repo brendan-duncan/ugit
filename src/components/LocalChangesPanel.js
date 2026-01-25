@@ -3,11 +3,10 @@ import FileList from './FileList';
 import DiffViewer from './DiffViewer';
 import './LocalChangesPanel.css';
 
-const GitFactory = window.require('./src/git/GitFactory');
 const { ipcRenderer } = window.require('electron');
 const path = window.require('path');
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }) {
 
   const [fileListsHeight, setFileListsHeight] = useState(50);
   const [leftWidth, setLeftWidth] = useState(50);
@@ -16,16 +15,6 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
   const [commitDescription, setCommitDescription] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const activeSplitter = useRef(null);
-  const gitAdapter = useRef(null);
-
-  // Initialize git adapter
-  const getGitAdapter = async () => {
-    if (!gitAdapter.current) {
-      const backend = await ipcRenderer.invoke('get-git-backend');
-      gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
-    }
-    return gitAdapter.current;
-  };
 
   const handleMouseDown = (splitterType) => {
     activeSplitter.current = splitterType;
@@ -66,7 +55,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
 
     try {
       setIsBusy(true);
-      const git = await getGitAdapter();
+      const git = gitAdapter;
 
       // Collect all files that need to be processed
       const allFilePaths = [];
@@ -126,7 +115,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
 
     try {
       setIsBusy(true);
-      const git = await getGitAdapter();
+      const git = gitAdapter;
 
       // Construct commit message with optional description
       const fullMessage = commitDescription.trim()
@@ -180,12 +169,12 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
         }
       });
 
-      const git = await getGitAdapter();
+      const git = gitAdapter;
 
       switch (action) {
         case 'show-in-explorer':
           // Show the clicked item in file explorer
-          const itemPath = path.join(repoPath, clickedItem);
+          const itemPath = path.join(gitAdapter.repoPath, clickedItem);
           await ipcRenderer.invoke('show-item-in-folder', itemPath);
           break;
 
@@ -234,7 +223,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
             // Use electron's save dialog
             const result = await ipcRenderer.invoke('show-save-dialog', {
               title: 'Save Patch As',
-              defaultPath: path.join(repoPath, 'changes.patch'),
+              defaultPath: path.join(gitAdapter.repoPath, 'changes.patch'),
               filters: [
                 { name: 'Patch Files', extensions: ['patch'] },
                 { name: 'All Files', extensions: ['*'] }
@@ -257,7 +246,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
 
         case 'copy-full-path':
           // Copy full absolute path to clipboard
-          const fullPath = path.join(repoPath, clickedItem);
+          const fullPath = path.join(gitAdapter.repoPath, clickedItem);
           navigator.clipboard.writeText(fullPath);
           console.log(`Copied full path: ${fullPath}`);
           break;
@@ -299,7 +288,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
               onDrop={handleFileDrop}
               onSelectFile={handleSelectFile}
               selectedFile={selectedFile}
-              repoPath={repoPath}
+              repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
             />
           </div>
@@ -317,7 +306,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
               onDrop={handleFileDrop}
               onSelectFile={handleSelectFile}
               selectedFile={selectedFile}
-              repoPath={repoPath}
+              repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
             />
           </div>
@@ -333,7 +322,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, repoPath, onRefresh }) 
             <div className="local-changes-diff-viewer" style={{ width: `${100 - leftWidth}%` }}>
               <DiffViewer
                 file={selectedFile.file}
-                repoPath={repoPath}
+                gitAdapter={gitAdapter}
                 isStaged={selectedFile.listType === 'staged'}
               />
             </div>

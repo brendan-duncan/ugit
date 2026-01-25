@@ -44,6 +44,17 @@ function RepositoryView({ repoPath }) {
   const cacheInitialized = useRef(false);
   const currentBranchLoadId = useRef(0);
 
+  // Initialize git adapter
+  useEffect(() => {
+    const initGitAdapter = async () => {
+      if (!gitAdapter.current) {
+        const backend = await ipcRenderer.invoke('get-git-backend');
+        gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
+      }
+    };
+    initGitAdapter();
+  }, [repoPath]);
+
   // Initialize cache manager with user data path
   useEffect(() => {
     const initCache = async () => {
@@ -133,11 +144,6 @@ function RepositoryView({ repoPath }) {
       setError(null);
       setUsingCache(false);
 
-      // Initialize git adapter if needed
-      if (!gitAdapter.current) {
-        const backend = await ipcRenderer.invoke('get-git-backend');
-        gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
-      }
       const git = gitAdapter.current;
 
       // Get current branch and modified files
@@ -760,7 +766,7 @@ function RepositoryView({ repoPath }) {
             <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
               <div className="split-panel top-panel" style={{ height: `${topHeight}%` }}>
                 <ChangesList
-                  repoPath={repoPath}
+                  gitAdapter={gitAdapter.current}
                   currentBranch={currentBranch}
                   originUrl={originUrl}
                   modifiedCount={modifiedCount}
@@ -809,7 +815,7 @@ function RepositoryView({ repoPath }) {
                 selectedItem={selectedItem || { type: lastContentPanel }}
                 unstagedFiles={unstagedFiles}
                 stagedFiles={stagedFiles}
-                repoPath={repoPath}
+                gitAdapter={gitAdapter.current}
                 onRefresh={refreshFileStatus}
               />
             </div>

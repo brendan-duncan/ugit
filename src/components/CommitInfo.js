@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './CommitInfo.css';
 import DiffViewer from './DiffViewer';
 
-function CommitInfo({ commit, files, repoPath }) {
+function CommitInfo({ commit, files, gitAdapter }) {
   const [expandedFiles, setExpandedFiles] = useState({});
   const [fileDiffs, setFileDiffs] = useState({});
 
@@ -48,13 +48,8 @@ function CommitInfo({ commit, files, repoPath }) {
       
       if (!fileDiffs[key]) {
         try {
-          // Load diff for this specific file from the commit
-          const GitFactory = window.require('./src/git/GitFactory');
-          const { ipcRenderer } = window.require('electron');
-          
-          const backend = await ipcRenderer.invoke('get-git-backend');
-          const git = await GitFactory.createAdapter(repoPath, backend);
-          const diffResult = await git.show(commit.hash, filePath);
+          // Load diff for this specific file from commit
+          const diffResult = await gitAdapter.show(commit.hash, filePath);
           
           setFileDiffs(prev => ({
             ...prev,
@@ -126,7 +121,7 @@ function CommitInfo({ commit, files, repoPath }) {
                           <div className="commit-file-diff">
                             <DiffViewer 
                               file={{ path: file.path, diff, status: file.status }}
-                              repoPath={repoPath}
+                              gitAdapter={gitAdapter}
                               isStaged={false}
                             />
                           </div>

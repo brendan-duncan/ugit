@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import './StashViewer.css';
 import DiffViewer from './DiffViewer';
 
-const GitFactory = window.require('./src/git/GitFactory');
-const { ipcRenderer } = window.require('electron');
 
-function StashViewer({ stash, stashIndex, repoPath }) {
+
+function StashViewer({ stash, stashIndex, gitAdapter }) {
   const [stashFile, setStashFile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -13,11 +12,9 @@ function StashViewer({ stash, stashIndex, repoPath }) {
     const loadStashDiff = async () => {
       try {
         setLoading(true);
-        const backend = await ipcRenderer.invoke('get-git-backend');
-        const git = await GitFactory.createAdapter(repoPath, backend);
-
+        
         // Get the diff for the stash
-        const diffResult = await git.showStash(stashIndex);
+        const diffResult = await gitAdapter.showStash(stashIndex);
         
         // Create a mock file object for DiffViewer
         setStashFile({
@@ -38,10 +35,10 @@ function StashViewer({ stash, stashIndex, repoPath }) {
       }
     };
 
-    if (stash && repoPath !== undefined) {
+    if (stash && gitAdapter) {
       loadStashDiff();
     }
-  }, [stash, stashIndex, repoPath]);
+  }, [stash, stashIndex, gitAdapter]);
 
   if (!stash) {
     return (
@@ -73,7 +70,7 @@ function StashViewer({ stash, stashIndex, repoPath }) {
       ) : (
         <DiffViewer 
           file={stashFile} 
-          repoPath={repoPath} 
+          gitAdapter={gitAdapter} 
           isStaged={false}
         />
       )}

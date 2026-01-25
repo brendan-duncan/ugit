@@ -3,15 +3,13 @@ import CommitList from './CommitList';
 import CommitInfo from './CommitInfo';
 import './BranchView.css';
 
-const GitFactory = window.require('./src/git/GitFactory');
-const { ipcRenderer } = window.require('electron');
 
-function BranchView({ branchName, commits, loading, repoPath, onRefresh }) {
+
+function BranchView({ branchName, commits, loading, gitAdapter, onRefresh }) {
   const [selectedCommit, setSelectedCommit] = useState(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [topHeight, setTopHeight] = useState(60);
   const activeSplitter = useRef(null);
-  const gitAdapter = useRef(null);
 
   const handleMouseDown = () => {
     activeSplitter.current = true;
@@ -40,13 +38,7 @@ function BranchView({ branchName, commits, loading, repoPath, onRefresh }) {
     if (!commit) return;
 
     try {
-      // Initialize git adapter if needed
-      if (!gitAdapter.current) {
-        const backend = await ipcRenderer.invoke('get-git-backend');
-        gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
-      }
-
-      const files = await gitAdapter.current.getCommitFiles(commit.hash);
+      const files = await gitAdapter.getCommitFiles(commit.hash);
       setCommitFiles(files);
     } catch (error) {
       console.error('Error loading commit files:', error);
@@ -88,7 +80,7 @@ function BranchView({ branchName, commits, loading, repoPath, onRefresh }) {
           </div>
 
           <div className="branch-view-bottom-panel" style={{ height: `${100 - topHeight}%` }}>
-            <CommitInfo commit={selectedCommit} files={commitFiles} repoPath={repoPath} />
+            <CommitInfo commit={selectedCommit} files={commitFiles} gitAdapter={gitAdapter} />
           </div>
         </div>
       )}
