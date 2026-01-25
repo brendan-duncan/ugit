@@ -42,6 +42,18 @@ class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async getOriginUrl() {
+    const startTime = performance.now();
+    try {
+      const result = await this.git.raw(['remote', 'get-url', 'origin']);
+      this._logCommand('git remote get-url origin', startTime);
+      return result.trim();
+    } catch (error) {
+      this._logCommand('git remote get-url origin', startTime);
+      return '';
+    }
+  }
+
   async stashList() {
     const startTime = performance.now();
     const result = await this.git.stashList();
@@ -188,8 +200,23 @@ class SimpleGitAdapter extends GitAdapter {
         author_email: '%ae'
       }
     });
+    
+    // Check which commits exist on origin
+    const commitsWithRemoteStatus = await Promise.all(
+      result.all.map(async (commit) => {
+        try {
+          // Check if commit exists on origin branch
+          await this.git.raw(['merge-base', '--is-ancestor', commit.hash, `origin/${branchName}`]);
+          return { ...commit, onOrigin: true };
+        } catch (error) {
+          // If merge-base fails, commit doesn't exist on origin
+          return { ...commit, onOrigin: false };
+        }
+      })
+    );
+    
     this._logCommand(`git log ${branchName} --max-count=${maxCount}`, startTime);
-    return result.all;
+    return commitsWithRemoteStatus;
   }
 
   async getCommitFiles(commitHash) {

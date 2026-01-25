@@ -27,6 +27,16 @@
   margin-bottom: 6px;
 }
 
+.repo-origin {
+  color: #cccccc;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.repo-origin strong {
+  color: #60c94e;
+}
+
 .repo-branch {
   color: #cccccc;
   font-size: 0.9rem;

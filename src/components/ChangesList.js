@@ -1,7 +1,7 @@
 import React from 'react';
 import './ChangesList.css';
 
-function ChangesList({ repoPath, currentBranch, modifiedCount, selectedItem, onSelectItem, usingCache }) {
+function ChangesList({ repoPath, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache }) {
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
   // Extract the repository directory name from the full path
@@ -11,6 +11,11 @@ function ChangesList({ repoPath, currentBranch, modifiedCount, selectedItem, onS
     <div className="changes-list">
       <div className="repo-info">
         <div className="repo-name">{repoName}</div>
+        {originUrl && (
+          <div className="repo-origin">
+            Origin: <strong>{originUrl}</strong>
+          </div>
+        )}
         {currentBranch && (
           <div className="repo-branch">
             Current branch: <strong>{currentBranch}</strong>

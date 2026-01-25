@@ -281,3 +281,11 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 141. remove the Repository menu
 
 142. Remove Refresh, Pull, Push, Fetch, and Stash menu items from File menu
+
+143. in the branch commit list, if a commit is not on origin, make it clear that it's not. Give it an icon, make the text italic
+
+144. delete esgitadapter
+
+145. display to repo origin url after the repo label in the changes panel
+
+146. use delete hotkey for discard in local changes panel. add the hotkey to the discard item in the context menu

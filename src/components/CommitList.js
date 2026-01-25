@@ -20,10 +20,11 @@ function CommitList({ commits, selectedCommit, onSelectCommit }) {
           return (
             <div
               key={commit.hash}
-              className={`commit-item ${isSelected ? 'selected' : ''}`}
+              className={`commit-item ${isSelected ? 'selected' : ''} ${!commit.onOrigin ? 'not-on-origin' : ''}`}
               onClick={() => onSelectCommit(commit)}
             >
-              <span className="commit-message">{commit.message}</span>
+              {!commit.onOrigin && <span className="commit-remote-indicator">⚡</span>}
+              <span className={`commit-message ${!commit.onOrigin ? 'italic' : ''}`}>{commit.message}</span>
               <span className="commit-author">{commit.author_name}</span>
               <span className="commit-hash">{commit.hash.substring(0, 7)}</span>
               <span className="commit-date">{commit.date}</span>

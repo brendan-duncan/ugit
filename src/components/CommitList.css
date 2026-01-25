@@ -29,7 +29,7 @@
 
 .commit-item {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: auto 1fr auto auto auto;
   gap: 12px;
   align-items: center;
   padding: 6px 8px;
@@ -79,4 +79,20 @@
   color: #888888;
   white-space: nowrap;
   font-size: 12px;
+}
+
+.commit-remote-indicator {
+  color: #ff6b35;
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+}
+
+.commit-item.not-on-origin .commit-message {
+  color: #ffa500;
+  font-style: italic;
+}
+
+.commit-item.not-on-origin.selected .commit-message {
+  color: #ffb347;
 }

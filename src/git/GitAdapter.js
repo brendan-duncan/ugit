@@ -55,6 +55,14 @@ class GitAdapter {
   }
 
   /**
+   * Get remote origin URL
+   * @returns {Promise<string>}
+   */
+  async getOriginUrl() {
+    throw new Error('getOriginUrl() must be implemented');
+  }
+
+  /**
    * Get list of stashes
    * @returns {Promise<{all: Array<{hash: string, message: string}>}>}
    */

@@ -17,6 +17,7 @@ function RepositoryView({ repoPath }) {
   const [branches, setBranches] = useState([]);
   const [currentBranch, setCurrentBranch] = useState('');
   const [branchStatus, setBranchStatus] = useState({});
+  const [originUrl, setOriginUrl] = useState('');
   const [stashes, setStashes] = useState([]);
   const [modifiedCount, setModifiedCount] = useState(0);
   const [unstagedFiles, setUnstagedFiles] = useState([]);
@@ -79,6 +80,7 @@ function RepositoryView({ repoPath }) {
         if (cachedData) {
           // Apply cached data immediately
           setCurrentBranch(cachedData.currentBranch || '');
+          setOriginUrl(cachedData.originUrl || '');
           setUnstagedFiles(cachedData.unstagedFiles || []);
           setStagedFiles(cachedData.stagedFiles || []);
           setModifiedCount(cachedData.modifiedCount || 0);
@@ -139,6 +141,10 @@ function RepositoryView({ repoPath }) {
       // Get current branch and modified files
       const status = await git.status();
       setCurrentBranch(status.current);
+
+      // Get origin URL
+      const url = await git.getOriginUrl();
+      setOriginUrl(url);
 
       // Parse files using status.files array for accurate staging info
       const unstaged = [];
@@ -230,6 +236,7 @@ function RepositoryView({ repoPath }) {
       // Save to cache
       cacheManager.saveCache(repoPath, {
         currentBranch: status.current,
+        originUrl: url,
         unstagedFiles: unstaged,
         stagedFiles: staged,
         modifiedCount: allPaths.size,
@@ -284,6 +291,10 @@ function RepositoryView({ repoPath }) {
       // Get current branch and modified files
       const status = await git.status();
       setCurrentBranch(status.current);
+
+      // Update origin URL (refresh it in case it changed)
+      const url = await git.getOriginUrl();
+      setOriginUrl(url);
 
       // Parse files using status.files array for accurate staging info
       const unstaged = [];
@@ -731,6 +742,7 @@ function RepositoryView({ repoPath }) {
                 <ChangesList
                   repoPath={repoPath}
                   currentBranch={currentBranch}
+                  originUrl={originUrl}
                   modifiedCount={modifiedCount}
                   selectedItem={selectedItem}
                   onSelectItem={handleItemSelect}

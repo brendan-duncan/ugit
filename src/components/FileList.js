@@ -63,6 +63,39 @@ function FileList({
     }
   }, [contextMenu]);
 
+  // Handle keyboard events for hotkeys
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Delete key for discard
+      if (e.key === 'Delete' && selectedItems.size > 0) {
+        // Get selected items with their details
+        const items = Array.from(selectedItems).map(path => {
+          // Check if it's a folder or file
+          const file = files.find(f => f.path === path);
+          if (file) {
+            return { type: 'file', path, file };
+          } else {
+            // It's a folder
+            const folderFiles = getAllFilesInFolder(path);
+            return { type: 'folder', path, files: folderFiles };
+          }
+        });
+
+        // Call discard action if context menu handler is available
+        if (onContextMenu && items.length > 0) {
+          onContextMenu('discard', items, Array.from(selectedItems)[0], repoPath, listType);
+        }
+      }
+    };
+
+    // Only add keyboard listener when component is focused
+    const element = document.querySelector('.file-list');
+    if (element) {
+      element.addEventListener('keydown', handleKeyDown);
+      return () => element.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedItems, files, onContextMenu, repoPath, listType]);
+
   const toggleFolder = (path) => {
     setExpandedFolders(prev => ({
       ...prev,
@@ -471,7 +504,8 @@ function FileList({
             </div>
           )}
           <div className="context-menu-item" onClick={() => handleMenuAction('discard')}>
-            Discard
+            <span>Discard</span>
+            <span className="context-menu-hotkey">Del</span>
           </div>
           <div className="context-menu-separator"></div>
           <div className="context-menu-item" onClick={() => handleMenuAction('stash')}>
