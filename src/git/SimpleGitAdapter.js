@@ -222,8 +222,9 @@ class SimpleGitAdapter extends GitAdapter {
       result.all.map(async (commit) => {
         try {
           // Check if commit exists on origin branch
-          await this.git.raw(['merge-base', '--is-ancestor', commit.hash, `origin/${branchName}`]);
-          return { ...commit, onOrigin: true };
+          const unpushedCommits = await this.git.raw(['log', `origin/${branchName}..${commit.hash}`]);
+          const onOrigin = unpushedCommits.trim().length === 0;
+          return { ...commit, onOrigin };
         } catch (error) {
           // If merge-base fails, commit doesn't exist on origin
           return { ...commit, onOrigin: false };

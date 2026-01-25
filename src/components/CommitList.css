@@ -37,14 +37,17 @@
   border-radius: 3px;
   transition: background-color 0.2s;
   cursor: pointer;
+  border: 1px solid transparent;
 }
 
 .commit-item:hover {
   background-color: #2d2d2d;
+  border-color: #264f78;
 }
 
 .commit-item.selected {
   background-color: #264f78;
+  border-color: #264f78;
 }
 
 .commit-item.selected:hover {
@@ -88,11 +91,16 @@
   text-align: center;
 }
 
+.commit-item.not-on-origin {
+  background-color: #2d2d2d;
+  border-color: #264f78;
+}
+
 .commit-item.not-on-origin .commit-message {
-  color: #ffa500;
+  color: #cccccc;
   font-style: italic;
 }
 
 .commit-item.not-on-origin.selected .commit-message {
-  color: #ffb347;
+  color: #ffffff;
 }

@@ -333,3 +333,5 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 167. send all instructions that I write here (not in the application) to the existing command-logger.js so that they get logged. do not rewrite command-logger.js.
 
 168. line 13 of BranchStashPanel.js has handleBranchSwitch. This should be onBranchSwitch.
+
+169. in commit list of a branch, if a commit is not on origin (meaning it still needs to be pushed), highlight it with an icon and background color, making it clear that it is not on origin
