@@ -29,7 +29,7 @@
 
 .commit-item {
   display: grid;
-  grid-template-columns: auto 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto;
   gap: 12px;
   align-items: center;
   padding: 6px 8px;
