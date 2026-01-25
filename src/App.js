@@ -61,7 +61,7 @@ function App() {
     }
   }, [hasLoadedRecent]);
 
-  // Listen for open-repository events from main process
+  // Listen for events from main process
   useEffect(() => {
     const handleOpenRepo = (event, repoPath) => {
       openRepository(repoPath);
@@ -72,7 +72,59 @@ function App() {
     return () => {
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
     };
-  }, [tabs]);
+
+    const handleFetch = () => {
+      if (activeTabId !== null && tabs.length > 0) {
+        const activeTab = tabs.find(tab => tab.id === activeTabId);
+        if (activeTab) {
+          ipcRenderer.send('fetch-repo', activeTab.path);
+        }
+      }
+    };
+
+    const handlePull = () => {
+      if (activeTabId !== null && tabs.length > 0) {
+        const activeTab = tabs.find(tab => tab.id === activeTabId);
+        if (activeTab) {
+          ipcRenderer.send('pull-repo', activeTab.path);
+        }
+      }
+    };
+
+    const handlePush = () => {
+      if (activeTabId !== null && tabs.length > 0) {
+        const activeTab = tabs.find(tab => tab.id === activeTabId);
+        if (activeTab) {
+          ipcRenderer.send('push-repo', activeTab.path);
+        }
+      }
+    };
+
+    const handleSaveStash = () => {
+      if (activeTabId !== null && tabs.length > 0) {
+        const activeTab = tabs.find(tab => tab.id === activeTabId);
+        if (activeTab) {
+          ipcRenderer.send('save-stash-repo', activeTab.path);
+        }
+      }
+    };
+
+    ipcRenderer.on('open-repository', handleOpenRepo);
+    ipcRenderer.on('refresh-repository', handleRefresh);
+    ipcRenderer.on('fetch-repository', handleFetch);
+    ipcRenderer.on('pull-repository', handlePull);
+    ipcRenderer.on('push-repository', handlePush);
+    ipcRenderer.on('save-stash', handleSaveStash);
+
+    return () => {
+      ipcRenderer.removeListener('open-repository', handleOpenRepo);
+      ipcRenderer.removeListener('refresh-repository', handleRefresh);
+      ipcRenderer.removeListener('fetch-repository', handleFetch);
+      ipcRenderer.removeListener('pull-repository', handlePull);
+      ipcRenderer.removeListener('push-repository', handlePush);
+      ipcRenderer.removeListener('save-stash', handleSaveStash);
+    };
+  }, [tabs, activeTabId]);
 
   const openRepository = (repoPath) => {
     // Check if repository is already open

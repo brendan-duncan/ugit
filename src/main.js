@@ -151,7 +151,7 @@ function createMenu() {
         {
           label: 'Clear All Caches',
           click: () => {
-            const cacheManager = require('./src/utils/cacheManager');
+            const cacheManager = require('./utils/cacheManager');
             cacheManager.clearAllCaches();
             if (mainWindow) {
               mainWindow.webContents.send('caches-cleared');
@@ -179,9 +179,13 @@ async function openRepository() {
   }
 }
 
+// Suppress cache access denied errors
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+
 app.whenReady().then(() => {
   // Initialize cache manager with user data path
-  const cacheManager = require('./src/utils/cacheManager');
+  const cacheManager = require('./utils/cacheManager');
   cacheManager.setCacheDir(app.getPath('userData'));
 
   // Set window state file path

@@ -64,6 +64,8 @@ function RepositoryView({ repoPath }) {
     };
   }, []);
 
+
+
   const loadRepoData = async (isRefresh = false) => {
     try {
       // Wait for cache to be initialized
