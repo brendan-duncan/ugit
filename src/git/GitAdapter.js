@@ -207,11 +207,22 @@ class GitAdapter {
     throw new Error('createPatch() must be implemented');
   }
 
+/**
+    * Clone a repository
+    * @param {string} repoUrl - Repository URL to clone
+    * @param {string} parentFolder - Parent directory where repository should be cloned
+    * @param {string} repoName - Name of the directory to create
+    * @returns {Promise<void>}
+    */
+  async clone(repoUrl, parentFolder, repoName) {
+    throw new Error('clone() must be implemented');
+  }
+
   /**
-   * Execute raw git command (fallback for operations not in the abstraction)
-   * @param {string[]} args - Git command arguments
-   * @returns {Promise<string>}
-   */
+    * Execute raw git command (fallback for operations not in the abstraction)
+    * @param {string[]} args - Git command arguments
+    * @returns {Promise<string>}
+    */
   async raw(args) {
     throw new Error('raw() must be implemented');
   }

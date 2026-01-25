@@ -117,6 +117,15 @@ function createMenu() {
       label: 'File',
       submenu: [
         {
+          label: 'Clone...',
+          accelerator: 'CmdOrCtrl+Shift+C',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('show-clone-dialog');
+            }
+          }
+        },
+        {
           label: 'Open Repository...',
           accelerator: 'CmdOrCtrl+O',
           click: () => {
@@ -251,4 +260,44 @@ ipcMain.handle('show-item-in-folder', async (event, itemPath) => {
 // Show save dialog
 ipcMain.handle('show-save-dialog', async (event, options) => {
   return await dialog.showSaveDialog(mainWindow, options);
+});
+
+// Show open dialog for directory selection
+ipcMain.handle('show-open-dialog', async (event, options) => {
+  return await dialog.showOpenDialog(mainWindow, options);
+});
+
+// Clone repository
+ipcMain.handle('clone-repository', async (event, repoUrl, parentFolder, repoName) => {
+  const GitFactory = require('./git/GitFactory');
+  const path = require('path');
+  
+  try {
+    const targetPath = path.join(parentFolder, repoName);
+    
+    // Check if target directory already exists
+    const fs = require('fs');
+    if (fs.existsSync(targetPath)) {
+      throw new Error(`Directory '${repoName}' already exists in the selected location.`);
+    }
+    
+    // Create git adapter with temporary path (will be overridden by clone)
+    const gitAdapter = await GitFactory.createAdapter(parentFolder, gitBackend);
+    
+    // Perform clone
+    console.log(`Cloning ${repoUrl} to ${targetPath}`);
+    await gitAdapter.clone(repoUrl, parentFolder, repoName);
+    console.log('Clone completed successfully');
+    
+    return {
+      success: true,
+      path: targetPath
+    };
+  } catch (error) {
+    console.error('Clone failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 });

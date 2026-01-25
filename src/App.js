@@ -1,28 +1,47 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
+import CloneDialog from './components/CloneDialog';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
 import './App.css';
 
+const ACTIVE_TAB_KEY = 'ugit-active-tab-path';
 const { ipcRenderer } = window.require('electron');
 
-const ACTIVE_TAB_KEY = 'ugit-active-tab-path';
+// Helper function to filter out invalid repository paths
+function filterValidRepos(repoPaths) {
+  const fs = require('fs');
+  return repoPaths.filter(repoPath => {
+    try {
+      return fs.existsSync(repoPath);
+    } catch (error) {
+      console.warn(`Failed to check path ${repoPath}:`, error);
+      return false;
+    }
+  });
+}
 
 function App() {
   const [tabs, setTabs] = useState([]);
   const [activeTabId, setActiveTabId] = useState(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState(false);
+  const [showCloneDialog, setShowCloneDialog] = useState(false);
 
   // Load recent repos and auto-open on startup
   useEffect(() => {
     if (!hasLoadedRecent) {
       const recent = getRecentRepos();
 
-      // Send recent repos to main process for menu
-      ipcRenderer.send('update-recent-repos', recent);
+      // Filter out invalid paths and update recent repos list
+      const validRecent = filterValidRepos(recent);
+      if (validRecent.length !== recent.length) {
+        // Update recent repos with only valid paths
+        setRecentRepos(validRecent);
+        ipcRenderer.send('update-recent-repos', validRecent);
+      }
 
       // Auto-open last opened repos
-      if (recent.length > 0) {
+      if (validRecent.length > 0) {
         const newTabs = [];
         let activeTabIdToSet = null;
 
@@ -30,7 +49,7 @@ function App() {
         const savedActiveTabPath = localStorage.getItem(ACTIVE_TAB_KEY);
 
         // Reverse recent repos to restore original tab order
-        const orderedRepos = [...recent].reverse();
+        const orderedRepos = [...validRecent].reverse();
         
         orderedRepos.forEach((repoPath, index) => {
           const tabId = Date.now() + index;
@@ -67,7 +86,12 @@ function App() {
       openRepository(repoPath);
     };
 
+    const handleShowCloneDialog = () => {
+      setShowCloneDialog(true);
+    };
+
     ipcRenderer.on('open-repository', handleOpenRepo);
+    ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
 
     return () => {
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
@@ -109,7 +133,12 @@ function App() {
       }
     };
 
+    const handleRefresh = () => {
+      // Refresh functionality would go here
+    };
+
     ipcRenderer.on('open-repository', handleOpenRepo);
+    ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
     ipcRenderer.on('refresh-repository', handleRefresh);
     ipcRenderer.on('fetch-repository', handleFetch);
     ipcRenderer.on('pull-repository', handlePull);
@@ -118,6 +147,7 @@ function App() {
 
     return () => {
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
+      ipcRenderer.removeListener('show-clone-dialog', handleShowCloneDialog);
       ipcRenderer.removeListener('refresh-repository', handleRefresh);
       ipcRenderer.removeListener('fetch-repository', handleFetch);
       ipcRenderer.removeListener('pull-repository', handlePull);
@@ -127,6 +157,19 @@ function App() {
   }, [tabs, activeTabId]);
 
   const openRepository = (repoPath) => {
+    // Check if path exists before opening
+    const fs = require('fs');
+    try {
+      if (!fs.existsSync(repoPath)) {
+        alert(`Repository path does not exist:\n${repoPath}`);
+        return;
+      }
+    } catch (error) {
+      console.error(`Error checking repository path ${repoPath}:`, error);
+      alert(`Error accessing repository path:\n${repoPath}`);
+      return;
+    }
+
     // Check if repository is already open
     const existingTab = tabs.find(tab => tab.path === repoPath);
     if (existingTab) {
@@ -169,13 +212,31 @@ function App() {
     setTabs(newTabs);
   };
 
+  const handleClone = async (repoUrl, parentFolder, repoName) => {
+    try {
+      const result = await ipcRenderer.invoke('clone-repository', repoUrl, parentFolder, repoName);
+      
+      if (result.success) {
+        // Close dialog and open the cloned repository
+        setShowCloneDialog(false);
+        openRepository(result.path);
+      } else {
+        // Show error message
+        alert(`Clone failed: ${result.error}`);
+      }
+    } catch (error) {
+      alert(`Clone failed: ${error.message}`);
+    }
+  };
+
   // Save open tabs to recent repos when tabs change
   useEffect(() => {
     if (hasLoadedRecent) {
       if (tabs.length > 0) {
-        // Set recent repos to exactly match current tabs (most recent first)
+        // Set recent repos to exactly match current tabs (most recent first), filtering out invalid paths
         const tabPaths = tabs.map(tab => tab.path).reverse();
-        const recent = setRecentRepos(tabPaths);
+        const validPaths = filterValidRepos(tabPaths);
+        const recent = setRecentRepos(validPaths);
         ipcRenderer.send('update-recent-repos', recent);
       } else {
         // No tabs open, clear recent repos
@@ -194,6 +255,49 @@ function App() {
       }
     }
   }, [activeTabId, tabs]);
+
+  // Periodic check for invalid tab paths
+  useEffect(() => {
+    if (!hasLoadedRecent || tabs.length === 0) return;
+
+    const checkTabValidity = () => {
+      const fs = require('fs');
+      const invalidTabs = tabs.filter(tab => {
+        try {
+          return !fs.existsSync(tab.path);
+        } catch (error) {
+          console.warn(`Failed to check tab path ${tab.path}:`, error);
+          return true; // Close tab if we can't verify it exists
+        }
+      });
+
+      if (invalidTabs.length > 0) {
+        const validTabs = tabs.filter(tab => 
+          !invalidTabs.some(invalidTab => invalidTab.id === tab.id)
+        );
+        
+        setTabs(validTabs);
+        
+        // If the active tab was invalid, clear the saved active tab
+        const wasActiveTabInvalid = invalidTabs.some(tab => tab.id === activeTabId);
+        if (wasActiveTabInvalid && validTabs.length > 0) {
+          setActiveTabId(validTabs[validTabs.length - 1].id);
+        } else if (wasActiveTabInvalid) {
+          setActiveTabId(null);
+          localStorage.removeItem(ACTIVE_TAB_KEY);
+        }
+
+        console.log(`Closed ${invalidTabs.length} invalid tab(s):`, 
+          invalidTabs.map(tab => tab.path));
+      }
+    };
+
+    // Check immediately and then every 30 seconds
+    checkTabValidity();
+    const interval = setInterval(checkTabValidity, 30000);
+
+    return () => clearInterval(interval);
+  }, [tabs, activeTabId, hasLoadedRecent]);
 
   return (
     <div className="app">
@@ -223,6 +327,12 @@ function App() {
           </>
         )}
       </div>
+      {showCloneDialog && (
+        <CloneDialog
+          onClose={() => setShowCloneDialog(false)}
+          onClone={handleClone}
+        />
+      )}
     </div>
   );
 }

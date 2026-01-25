@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ChangesList from './ChangesList';
+import RepoInfo from './RepoInfo';
 import BranchTree from './BranchTree';
 import StashList from './StashList';
 import ContentViewer from './ContentViewer';
@@ -44,16 +44,23 @@ function RepositoryView({ repoPath }) {
   const cacheInitialized = useRef(false);
   const currentBranchLoadId = useRef(0);
 
-  // Initialize git adapter
+  // Initialize git adapter and load repository data
   useEffect(() => {
-    const initGitAdapter = async () => {
+    const initRepository = async () => {
       if (!gitAdapter.current) {
         const backend = await ipcRenderer.invoke('get-git-backend');
         gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
+        // Wait for adapter to be fully initialized before loading data
+        if (gitAdapter.current) {
+          await gitAdapter.current.open();
+        }
       }
+      // Load repository data after adapter is ready
+      loadRepoData(false);
     };
-    initGitAdapter();
-  }, [repoPath]);
+    initRepository();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoPath]); // Load repo when path changes
 
   // Initialize cache manager with user data path
   useEffect(() => {
@@ -143,6 +150,12 @@ function RepositoryView({ repoPath }) {
       }
       setError(null);
       setUsingCache(false);
+
+      // Ensure git adapter is available
+      if (!gitAdapter.current) {
+        console.error('Git adapter not available in loadRepoData');
+        return;
+      }
 
       const git = gitAdapter.current;
 
@@ -270,11 +283,6 @@ function RepositoryView({ repoPath }) {
     }
   };
 
-  useEffect(() => {
-    loadRepoData(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only load once on mount - component instance is tied to a specific repo
-
   // Periodic background check for local changes
   useEffect(() => {
     // Don't start checking until initial load is complete
@@ -293,6 +301,11 @@ function RepositoryView({ repoPath }) {
   }, [loading]); // Re-run if loading state changes
 
   const refreshFileStatus = async () => {
+    // Ensure git adapter is available before attempting to use it
+    if (!gitAdapter.current) {
+      return;
+    }
+    
     try {
       const git = gitAdapter.current;
 
@@ -349,6 +362,11 @@ function RepositoryView({ repoPath }) {
   };
 
   const refreshBranchStatus = async () => {
+    // Ensure git adapter is available before attempting to use it
+    if (!gitAdapter.current) {
+      return;
+    }
+    
     try {
       const git = gitAdapter.current;
 
@@ -765,7 +783,7 @@ function RepositoryView({ repoPath }) {
           <>
             <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
               <div className="split-panel top-panel" style={{ height: `${topHeight}%` }}>
-                <ChangesList
+                <RepoInfo
                   gitAdapter={gitAdapter.current}
                   currentBranch={currentBranch}
                   originUrl={originUrl}

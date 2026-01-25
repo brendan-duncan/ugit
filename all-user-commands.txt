@@ -295,3 +295,31 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 148. instead of passing repoPath to the different panels from RepositoryView, pass gitAdapter.current, so that the panels can use that same GitAdapter
 
 149. in RepositoryView, move the initialization of the git adapter out of loadRepoData and to the top just before initCache
+
+150. in the file menu, add "Clone..." to the top of the menu. This should bring up a dialog with a "Clone" label, a message label that says "Clone remote repository into a local folder", a "Repository Url:" text field with a placeholder "Git Repository Url", a "Parent Folder:" text field with a file browser button next to it to select a directory, and a "Name:" text field a placeholder "Repository name". The buttons should be "Clone" and "Cancel", where Cancel closes the dialog doing nothing. Clone will do a git clone of the url to a the parent folder to a repo folder with the given name. If the copy/paste clipboard is a url string, then automatically fill the url field with that.
+
+151. Error: Attempted to register a second handler for 'get-git-backend'
+
+152. gitAdapter.clone is not a function. add a clone method to GitAdapter, with an implementation for SimpleGitAdapter.
+
+153. in RepositoryView.js, gitAdapter.current is still null when git.status is called at line 300. make sure the adapter is available at the start of the repo view load, before any code that would use it is called
+
+154. if a tab has a repoPath that doesn't exist, close tab. if a path in Recent Repositories menu doesn't exist, remove it from the recents list
+
+155. make parent folder field of clone dialog persisent so it has the same value next time the dialog is opened, even between app runs. also, use escape as hotkey for cancel.
+
+156. when Repository Url field value changes, update name field from url
+
+157. when editing url field, name field should be replaced with parsed name from url
+
+158. gitadapter clone is missing parent folder argument
+
+159. SimpleGitAdapter clone is wrong. Change it to `const localFolder = parentFolder + "/" + repoName; const git = simpleGit(); await git.clone(repoUrl, localFolder);` so that it's cloned into the correct folder
+
+160. rename ChangeList to RepoInfo
+
+161. improve styling of the RepoInfo panel. Reduce margin bellow repro-branch to 8px. Remove top margin from local-changes-section. Add a changes icon before Local Changes. Remove the modified count from the repro branch and put the count in parenthesis on the local changes item.
+
+162. put change count next to Local Changes label, change the color to off-white and bold.
+
+163. use 📝 as the local changes icon. change the local changes selection background color to #264f78. change the hover background color to #2d2d2d

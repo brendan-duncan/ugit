@@ -292,6 +292,15 @@ class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async clone(repoUrl, parentFolder, repoName) {
+    const startTime = performance.now();
+    // Clone into the specific folder within parent directory
+    const localFolder = parentFolder + "/" + repoName;
+    const git = simpleGit();
+    await git.clone(repoUrl, localFolder);
+    this._logCommand(`git clone ${repoUrl} ${localFolder}`, startTime);
+  }
+
   async raw(args) {
     const startTime = performance.now();
     const result = await this.git.raw(args);
