@@ -323,3 +323,13 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 162. put change count next to Local Changes label, change the color to off-white and bold.
 
 163. use 📝 as the local changes icon. change the local changes selection background color to #264f78. change the hover background color to #2d2d2d
+
+164. instead of having repoinfo be in a split panel, make it have a fixed height. branches and stashes panels should be in a split panel to allow resizing between them, below of repo info.
+
+165. handleBranchSwitch is not defined at BranchStashPanel (BranchStashPanel.js:13:27)
+
+166. in BranchStashPanel, handleBranchSwitch should be onBranchSwitch. change RepoInfo fixed height to 160px. remove splitter-handle between RepoPanel and BranchStashPanel.
+
+167. send all instructions that I write here (not in the application) to the existing command-logger.js so that they get logged. do not rewrite command-logger.js.
+
+168. line 13 of BranchStashPanel.js has handleBranchSwitch. This should be onBranchSwitch.

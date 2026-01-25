@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import RepoInfo from './RepoInfo';
-import BranchTree from './BranchTree';
-import StashList from './StashList';
+import BranchStashPanel from './BranchStashPanel';
+import './BranchStashPanel.css';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -30,7 +30,7 @@ function RepositoryView({ repoPath }) {
   const [error, setError] = useState(null);
   const [usingCache, setUsingCache] = useState(false);
   const [topHeight, setTopHeight] = useState(12);
-  const [middleHeight, setMiddleHeight] = useState(48);
+  const [branchesHeight, setBranchesHeight] = useState(50);
   const [leftWidth, setLeftWidth] = useState(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
@@ -430,20 +430,13 @@ function RepositoryView({ repoPath }) {
         setLeftWidth(mouseX);
       }
     } else {
-      // Vertical splitters in left panel
+      // Vertical splitter in branch-stash panel
       const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
 
-      if (activeSplitter.current === 0) {
-        // First splitter - adjusts top panel
-        if (mouseY >= 10 && mouseY <= 60) {
-          setTopHeight(mouseY);
-        }
-      } else if (activeSplitter.current === 1) {
-        // Second splitter - adjusts middle panel
-        const minMiddleStart = topHeight + 10;
-        const maxMiddleEnd = 90;
-        if (mouseY >= minMiddleStart && mouseY <= maxMiddleEnd) {
-          setMiddleHeight(mouseY - topHeight);
+      if (activeSplitter.current === 1) {
+        // Branches/Stashes splitter
+        if (mouseY >= 20 && mouseY <= 80) {
+          setBranchesHeight(mouseY);
         }
       }
     }
@@ -777,48 +770,33 @@ function RepositoryView({ repoPath }) {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {loading && <div className="loading">Loading repository...</div>}
+{loading && <div className="loading">Loading repository...</div>}
         {error && <div className="error">Error: {error}</div>}
         {!loading && !error && (
           <>
             <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
-              <div className="split-panel top-panel" style={{ height: `${topHeight}%` }}>
-                <RepoInfo
-                  gitAdapter={gitAdapter.current}
+              <RepoInfo
+                gitAdapter={gitAdapter.current}
+                currentBranch={currentBranch}
+                originUrl={originUrl}
+                modifiedCount={modifiedCount}
+                selectedItem={selectedItem}
+                onSelectItem={handleItemSelect}
+                usingCache={usingCache}
+              />
+              <div className="branch-stash-panel">
+                <BranchStashPanel
+                  branches={branches}
                   currentBranch={currentBranch}
-                  originUrl={originUrl}
-                  modifiedCount={modifiedCount}
-                  selectedItem={selectedItem}
-                  onSelectItem={handleItemSelect}
-                  usingCache={usingCache}
-                />
-              </div>
-              <div
-                className="splitter-handle"
-                onMouseDown={() => handleMouseDown(0)}
-              >
-                <div className="splitter-line"></div>
-              </div>
-              <div className="split-panel middle-panel" style={{ height: `${middleHeight}%` }}>
-                <BranchTree branches={branches} currentBranch={currentBranch} branchStatus={branchStatus} onBranchSwitch={handleBranchSwitch} pullingBranch={pullingBranch} onBranchSelect={handleBranchSelect} selectedBranch={selectedBranch} />
-              </div>
-              <div
-                className="splitter-handle"
-                onMouseDown={() => handleMouseDown(1)}
-              >
-                <div className="splitter-line"></div>
-              </div>
-              <div
-                className="splitter-handle"
-                onMouseDown={() => handleMouseDown(1)}
-              >
-                <div className="splitter-line"></div>
-              </div>
-              <div className="split-panel bottom-panel" style={{ height: `${100 - topHeight - middleHeight}%` }}>
-                <StashList
+                  branchStatus={branchStatus}
+                  onBranchSwitch={handleBranchSwitch}
+                  pullingBranch={pullingBranch}
+                  onBranchSelect={handleBranchSelect}
+                  selectedBranch={selectedBranch}
                   stashes={stashes}
                   onSelectStash={(stash, index) => handleItemSelect({ type: 'stash', stash, index })}
                   selectedItem={selectedItem}
+                  onMouseDown={handleMouseDown}
                 />
               </div>
             </div>
