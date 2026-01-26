@@ -771,6 +771,9 @@ function RepositoryView({ repoPath }) {
 
       if (checkoutAfterCreate && previousBranch && previousBranch !== branchName) {
         await git.checkoutBranch(branchName);
+        
+        // Select the newly checked out branch to update the branch view
+        await handleBranchSelect(branchName);
       }
 
       // Refresh all data after branch operations

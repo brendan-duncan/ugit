@@ -360,3 +360,4 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 
 181. implement createBranch in SimpleGitAdapte
 
+182. in RepositoryView handleCreateBranch, if checkoutAfterCreate is true and the branch is checked out, select the branch so the branch view is updated
