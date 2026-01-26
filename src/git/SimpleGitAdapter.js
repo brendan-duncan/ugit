@@ -8,6 +8,7 @@ class SimpleGitAdapter extends GitAdapter {
   constructor(repoPath) {
     super(repoPath);
     this.git = null;
+    this.currentBranch = null;
   }
 
   async open() {
@@ -18,6 +19,7 @@ class SimpleGitAdapter extends GitAdapter {
   async status() {
     const startTime = performance.now();
     const result = await this.git.status();
+    this.currentBranch = result.current; // Track current branch
     this._logCommand('git status', startTime);
     return result;
   }
@@ -27,6 +29,23 @@ class SimpleGitAdapter extends GitAdapter {
     const result = await this.git.branchLocal();
     this._logCommand('git branch --list', startTime);
     return result;
+  }
+
+  async createBranch(branchName, startPoint = null) {
+    const startTime = performance.now();
+    try {
+      if (startPoint) {
+        await this.git.branch([branchName, startPoint]);
+        this._logCommand(`git branch ${branchName} ${startPoint}`, startTime);
+      } else {
+        await this.git.branch([branchName]);
+        this._logCommand(`git branch ${branchName}`, startTime);
+      }
+    } catch (error) {
+      const command = startPoint ? `git branch ${branchName} ${startPoint}` : `git branch ${branchName}`;
+      this._logCommand(command, startTime);
+      throw error;
+    }
   }
 
   async getAheadBehind(localBranch, remoteBranch) {

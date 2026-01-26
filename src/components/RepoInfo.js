@@ -7,15 +7,22 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
   // Extract the repository directory name from the full path
   const repoName = gitAdapter?.repoPath?.split(/[\\/]/).pop() || 'Repository';
 
-  return (
+return (
     <div className="repo-info">
       <div className="repo-name">{repoName}</div>
-      {originUrl && (
-        <div className="repo-origin">
-          Origin: <strong>{originUrl}</strong>
-        </div>
-      )}
-{currentBranch && (
+      <div className="repo-local">
+        Local: <strong>{gitAdapter?.repoPath || 'Unknown'}</strong>
+      </div>
+      {originUrl ? (
+          <div className="repo-origin">
+            Origin: <strong>{originUrl}</strong>
+          </div>
+        ) : (
+          <div className="repo-origin">
+            Origin: <strong>none</strong>
+          </div>
+        )}
+      {currentBranch && (
           <div className="repo-branch">
             Branch: <strong>{currentBranch}</strong>
           </div>

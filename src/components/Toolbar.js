@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Toolbar.css';
 
-function Toolbar({ onRefresh, onFetch, onPull, onPush, onStash, onResetToOrigin, refreshing, currentBranch, branchStatus }) {
+function Toolbar({ onRefresh, onFetch, onPull, onPush, onStash, onResetToOrigin, refreshing, currentBranch, branchStatus, onCreateBranch }) {
   const [showRepositoryMenu, setShowRepositoryMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -52,6 +52,10 @@ function Toolbar({ onRefresh, onFetch, onPull, onPush, onStash, onResetToOrigin,
       <button className="toolbar-button" onClick={onStash} disabled={!onStash}>
         <span className="toolbar-button-icon">📦</span>
         <span className="toolbar-button-label">Stash</span>
+      </button>
+      <button className="toolbar-button" onClick={onCreateBranch} disabled={!currentBranch}>
+        <span className="toolbar-button-icon">🌿</span>
+        <span className="toolbar-button-label">Branch</span>
       </button>
       <div className="toolbar-separator"></div>
       <div className="toolbar-dropdown" ref={menuRef}>

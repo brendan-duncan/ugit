@@ -45,6 +45,16 @@ class GitAdapter {
   }
 
   /**
+   * Create a new branch
+   * @param {string} branchName - Name of the new branch to create
+   * @param {string} startPoint - Optional starting point (commit hash, branch name, or tag). Defaults to current HEAD
+   * @returns {Promise<void>}
+   */
+  async createBranch(branchName, startPoint = null) {
+    throw new Error('createBranch() must be implemented');
+  }
+
+  /**
    * Get ahead/behind count for a branch relative to its remote
    * @param {string} localBranch - Local branch name
    * @param {string} remoteBranch - Remote branch name (e.g., 'origin/main')

@@ -335,3 +335,28 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 168. line 13 of BranchStashPanel.js has handleBranchSwitch. This should be onBranchSwitch.
 
 169. in commit list of a branch, if a commit is not on origin (meaning it still needs to be pushed), highlight it with an icon and background color, making it clear that it is not on origin
+
+170. if a repo doesn't have an origin, RepoInfo origin label should be "Origin: none"
+
+171. in the RepoInfo, above origin, add a label "Local:" with the path to the local repo
+
+172. on the toolbar, after Stash and before Repository, add a Branch button. this will be used to create a new branch. this will bring up a Create Branch dialog. The dialog will have a label item saying "Create branch at:" with a current branch name, and a text field with a label "Branch name:", with a placeholder "Enter branch name". Then have a checkbox "Check out after create". The buttons will be "Create" and "Cancel". Cancel, with hotkey escape, will close the dialog without doing anything. Create will create a branch using git. If the checkbox is checked, the new branch will be checked out after being created.
+
+173. add createBranch to GitAdapter and an implementation for SimpleGitAdapter
+
+174. in CreateBranchDialog, check the checkbox by default and make its state persistent. In RepositoryView, if checkoutAfterCreate is false, then check out the branch that was current prior to creating the branch, after the branch has been created.
+
+175. remove createBranch from GitAdapter and SimpleGitAdapter
+
+176. in CreateBranchDialog, make Branch name empty by default, and disable the Create button if the branch name is empty. Add a warning label below the Branch name field, which is empty, but will display a warning if the branch name already exists. If the branch name already exists, the Create button will disabled.
+
+177. pass the current git adapter to CreateBranchDialog so it doesn't create one from the factory.
+
+178. add createBranch to GitAdapter and SimpleGitAdapter, and have CreateBranchDialog call that to create the branch instead of checkoutBranch.
+
+179. undo that last change, you just deleted the entire GitAdapter class!
+
+180. add createBranch to GitAdapter
+
+181. implement createBranch in SimpleGitAdapte
+

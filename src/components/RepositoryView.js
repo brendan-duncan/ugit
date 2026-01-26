@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import RepoInfo from './RepoInfo';
 import BranchStashPanel from './BranchStashPanel';
-import './BranchStashPanel.css';
+import CreateBranchDialog from './CreateBranchDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -38,6 +38,7 @@ function RepositoryView({ repoPath }) {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [selectedBranch, setSelectedBranch] = useState(null);
+  const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const hasLoadedCache = useRef(false);
@@ -759,11 +760,32 @@ function RepositoryView({ repoPath }) {
     }
   };
 
+  const handleCreateBranch = async (branchName, checkoutAfterCreate) => {
+    try {
+      const git = gitAdapter.current;
+
+      await git.createBranch(branchName);
+
+      // Get current branch before creating new one
+      const previousBranch = gitAdapter.current.currentBranch || currentBranch;
+
+      if (checkoutAfterCreate && previousBranch && previousBranch !== branchName) {
+        await git.checkoutBranch(branchName);
+      }
+
+      // Refresh all data after branch operations
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error creating branch:', error);
+      setError(`Branch creation failed: ${error.message}`);
+    }
+  };
+
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
   return (
     <div className="repository-view">
-      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onResetToOrigin={() => setShowResetDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
+      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onResetToOrigin={() => setShowResetDialog(true)} onCreateBranch={() => setShowCreateBranchDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}
@@ -818,12 +840,41 @@ function RepositoryView({ repoPath }) {
           </>
         )}
       </div>
-      {showPullDialog && (
+{showPullDialog && (
         <PullDialog
           onClose={() => setShowPullDialog(false)}
           onPull={handlePull}
           branches={branches}
           currentBranch={currentBranch}
+        />
+      )}
+      {showPushDialog && (
+        <PushDialog
+          onClose={() => setShowPushDialog(false)}
+          onPush={handlePush}
+          branches={branches}
+          currentBranch={currentBranch}
+        />
+      )}
+      {showStashDialog && (
+        <StashDialog
+          onClose={() => setShowStashDialog(false)}
+          onStash={handleStash}
+        />
+      )}
+      {showResetDialog && (
+        <ResetToOriginDialog
+          onClose={() => setShowResetDialog(false)}
+          onReset={handleResetToOrigin}
+          currentBranch={currentBranch}
+        />
+      )}
+      {showCreateBranchDialog && (
+        <CreateBranchDialog
+          onClose={() => setShowCreateBranchDialog(false)}
+          onCreateBranch={handleCreateBranch}
+          currentBranch={currentBranch}
+          gitAdapter={gitAdapter.current}
         />
       )}
       {showPushDialog && (
