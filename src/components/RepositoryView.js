@@ -43,6 +43,54 @@ function RepositoryView({ repoPath }) {
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const hasLoadedCache = useRef(false);
+  const branchCommitsCache = useRef(new Map()); // Cache commits per branch
+
+  // Helper function to update branch commits cache
+  const updateBranchCache = (branchName, commits) => {
+    branchCommitsCache.current.set(branchName, commits);
+    
+    // Persist to cache manager (merge with existing)
+    const cacheData = cacheManager.loadCache(repoPath) || {};
+    cacheData.branchCommits = {
+      ...cacheData.branchCommits,
+      [branchName]: commits
+    };
+    cacheManager.saveCache(repoPath, cacheData);
+  };
+
+  // Helper function to clear branch commits cache
+  const clearBranchCache = (branchName = null) => {
+    if (branchName) {
+      branchCommitsCache.current.delete(branchName);
+      
+      // Remove from persistent cache
+      const cacheData = cacheManager.loadCache(repoPath) || {};
+      if (cacheData.branchCommits) {
+        delete cacheData.branchCommits[branchName];
+        cacheManager.saveCache(repoPath, cacheData);
+      }
+    } else {
+      branchCommitsCache.current.clear();
+      
+      // Clear all from persistent cache
+      const cacheData = cacheManager.loadCache(repoPath) || {};
+      delete cacheData.branchCommits;
+      cacheManager.saveCache(repoPath, cacheData);
+    }
+  };
+
+  // Helper function to load branch commits from persistent cache
+  const loadBranchCommitsFromCache = () => {
+    const cacheData = cacheManager.loadCache(repoPath);
+    if (cacheData && cacheData.branchCommits) {
+      // Load into memory cache
+      Object.entries(cacheData.branchCommits).forEach(([branchName, commits]) => {
+        branchCommitsCache.current.set(branchName, commits);
+      });
+      return cacheData.branchCommits;
+    }
+    return {};
+  };
   const cacheInitialized = useRef(false);
   const currentBranchLoadId = useRef(0);
 
@@ -69,12 +117,15 @@ function RepositoryView({ repoPath }) {
           const userDataPath = await ipcRenderer.invoke('get-user-data-path');
           cacheManager.setCacheDir(userDataPath);
           cacheInitialized.current = true;
+
+          // Initialize branch commits cache from persistent cache
+          loadBranchCommitsFromCache();
+
+          // Load repository data after adapter is ready
+          loadRepoData(false);
         }
       };
       initCache();
-
-      // Load repository data after adapter is ready
-      loadRepoData(false);
     };
 
     initRepository();
@@ -246,7 +297,7 @@ function RepositoryView({ repoPath }) {
       }
 
       // Save to cache (excluding lastContentPanel to avoid persistence)
-      cacheManager.saveCache(repoPath, {
+      const cacheData = {
         currentBranch: status.current,
         originUrl: url,
         unstagedFiles: unstaged,
@@ -255,7 +306,16 @@ function RepositoryView({ repoPath }) {
         branches: branchNames,
         branchStatus: statusMap,
         stashes: stashList.all
+      };
+      
+      // Include all branch commits from memory cache
+      const currentBranchCommits = {};
+      branchCommitsCache.current.forEach((commits, branchName) => {
+        currentBranchCommits[branchName] = commits;
       });
+      cacheData.branchCommits = currentBranchCommits;
+      
+      cacheManager.saveCache(repoPath, cacheData);
 
     } catch (err) {
       console.error('Error loading repo data:', err);
@@ -437,6 +497,9 @@ function RepositoryView({ repoPath }) {
       await git.fetch('origin');
       console.log('Fetch completed successfully');
 
+      // Clear branch commits cache since remote changes may affect commits
+      clearBranchCache();
+
       // Refresh branch status after fetch (parallel, update UI incrementally)
       branches.forEach(async (branchName) => {
         try {
@@ -501,19 +564,8 @@ function RepositoryView({ repoPath }) {
       await git.pull('origin', branch);
       console.log('Pull completed successfully');
 
-      // Clear pulling indicator immediately after pull completes
-      setPullingBranch(null);
-
-      // Reapply stash if it was created
-      if (stashCreated) {
-        try {
-          await git.stashPop();
-          console.log('Stash applied and removed successfully');
-        } catch (error) {
-          console.error('Failed to apply stash, leaving it in stash list:', error);
-          // Stash will remain in the list for manual resolution
-        }
-      }
+      // Clear branch commits cache since pull may have changed commits
+      clearBranchCache();
 
       // Refresh all data after pull
       const status = await git.status();
@@ -576,6 +628,9 @@ function RepositoryView({ repoPath }) {
         await git.push('origin', `${branch}:${remoteBranch}`);
         console.log('Push completed successfully');
       }
+
+      // Clear branch commits cache since push may have changed commits
+      clearBranchCache();
 
       // Refresh branch status after push (parallel, update UI incrementally)
       branches.forEach(async (branchName) => {
@@ -744,6 +799,18 @@ function RepositoryView({ repoPath }) {
   };
 
   const handleBranchSelect = async (branchName) => {
+    // Check cache first
+    if (branchCommitsCache.current.has(branchName)) {
+      console.log(`Loading commits for ${branchName} from cache`);
+      _setSelectedItem({
+        type: 'branch',
+        branchName,
+        commits: branchCommitsCache.current.get(branchName),
+        loading: false
+      });
+      return;
+    }
+
     // Increment load ID to cancel any pending requests
     currentBranchLoadId.current += 1;
     const thisLoadId = currentBranchLoadId.current;
@@ -761,6 +828,9 @@ function RepositoryView({ repoPath }) {
 
       console.log(`Loading commits for branch: ${branchName}`);
       const commits = await git.log(branchName);
+
+      // Cache the commits for this branch
+      updateBranchCache(branchName, commits);
 
       // Only update state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
@@ -814,6 +884,9 @@ function RepositoryView({ repoPath }) {
       await git.stashPush(stashMessage);
       console.log('Stash created successfully');
 
+      // Clear branch commits cache since stash may affect working tree
+      clearBranchCache();
+
       // Refresh file status and stashes
       await refreshFileStatus();
       const stashList = await git.stashList();
@@ -834,6 +907,9 @@ function RepositoryView({ repoPath }) {
       console.log(`Resetting ${currentBranch} to origin...`);
       await git.resetToOrigin(currentBranch);
       console.log('Reset to origin completed successfully');
+
+      // Clear branch commits cache since reset changes commits
+      clearBranchCache();
 
       // Refresh all data after reset
       await loadRepoData(true);
@@ -858,6 +934,9 @@ function RepositoryView({ repoPath }) {
         // Select the newly checked out branch to update the branch view
         await handleBranchSelect(branchName);
       }
+
+      // Clear branch commits cache since branch operations may affect commits
+      clearBranchCache();
 
       // Refresh all data after branch operations
       await loadRepoData(true);
