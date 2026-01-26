@@ -377,3 +377,5 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 189. there's an error on startup that selectedItem.stash is undefined when getting selectedItem.stash.index in ContentViewer.js
 
 190. don't make the last selected item persistent. Always select the local changes item on startup.
+
+92. make the branch panel and the scroll panel collapsable

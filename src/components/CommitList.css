@@ -94,6 +94,7 @@
 .commit-item.not-on-origin {
   background-color: #2d2d2d;
   border-color: #264f78;
+  grid-template-columns: auto 1fr auto auto auto auto;
 }
 
 .commit-item.not-on-origin .commit-message {

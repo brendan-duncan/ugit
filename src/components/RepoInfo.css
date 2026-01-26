@@ -10,28 +10,34 @@
   margin-bottom: 8px;
 }
 
-.repo-origin {
-  color: #cccccc;
-  font-size: 0.9rem;
-  margin-bottom: 4px;
-}
-
 .repo-local {
   color: #cccccc;
   font-size: 0.9rem;
-  margin-bottom: 8px;
+  /*margin-bottom: 8px;*/
+}
+
+.repo-local strong {
+  color: #26e1da;
 }
 
 .repo-origin {
   color: #cccccc;
   font-size: 0.9rem;
-  margin-bottom: 4px;
+  /*margin-bottom: 4px;*/
+}
+
+.repo-origin strong {
+  color: #48dd2f;
 }
 
 .repo-branch {
   color: #cccccc;
   font-size: 0.9rem;
   margin-bottom: 8px;
+}
+
+.repo-branch strong {
+  color: #ffab40;
 }
 
 .local-changes-section {

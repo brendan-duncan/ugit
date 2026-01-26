@@ -20,7 +20,7 @@ class SimpleGitAdapter extends GitAdapter {
     const startTime = performance.now();
     const result = await this.git.status();
     this.currentBranch = result.current; // Track current branch
-    this._logCommand('git status', startTime);
+    //this._logCommand('git status', startTime);
     return result;
   }
 
@@ -65,7 +65,7 @@ class SimpleGitAdapter extends GitAdapter {
     const startTime = performance.now();
     try {
       const result = await this.git.raw(['remote', 'get-url', 'origin']);
-      this._logCommand('git remote get-url origin', startTime);
+      //this._logCommand('git remote get-url origin', startTime);
       return result.trim();
     } catch (error) {
       this._logCommand('git remote get-url origin', startTime);

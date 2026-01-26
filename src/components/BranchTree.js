@@ -97,7 +97,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   );
 }
 
-function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedBranch }) {
+function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedBranch, collapsed, onToggleCollapse }) {
   if (!branches || branches.length === 0) {
     return <div className="branch-tree-empty">No branches found</div>;
   }
@@ -129,22 +129,29 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
 
   return (
     <div className="branch-tree">
-      <h3>Branches</h3>
-      <div className="branch-tree-content">
-        {Object.keys(tree.children).sort().map(key => (
-          <TreeNode
-            key={key}
-            node={tree.children[key]}
-            currentBranch={currentBranch}
-            branchStatus={branchStatus}
-            level={0}
-            onBranchSwitch={onBranchSwitch}
-            pullingBranch={pullingBranch}
-            onBranchSelect={onBranchSelect}
-            selectedBranch={selectedBranch}
-          />
-        ))}
+      <div className="panel-header">
+        <h3>Branches</h3>
+        <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
+          {collapsed ? '▶' : '▼'}
+        </button>
       </div>
+      {!collapsed && (
+        <div className="branch-tree-content">
+          {Object.keys(tree.children).sort().map(key => (
+            <TreeNode
+              key={key}
+              node={tree.children[key]}
+              currentBranch={currentBranch}
+              branchStatus={branchStatus}
+              level={0}
+              onBranchSwitch={onBranchSwitch}
+              pullingBranch={pullingBranch}
+              onBranchSelect={onBranchSelect}
+              selectedBranch={selectedBranch}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

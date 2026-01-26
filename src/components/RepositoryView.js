@@ -59,25 +59,27 @@ function RepositoryView({ repoPath }) {
           await gitAdapter.current.open();
         }
       }
+
+      // Initialize cache manager with user data path
+      const initCache = async () => {
+        if (!cacheInitialized.current) {
+          const userDataPath = await ipcRenderer.invoke('get-user-data-path');
+          cacheManager.setCacheDir(userDataPath);
+          cacheInitialized.current = true;
+        }
+      };
+      await initCache();
+
       // Load repository data after adapter is ready
-      loadRepoData(false);
+      await loadRepoData(false);
     };
     initRepository();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]); // Load repo when path changes
 
-  // Initialize cache manager with user data path
-  useEffect(() => {
-    const initCache = async () => {
-      if (!cacheInitialized.current) {
-        const userDataPath = await ipcRenderer.invoke('get-user-data-path');
-        cacheManager.setCacheDir(userDataPath);
-        cacheInitialized.current = true;
-      }
-    };
-    initCache();
 
-    // Add event listener for branch status refresh
+  // Add event listener for branch status refresh
+  useEffect(() => {
     const handleBranchStatusRefresh = () => {
       refreshBranchStatus();
     };
@@ -89,17 +91,16 @@ function RepositoryView({ repoPath }) {
     };
   }, []);
 
-
-
   const loadRepoData = async (isRefresh = false) => {
     try {
       // Wait for cache to be initialized
       while (!cacheInitialized.current) {
         await new Promise(resolve => setTimeout(resolve, 10));
       }
+      const cacheLoadTime = performance.now();
 
       // Load from cache first on initial load
-      if (!isRefresh && !hasLoadedCache.current) {
+      if (!isRefresh /*&& !hasLoadedCache.current*/) {
         const cachedData = cacheManager.loadCache(repoPath);
         if (cachedData) {
           // Apply cached data immediately
@@ -265,11 +266,11 @@ function RepositoryView({ repoPath }) {
     // Don't start checking until initial load is complete
     if (loading) return;
 
-    // Check for changes every 5 seconds
+    // Check for changes every 10 seconds
     const intervalId = setInterval(() => {
       // Silently refresh file status in the background
       refreshFileStatus();
-    }, 5000);
+    }, 10000);
 
     // Clean up interval on unmount
     return () => {
@@ -617,7 +618,7 @@ function RepositoryView({ repoPath }) {
     try {
       const git = gitAdapter.current;
 
-      console.log(`Switching to branch: ${branchName}`);
+      console.log(`@@@@ Switching to branch: ${branchName}`);
       await git.checkoutBranch(branchName);
       console.log('Branch switch completed successfully');
 
