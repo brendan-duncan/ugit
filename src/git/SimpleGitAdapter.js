@@ -177,6 +177,88 @@ class SimpleGitAdapter extends GitAdapter {
     return result;
   }
 
+  /**
+   * Get detailed information about a git stash entry
+   * @param {number} stashIndex - The stash index (default: 0 for most recent)
+   * @param {string} repoPath - Path to the git repository (default: current directory)
+   * @returns {Promise<Object>} Object containing stash information
+   */
+  async getStashInfo(stashIndex) {
+    const stashRef = `stash@{${stashIndex}}`;
+    const startTime = performance.now();
+    try {
+      // Get basic stash info using git show
+      const showOutput = await this.git.show([stashRef]);
+      
+      // Get the list of files in the stash
+      const stashShowOutput = await this.git.raw([
+        'stash',
+        'show',
+        '--name-only',
+        stashRef
+      ]);
+      this._logCommand(`git show --name-only ${stashRef}`, startTime);
+      
+      const files = stashShowOutput
+        .trim()
+        .split('\n')
+        .filter(file => file.length > 0);
+      
+      // Get diff for each file
+      const fileDiffs = {};
+      for (const file of files) {
+        try {
+          const diff = await this.git.raw([
+            'stash',
+            'show',
+            '-p',
+            stashRef,
+            '--',
+            file
+          ]);
+          this._logCommand(`git stash show -p ${stashRef} -- ${file}`, startTime);
+          fileDiffs[file] = diff;
+        } catch (error) {
+          fileDiffs[file] = `Error getting diff: ${error.message}`;
+        }
+      }
+      
+      const info = {};
+
+      showOutput.split('\n').forEach(line => {
+        if (line.startsWith('commit ')) {
+          const hash = line.substring('commit '.length).trim();
+          info.hash = hash;
+        } else if (line.startsWith('Author: ')) {
+          const author = line.substring('Author: '.length).trim();
+          info.author = author;
+        } else if (line.startsWith('Date: ')) {
+          const date = line.substring('Date: '.length).trim();
+          info.date = date;
+        } else if (line.startsWith('Merge: ')) {
+          const merge = line.substring('Merge: '.length).trim();
+          info.merge = merge;
+        } else if (line.startsWith('    ')) {
+          const message = line.substring(line.indexOf(':') + 1).trim();
+          info.message = message;
+        }
+      });
+      
+      return {
+        stashRef,
+        stashIndex,
+        info,
+        showOutput,
+        files,
+        fileDiffs,
+        totalFiles: files.length
+      };
+    } catch (error) {
+      throw new Error(`Failed to get stash info: ${error.message}`);
+    }
+    console.log('!!!! getStashInfo completed', performance.now() - startTime, 'ms');
+  }
+
   async showStash(stashIndex) {
     const startTime = performance.now();
     const result = await this.git.show([`stash@{${stashIndex}}`]);

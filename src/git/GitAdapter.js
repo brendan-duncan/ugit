@@ -197,10 +197,15 @@ class GitAdapter {
   }
 
   /**
-   * Show stash contents
-   * @param {number} stashIndex - Stash index
-   * @returns {Promise<string>}
+   * Get detailed information about a git stash entry
+   * @param {number} stashIndex - The stash index (default: 0 for most recent)
+   * @param {string} repoPath - Path to the git repository (default: current directory)
+   * @returns {Promise<Object>} Object containing stash information
    */
+  async getStashInfo(stashIndex) {
+    throw new Error('getStashInfo() must be implemented');
+  }
+
   async showStash(stashIndex) {
     throw new Error('showStash() must be implemented');
   }
