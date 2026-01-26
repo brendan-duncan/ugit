@@ -129,12 +129,20 @@ class GitAdapter {
     throw new Error('stashPush() must be implemented');
   }
 
-  /**
-   * Apply and remove most recent stash
-   * @returns {Promise<void>}
-   */
+/**
+    * Apply and remove most recent stash
+    * @returns {Promise<void>}
+    */
   async stashPop() {
     throw new Error('stashPop() must be implemented');
+  }
+
+  /**
+    * Apply most recent stash without removing it
+    * @returns {Promise<void>}
+    */
+  async stashApply() {
+    throw new Error('stashApply() must be implemented');
   }
 
   /**

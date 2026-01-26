@@ -33,25 +33,21 @@
   align-items: center;
   padding: 8px 12px;
   margin-bottom: 4px;
-  background-color: #252526;
   border-radius: 3px;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
   gap: 12px;
   cursor: pointer;
+  border: 1px solid transparent;
 }
 
 .stash-item:hover {
-  background-color: #2d2d2d;
+  border-color: #3d3d3d;
 }
 
 .stash-item.selected {
-  background-color: #37373d;
+  background-color: #2d2d2d;
+  border: 1px solid #4ec9b0;
   border-left: 3px solid #4ec9b0;
-  padding-left: 9px;
-}
-
-.stash-item.selected:hover {
-  background-color: #3d3d3d;
 }
 
 .stash-index {

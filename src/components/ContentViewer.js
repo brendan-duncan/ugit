@@ -29,10 +29,10 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           onRefresh={onRefresh}
         />
       )}
-      {item.type === 'stash' && (
+      {item.type === 'stash' && selectedItem.stash && (
         <StashViewer
           stash={selectedItem.stash}
-          stashIndex={selectedItem.index}
+          stashIndex={selectedItem.index !== undefined ? selectedItem.index : (selectedItem.stash.index !== undefined ? selectedItem.stash.index : 0)}
           gitAdapter={gitAdapter}
         />
       )}

@@ -12,9 +12,9 @@ function CreateBranchDialog({ onClose, onCreateBranch, currentBranch, gitAdapter
   const [branchExists, setBranchExists] = useState(false);
   const [existingBranchName, setExistingBranchName] = useState('');
 
-  // Auto-fill with current branch name when dialog opens
+  // Use an empty name by default
   useEffect(() => {
-    setBranchName(currentBranch || '');
+    setBranchName('');
   }, [currentBranch]);
 
   // Save checkbox state when it changes

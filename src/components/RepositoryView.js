@@ -8,6 +8,7 @@ import PullDialog from './PullDialog';
 import PushDialog from './PushDialog';
 import StashDialog from './StashDialog';
 import ResetToOriginDialog from './ResetToOriginDialog';
+import LocalChangesDialog from './LocalChangesDialog';
 import './RepositoryView.css';
 
 const GitFactory = window.require('./src/git/GitFactory');
@@ -36,6 +37,8 @@ function RepositoryView({ repoPath }) {
   const [showPushDialog, setShowPushDialog] = useState(false);
   const [showStashDialog, setShowStashDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showLocalChangesDialog, setShowLocalChangesDialog] = useState(false);
+  const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [selectedBranch, setSelectedBranch] = useState(null);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
@@ -626,6 +629,18 @@ function RepositoryView({ repoPath }) {
   };
 
   const handleBranchSwitch = async (branchName) => {
+    // Check if there are local changes
+    if (hasLocalChanges) {
+      setPendingBranchSwitch(branchName);
+      setShowLocalChangesDialog(true);
+      return;
+    }
+
+    // No local changes, proceed with branch switch
+    await performBranchSwitch(branchName);
+  };
+
+  const performBranchSwitch = async (branchName) => {
     try {
       const git = gitAdapter.current;
 
@@ -638,6 +653,97 @@ function RepositoryView({ repoPath }) {
     } catch (error) {
       console.error('Error switching branch:', error);
       setError(`Branch switch failed: ${error.message}`);
+    }
+  };
+
+  const handleLocalChangesDialog = async (option) => {
+    setShowLocalChangesDialog(false);
+    
+    if (!pendingBranchSwitch) {
+      return;
+    }
+
+    const branchName = pendingBranchSwitch;
+    setPendingBranchSwitch(null);
+
+    try {
+      const git = gitAdapter.current;
+
+      switch (option) {
+        case 'leave-alone':
+          // Just switch branches, keep changes as they are
+          await performBranchSwitch(branchName);
+          break;
+
+        case 'stash-and-reapply':
+          // Stash changes, switch branches, then reapply
+          console.log('Stashing changes before branch switch...');
+          await git.stashPush(`Auto-stash before switching to ${branchName}`);
+          
+          // Switch branches
+          await performBranchSwitch(branchName);
+          
+          // Try to reapply the stash without deleting it
+          try {
+            console.log('Reapplying stashed changes...');
+            await git.stashApply();
+            console.log('Stash reapplied successfully');
+            
+            // If apply succeeded, then pop the stash to remove it
+            // Try to pop stash to remove it
+            try {
+              await git.stashPop();
+              console.log('Stash removed successfully');
+            } catch (popError) {
+              console.warn('Failed to remove stash after successful apply:', popError.message);
+              setError(`Stash reapplied but could not be removed: ${popError.message}`);
+            }
+            
+            // Refresh Local Changes panel after stash reapplication
+            await refreshFileStatus();
+          } catch (stashError) {
+            console.warn('Could not reapply stash automatically:', stashError.message);
+            setError(`Branch switched but stash could not be reapplied: ${stashError.message}`);
+            console.info('The stash has been preserved and can be applied manually.');
+            
+            // Still refresh file status even if stash failed
+            await refreshFileStatus();
+          }
+          
+          // Refresh all data after stash operations
+          await loadRepoData(true);
+          break;
+
+        case 'discard':
+          // Discard all local changes
+          console.log('Discarding local changes...');
+          
+          // Discard staged changes
+          if (stagedFiles.length > 0) {
+            const stagedPaths = stagedFiles.map(f => f.path);
+            if (stagedPaths.length === 1) {
+              await git.reset(stagedPaths[0]);
+            } else {
+              await git.reset(stagedPaths);
+            }
+          }
+          
+          // Discard unstaged changes
+          if (unstagedFiles.length > 0) {
+            await git.discard(unstagedFiles.map(f => f.path));
+          }
+          
+          // Switch branches
+          await performBranchSwitch(branchName);
+          break;
+
+        default:
+          // Cancel, do nothing
+          return;
+      }
+    } catch (error) {
+      console.error('Error handling local changes:', error);
+      setError(`Failed to handle local changes: ${error.message}`);
     }
   };
 
@@ -870,6 +976,16 @@ function RepositoryView({ repoPath }) {
           onClose={() => setShowResetDialog(false)}
           onReset={handleResetToOrigin}
           currentBranch={currentBranch}
+        />
+      )}
+      {showLocalChangesDialog && (
+        <LocalChangesDialog
+          onClose={() => {
+            setShowLocalChangesDialog(false);
+            setPendingBranchSwitch(null);
+          }}
+          onProceed={handleLocalChangesDialog}
+          targetBranch={pendingBranchSwitch}
         />
       )}
       {showCreateBranchDialog && (

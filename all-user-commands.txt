@@ -361,3 +361,17 @@ instead of waiting for all rev-list commands to finish before updating the gui, 
 181. implement createBranch in SimpleGitAdapte
 
 182. in RepositoryView handleCreateBranch, if checkoutAfterCreate is true and the branch is checked out, select the branch so the branch view is updated
+
+183. when switching branches, if you have local changes, present a dialog asking what should be done with the local changes. There should be three radio buttons: Leave Alone, Stash and Reapply, Discard.
+
+184. after stash has been reapplied in stash-and-reapply, refresh Local Change
+
+185. if stashPop fails, don't delete the stash
+
+186. make the LocalChangesDialog options persisent
+
+187. In ContentViewer for stash item, selectedItem.index is undefined. It should be selectedItem.stash.index
+
+188. don't use a background color for stash list items. when a stash list item is selected, make it look selected and remove the selection state of other items
+
+189. there's an error on startup that selectedItem.stash is undefined when getting selectedItem.stash.index in ContentViewer.js

@@ -136,6 +136,12 @@ class SimpleGitAdapter extends GitAdapter {
     this._logCommand('git stash pop', startTime);
   }
 
+  async stashApply() {
+    const startTime = performance.now();
+    await this.git.stash(['apply']);
+    this._logCommand('git stash apply', startTime);
+  }
+
   async add(filePaths) {
     const startTime = performance.now();
     // Support both single string and array of file paths for backward compatibility
