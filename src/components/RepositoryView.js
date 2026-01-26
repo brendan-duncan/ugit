@@ -95,7 +95,6 @@ function RepositoryView({ repoPath }) {
   const currentBranchLoadId = useRef(0);
 
   const _setSelectedItem = (item) => {
-    //console.trace();
     setSelectedItem(item);
   };
 
@@ -980,7 +979,7 @@ function RepositoryView({ repoPath }) {
                   pullingBranch={pullingBranch}
                   onBranchSelect={handleBranchSelect}
                   stashes={stashes}
-                  onSelectStash={(stash, index) => handleItemSelect({ type: 'stash', stash, index })}
+                  onSelectStash={(stash) => handleItemSelect(stash)}
                   selectedItem={selectedItem}
                   onMouseDown={handleMouseDown}
                 />
@@ -1004,7 +1003,7 @@ function RepositoryView({ repoPath }) {
           </>
         )}
       </div>
-{showPullDialog && (
+      {showPullDialog && (
         <PullDialog
           onClose={() => setShowPullDialog(false)}
           onPull={handlePull}

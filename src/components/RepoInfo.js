@@ -120,7 +120,7 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
           <span className="changes-icon">📝</span>
           Local Changes
           <span className="modified-count">({modifiedCount})</span>
-          {usingCache && <span className="cache-indicator"> (cached)</span>}
+          {usingCache && <span className="cache-indicator"></span>}
         </div>
       </div>
     </div>

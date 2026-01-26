@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import './StashViewer.css';
 import DiffViewer from './DiffViewer';
 
-
-
 function StashViewer({ stash, stashIndex, gitAdapter }) {
   const [stashFile, setStashFile] = useState(null);
   const [loading, setLoading] = useState(true);

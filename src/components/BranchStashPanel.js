@@ -32,7 +32,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
       <div className={`split-panel stashes-panel ${stashesCollapsed ? 'collapsed' : ''}`}>
         <StashList
           stashes={stashes}
-          onSelectStash={(stash, index) => onSelectStash({ type: 'stash', stash, index })}
+          onSelectStash={(stash) => onSelectStash(stash)}
           selectedItem={selectedItem}
           collapsed={stashesCollapsed}
           onToggleCollapse={() => setStashesCollapsed(!stashesCollapsed)}

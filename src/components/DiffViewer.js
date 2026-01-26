@@ -10,9 +10,12 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
   const [loading, setLoading] = useState(true);
   const [diffHtml, setDiffHtml] = useState('');
 
+  //console.log('DiffViewer rendering for file:', file);
+
   useEffect(() => {
     const loadDiff = async () => {
-      if (!file || !gitAdapter) return;
+      if (!file || !gitAdapter)
+        return;
 
       try {
         setLoading(true);
@@ -22,11 +25,14 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
         // If diff is already provided in the file object (for stashes), use it
         if (file.diff) {
           diffResult = file.diff;
+          //console.log('DiffViewer using provided diff for file:', file.path);
         } else {
+          //console.log('DiffViewer fetching diff from git for file:', file.path);
           // Otherwise fetch the diff from git
           diffResult = await gitAdapter.diff(file.path, isStaged);
         }
 
+        //console.log(diffResult);
         setDiff(diffResult);
         
         // Generate HTML using diff2html
