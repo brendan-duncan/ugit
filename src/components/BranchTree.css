@@ -86,7 +86,7 @@
 }
 
 .tree-node-content.current {
-  /* Current branch indicated by bullet icon only */
+  background-color: #37373d;
 }
 
 .tree-node-content.current:hover {
@@ -94,11 +94,11 @@
 }
 
 .tree-node-content.branch-selected {
-  background-color: #37373d;
+  background-color: #264f78;
 }
 
 .tree-node-content.branch-selected:hover {
-  background-color: #3d3d3d;
+  background-color: #2a4b68;
 }
 
 .tree-node-content.switchable {
@@ -106,7 +106,7 @@
 }
 
 .tree-node-content.switchable:hover {
-  background-color: #37373d;
+  background-color: #2a4b58;
 }
 
 .tree-node-icon {

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import './BranchTree.css';
 
-function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch, onBranchSelect, selectedBranch }) {
+function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
   const isCurrent = node.fullPath === currentBranch;
   const isPulling = node.fullPath === pullingBranch;
-  const isSelected = !hasChildren && selectedBranch === node.fullPath;
+  const isSelected = selectedItem && selectedItem.type === 'branch' && selectedItem.branchName === node.fullPath;
   const status = branchStatus && branchStatus[node.fullPath];
 
   const handleToggle = () => {
@@ -88,7 +88,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
               onBranchSwitch={onBranchSwitch}
               pullingBranch={pullingBranch}
               onBranchSelect={onBranchSelect}
-              selectedBranch={selectedBranch}
+              selectedItem={selectedItem}
             />
           ))}
         </div>
@@ -97,7 +97,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   );
 }
 
-function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedBranch, collapsed, onToggleCollapse }) {
+function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem, collapsed, onToggleCollapse }) {
   if (!branches || branches.length === 0) {
     return <div className="branch-tree-empty">No branches found</div>;
   }
@@ -147,7 +147,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               onBranchSwitch={onBranchSwitch}
               pullingBranch={pullingBranch}
               onBranchSelect={onBranchSelect}
-              selectedBranch={selectedBranch}
+              selectedItem={selectedItem}
             />
           ))}
         </div>

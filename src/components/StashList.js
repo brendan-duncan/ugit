@@ -38,7 +38,8 @@ function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCo
                 className={`stash-item ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelectStash && onSelectStash(stash, index)}
               >
-                <div className="stash-message">{displayMessage}</div>
+                <span className="stash-item-icon">🗂️</span>
+                <span className="stash-message">{displayMessage}</span>
               </div>
             );
           })}

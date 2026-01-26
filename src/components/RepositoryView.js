@@ -40,7 +40,6 @@ function RepositoryView({ repoPath }) {
   const [showLocalChangesDialog, setShowLocalChangesDialog] = useState(false);
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
   const [pullingBranch, setPullingBranch] = useState(null);
-  const [selectedBranch, setSelectedBranch] = useState(null);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
@@ -741,7 +740,6 @@ function RepositoryView({ repoPath }) {
 
     try {
       const git = gitAdapter.current;
-      setSelectedBranch(branchName);
 
       // Set loading state immediately
       setSelectedItem({
@@ -892,7 +890,6 @@ function RepositoryView({ repoPath }) {
                   onBranchSwitch={handleBranchSwitch}
                   pullingBranch={pullingBranch}
                   onBranchSelect={handleBranchSelect}
-                  selectedBranch={selectedBranch}
                   stashes={stashes}
                   onSelectStash={(stash, index) => handleItemSelect({ type: 'stash', stash, index })}
                   selectedItem={selectedItem}
