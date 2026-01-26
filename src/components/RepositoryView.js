@@ -115,14 +115,12 @@ function RepositoryView({ repoPath }) {
           setLoading(false);
           hasLoadedCache.current = true;
 
-          if (!isRefresh) {
-            // Always select local changes
-            setLastContentPanel('local-changes');
-            setSelectedItem({ type: 'local-changes' });
-          }
+          // Always select local changes
+          setLastContentPanel('local-changes');
+          setSelectedItem({ type: 'local-changes' });
 
           // Continue loading fresh data in background
-          setTimeout(() => loadRepoData(true), 100);
+          setTimeout(() => loadRepoData(true), 1000);
           return;
         }
         hasLoadedCache.current = true;

@@ -66,6 +66,10 @@
   border-left: 4px solid #f48771;
 }
 
+.branch-stash-panel {
+  overflow: auto;
+}
+
 /* Horizontal split layout */
 .repo-content-horizontal {
   flex: 1;

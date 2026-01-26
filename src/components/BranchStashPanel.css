@@ -24,10 +24,11 @@
   margin-bottom: 8px;
 }
 
-.branch-stash-panel {
+.branch-stash-panel-container {
   display: flex;
   flex-direction: column;
   height: calc(100% - 160px);
+  overflow: auto;
 }
 
 .branches-panel {

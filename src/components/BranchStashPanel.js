@@ -4,7 +4,7 @@ import StashList from './StashList';
 
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedBranch, stashes, onSelectStash, selectedItem, onMouseDown }) {
   return (
-    <div className="branch-stash-panel">
+    <div className="branch-stash-panel-contents">
       <div className="split-panel branches-panel">
         <BranchTree 
           branches={branches} 
