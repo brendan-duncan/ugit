@@ -7,7 +7,7 @@ let recentRepos = [];
 let windowStatePath;
 
 // Parse command-line arguments for git backend selection
-// Usage: npm start -- --git-backend=nodegit
+// Usage: npm start -- --git-backend=simple-git
 let gitBackend = 'simple-git'; // default
 const args = process.argv.slice(1);
 for (const arg of args) {

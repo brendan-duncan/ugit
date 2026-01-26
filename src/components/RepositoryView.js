@@ -26,11 +26,10 @@ function RepositoryView({ repoPath }) {
   const [stagedFiles, setStagedFiles] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [lastContentPanel, setLastContentPanel] = useState(''); // Will be set based on current branch
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [usingCache, setUsingCache] = useState(false);
-  const [topHeight, setTopHeight] = useState(12);
   const [branchesHeight, setBranchesHeight] = useState(50);
   const [leftWidth, setLeftWidth] = useState(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
@@ -46,6 +45,11 @@ function RepositoryView({ repoPath }) {
   const hasLoadedCache = useRef(false);
   const cacheInitialized = useRef(false);
   const currentBranchLoadId = useRef(0);
+
+  const _setSelectedItem = (item) => {
+    //console.trace();
+    setSelectedItem(item);
+  };
 
   // Initialize git adapter and load repository data
   useEffect(() => {
@@ -67,12 +71,14 @@ function RepositoryView({ repoPath }) {
           cacheInitialized.current = true;
         }
       };
-      await initCache();
+      initCache();
 
       // Load repository data after adapter is ready
-      await loadRepoData(false);
+      loadRepoData(false);
     };
+
     initRepository();
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]); // Load repo when path changes
 
@@ -91,12 +97,22 @@ function RepositoryView({ repoPath }) {
   }, []);
 
   const loadRepoData = async (isRefresh = false) => {
+    if (loading) {
+      return;
+    }
+
+    const cacheLoadTime = performance.now();
+
+    if (isRefresh) {
+      setRefreshing(true);
+    }
+    setLoading(true);
+
     try {
       // Wait for cache to be initialized
       while (!cacheInitialized.current) {
         await new Promise(resolve => setTimeout(resolve, 10));
       }
-      const cacheLoadTime = performance.now();
 
       // Load from cache first on initial load
       if (!isRefresh /*&& !hasLoadedCache.current*/) {
@@ -112,25 +128,22 @@ function RepositoryView({ repoPath }) {
           setBranchStatus(cachedData.branchStatus || {});
           setStashes(cachedData.stashes || []);
           setUsingCache(true);
-          setLoading(false);
+          
           hasLoadedCache.current = true;
 
           // Always select local changes
-          setLastContentPanel('local-changes');
-          setSelectedItem({ type: 'local-changes' });
+          if (selectedItem == null) {
+            setLastContentPanel('local-changes');
+            _setSelectedItem({ type: 'local-changes' });
+          }
 
-          // Continue loading fresh data in background
-          setTimeout(() => loadRepoData(true), 1000);
+          setLoading(false);
+
           return;
         }
         hasLoadedCache.current = true;
       }
 
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
       setError(null);
       setUsingCache(false);
 
@@ -227,9 +240,9 @@ function RepositoryView({ repoPath }) {
       setStashes(stashList.all);
 
       // Always select local changes
-      if (!selectedItem) {
+      if (selectedItem == null) {
         setLastContentPanel('local-changes');
-        setSelectedItem({ type: 'local-changes' });
+        _setSelectedItem({ type: 'local-changes' });
       }
 
       // Save to cache (excluding lastContentPanel to avoid persistence)
@@ -244,26 +257,23 @@ function RepositoryView({ repoPath }) {
         stashes: stashList.all
       });
 
-      if (isRefresh) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
     } catch (err) {
       console.error('Error loading repo data:', err);
       setError(err.message);
-      if (isRefresh) {
-        setRefreshing(false);
-      } else {
-        setLoading(false);
-      }
+    }
+    if (refreshing) {
+      setRefreshing(false);
+    }
+    if (loading) {
+      setLoading(false);
     }
   };
 
   // Periodic background check for local changes
   useEffect(() => {
     // Don't start checking until initial load is complete
-    if (loading) return;
+    if (loading)
+      return;
 
     // Check for changes every 10 seconds
     const intervalId = setInterval(() => {
@@ -617,7 +627,7 @@ function RepositoryView({ repoPath }) {
     try {
       const git = gitAdapter.current;
 
-      console.log(`@@@@ Switching to branch: ${branchName}`);
+      console.log(`Switching to branch: ${branchName}`);
       await git.checkoutBranch(branchName);
       console.log('Branch switch completed successfully');
 
@@ -725,7 +735,7 @@ function RepositoryView({ repoPath }) {
     if (item.type !== 'branch') {
       currentBranchLoadId.current += 1;
     }
-    setSelectedItem(item);
+    _setSelectedItem(item);
 
     // Update content panel type when selecting content panel items (no persistence)
     if (item.type === 'local-changes' || item.type === 'branch' || item.type === 'stash') {
@@ -742,7 +752,7 @@ function RepositoryView({ repoPath }) {
       const git = gitAdapter.current;
 
       // Set loading state immediately
-      setSelectedItem({
+      _setSelectedItem({
         type: 'branch',
         branchName,
         commits: [],
@@ -754,7 +764,7 @@ function RepositoryView({ repoPath }) {
 
       // Only update state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
-        setSelectedItem({
+        _setSelectedItem({
           type: 'branch',
           branchName,
           commits,
@@ -767,7 +777,7 @@ function RepositoryView({ repoPath }) {
       // Only update error state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
         setError(`Failed to load commits: ${error.message}`);
-        setSelectedItem({
+        _setSelectedItem({
           type: 'branch',
           branchName,
           commits: [],

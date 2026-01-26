@@ -93,10 +93,6 @@ function App() {
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
 
-    return () => {
-      ipcRenderer.removeListener('open-repository', handleOpenRepo);
-    };
-
     const handleFetch = () => {
       if (activeTabId !== null && tabs.length > 0) {
         const activeTab = tabs.find(tab => tab.id === activeTabId);
@@ -258,7 +254,8 @@ function App() {
 
   // Periodic check for invalid tab paths
   useEffect(() => {
-    if (!hasLoadedRecent || tabs.length === 0) return;
+    if (!hasLoadedRecent || tabs.length === 0)
+      return;
 
     const checkTabValidity = () => {
       const fs = require('fs');
