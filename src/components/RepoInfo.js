@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import './RepoInfo.css';
 import { DropdownMenu, DropdownItem, DropdownSeparator } from './DropdownMenu';
+const { exec } = require('child_process');
+const { shell } = window.require('electron');
 
 function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -16,12 +18,12 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
   };
 
   const handleOpenInConsole = () => {
-    const { shell } = window.require('electron');
     const platform = process.platform;
     const repoPath = gitAdapter?.repoPath;
     
     if (platform === 'win32') {
-      shell.openExternal(`start cmd /k "cd /d "${repoPath}"`);
+      //shell.openExternal(`start cmd /k "cd /d ${repoPath}`);
+      exec(`start cmd /k "cd /d ${repoPath}"`);
     } else if (platform === 'darwin') {
       shell.openExternal(`osascript -e 'tell app "Terminal" to do script "cd \\"${repoPath}\\"" end tell'`);
     } else {
@@ -61,7 +63,7 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
     await clipboard.writeText(originUrl || '');
   };
 
-return (
+  return (
     <div className="repo-info">
       <div className="repo-header">
         <div className="repo-name">{repoName}</div>
