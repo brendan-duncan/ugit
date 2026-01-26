@@ -34,9 +34,7 @@ return (
         >
           <span className="changes-icon">📝</span>
           Local Changes
-          {modifiedCount > 0 && (
-            <span className="modified-count">({modifiedCount})</span>
-          )}
+          <span className="modified-count">({modifiedCount})</span>
           {usingCache && <span className="cache-indicator"> (cached)</span>}
         </div>
       </div>

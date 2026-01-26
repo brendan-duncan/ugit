@@ -12,17 +12,17 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
     const loadStashDiff = async () => {
       try {
         setLoading(true);
-        
+
         // Get the diff for the stash
         const diffResult = await gitAdapter.showStash(stashIndex);
-        
+
         // Create a mock file object for DiffViewer
         setStashFile({
           path: `stash@${stashIndex}: ${stash.message}`,
           status: 'STASH',
           diff: diffResult
         });
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error loading stash diff:', error);
@@ -68,9 +68,9 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
           <div className="stash-loading">Loading stash contents...</div>
         </div>
       ) : (
-        <DiffViewer 
-          file={stashFile} 
-          gitAdapter={gitAdapter} 
+        <DiffViewer
+          file={stashFile}
+          gitAdapter={gitAdapter}
           isStaged={false}
         />
       )}

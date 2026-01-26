@@ -25,7 +25,7 @@ function RepositoryView({ repoPath }) {
   const [unstagedFiles, setUnstagedFiles] = useState([]);
   const [stagedFiles, setStagedFiles] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [lastContentPanel, setLastContentPanel] = useState('local-changes'); // Default to local changes
+  const [lastContentPanel, setLastContentPanel] = useState(''); // Will be set based on current branch
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -115,29 +115,10 @@ function RepositoryView({ repoPath }) {
           setLoading(false);
           hasLoadedCache.current = true;
 
-          // Restore last content panel selection
-          const lastPanel = cachedData.lastContentPanel || 'local-changes';
-          setLastContentPanel(lastPanel);
-          
-          // Set appropriate selected item based on last content panel
-          if (lastPanel === 'local-changes') {
+          if (!isRefresh) {
+            // Always select local changes
+            setLastContentPanel('local-changes');
             setSelectedItem({ type: 'local-changes' });
-          } else if (lastPanel === 'branch') {
-            // Auto-select the current branch
-            if (cachedData.currentBranch) {
-              setSelectedItem({
-                type: 'branch',
-                branchName: cachedData.currentBranch,
-                commits: [],
-                loading: false
-              });
-              setSelectedBranch(cachedData.currentBranch);
-            } else {
-              setSelectedItem(null);
-            }
-          } else if (lastPanel === 'stash') {
-            // Don't auto-select a stash
-            setSelectedItem(null);
           }
 
           // Continue loading fresh data in background
@@ -247,18 +228,13 @@ function RepositoryView({ repoPath }) {
       const stashList = await git.stashList();
       setStashes(stashList.all);
 
-      // Auto-select current branch if branch panel is active and no branch is selected
-      if (lastContentPanel === 'branch' && !selectedItem && status.current) {
-        setSelectedItem({
-          type: 'branch',
-          branchName: status.current,
-          commits: [],
-          loading: false
-        });
-        setSelectedBranch(status.current);
+      // Always select local changes
+      if (!selectedItem) {
+        setLastContentPanel('local-changes');
+        setSelectedItem({ type: 'local-changes' });
       }
 
-      // Save to cache
+      // Save to cache (excluding lastContentPanel to avoid persistence)
       cacheManager.saveCache(repoPath, {
         currentBranch: status.current,
         originUrl: url,
@@ -267,8 +243,7 @@ function RepositoryView({ repoPath }) {
         modifiedCount: allPaths.size,
         branches: branchNames,
         branchStatus: statusMap,
-        stashes: stashList.all,
-        lastContentPanel: lastContentPanel
+        stashes: stashList.all
       });
 
       if (isRefresh) {
@@ -309,7 +284,7 @@ function RepositoryView({ repoPath }) {
     if (!gitAdapter.current) {
       return;
     }
-    
+
     try {
       const git = gitAdapter.current;
 
@@ -370,7 +345,7 @@ function RepositoryView({ repoPath }) {
     if (!gitAdapter.current) {
       return;
     }
-    
+
     try {
       const git = gitAdapter.current;
 
@@ -658,7 +633,7 @@ function RepositoryView({ repoPath }) {
 
   const handleLocalChangesDialog = async (option) => {
     setShowLocalChangesDialog(false);
-    
+
     if (!pendingBranchSwitch) {
       return;
     }
@@ -679,16 +654,16 @@ function RepositoryView({ repoPath }) {
           // Stash changes, switch branches, then reapply
           console.log('Stashing changes before branch switch...');
           await git.stashPush(`Auto-stash before switching to ${branchName}`);
-          
+
           // Switch branches
           await performBranchSwitch(branchName);
-          
+
           // Try to reapply the stash without deleting it
           try {
             console.log('Reapplying stashed changes...');
             await git.stashApply();
             console.log('Stash reapplied successfully');
-            
+
             // If apply succeeded, then pop the stash to remove it
             // Try to pop stash to remove it
             try {
@@ -698,18 +673,18 @@ function RepositoryView({ repoPath }) {
               console.warn('Failed to remove stash after successful apply:', popError.message);
               setError(`Stash reapplied but could not be removed: ${popError.message}`);
             }
-            
+
             // Refresh Local Changes panel after stash reapplication
             await refreshFileStatus();
           } catch (stashError) {
             console.warn('Could not reapply stash automatically:', stashError.message);
             setError(`Branch switched but stash could not be reapplied: ${stashError.message}`);
             console.info('The stash has been preserved and can be applied manually.');
-            
+
             // Still refresh file status even if stash failed
             await refreshFileStatus();
           }
-          
+
           // Refresh all data after stash operations
           await loadRepoData(true);
           break;
@@ -717,7 +692,7 @@ function RepositoryView({ repoPath }) {
         case 'discard':
           // Discard all local changes
           console.log('Discarding local changes...');
-          
+
           // Discard staged changes
           if (stagedFiles.length > 0) {
             const stagedPaths = stagedFiles.map(f => f.path);
@@ -727,12 +702,12 @@ function RepositoryView({ repoPath }) {
               await git.reset(stagedPaths);
             }
           }
-          
+
           // Discard unstaged changes
           if (unstagedFiles.length > 0) {
             await git.discard(unstagedFiles.map(f => f.path));
           }
-          
+
           // Switch branches
           await performBranchSwitch(branchName);
           break;
@@ -753,15 +728,10 @@ function RepositoryView({ repoPath }) {
       currentBranchLoadId.current += 1;
     }
     setSelectedItem(item);
-    
-    // Save content panel type when selecting content panel items
+
+    // Update content panel type when selecting content panel items (no persistence)
     if (item.type === 'local-changes' || item.type === 'branch' || item.type === 'stash') {
       setLastContentPanel(item.type);
-      
-      // Save to cache manager for persistence
-      const cacheData = cacheManager.loadCache(repoPath) || {};
-      cacheData.lastContentPanel = item.type;
-      cacheManager.saveCache(repoPath, cacheData);
     }
   };
 
@@ -877,7 +847,7 @@ function RepositoryView({ repoPath }) {
 
       if (checkoutAfterCreate && previousBranch && previousBranch !== branchName) {
         await git.checkoutBranch(branchName);
-        
+
         // Select the newly checked out branch to update the branch view
         await handleBranchSelect(branchName);
       }
@@ -901,7 +871,7 @@ function RepositoryView({ repoPath }) {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-{loading && <div className="loading">Loading repository...</div>}
+        {loading && <div className="loading">Loading repository...</div>}
         {error && <div className="error">Error: {error}</div>}
         {!loading && !error && (
           <>

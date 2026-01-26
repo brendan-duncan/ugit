@@ -31,13 +31,14 @@
 .stash-item {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 4px;
+  padding: 4px 12px;
+  /*margin-bottom: 4px;*/
   border-radius: 3px;
   transition: all 0.2s;
   gap: 12px;
   cursor: pointer;
   border: 1px solid transparent;
+  font-weight: bold;
 }
 
 .stash-item:hover {
