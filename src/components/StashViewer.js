@@ -91,30 +91,30 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
       </div>
       <div className="stash-info-section">
         <div className="stash-info-message">
-          <span className="stash-message-label">Message:</span>
+          <span className="stash-message-label">Message: </span>
           <span className="stash-message-text">{stash?.message || 'No message'}</span>
         </div>
         {stashInfo?.info?.author && (
           <div className="stash-info-author">
-            <span className="stash-message-label">Author:</span>
+            <span className="stash-message-label">Author: </span>
             <span className="stash-message-text">{stashInfo.info.author}</span>
           </div>
         )}
         {stashInfo?.info?.date && (
           <div className="stash-info-date">
-            <span className="stash-message-label">Date:</span>
+            <span className="stash-message-label">Date: </span>
             <span className="stash-message-text">{stashInfo.info.date}</span>
           </div>
         )}
         {stashInfo?.info?.hash && (
           <div className="stash-info-hash">
-            <span className="stash-message-label">Commit:</span>
+            <span className="stash-message-label">Commit: </span>
             <span className="stash-message-text">{stashInfo.info.hash}</span>
           </div>
         )}
         {stashInfo?.info?.merge && (
           <div className="stash-info-merge">
-            <span className="stash-message-label">Parents:</span>
+            <span className="stash-message-label">Parents: </span>
             <span className="stash-message-text">{stashInfo.info.merge}</span>
           </div>
         )}
