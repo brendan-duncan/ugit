@@ -969,42 +969,42 @@ function RepositoryView({ repoPath }) {
         break;
       case 'push-to-origin':
         // TODO: Implement push to origin dialog
-        console.log('Push to origin:', branchName);
+        alert(`Push to origin: ${branchName}`);
         break;
       case 'merge-into-active':
         // TODO: Implement merge into active branch
-        console.log(`Merge '${branchName}' into '${activeBranch}':`);
+        alert(`Merge '${branchName}' into '${activeBranch}'`);
         break;
       case 'rebase-active-onto-branch':
         // TODO: Implement rebase active branch onto branch
-        console.log(`Rebase ${activeBranch} onto branch: ${branchName}`);
+        alert(`Rebase ${activeBranch} onto branch: ${branchName}`);
         break;
       case 'new-branch':
         // TODO: Implement new branch dialog
-        console.log('New branch from:', activeBranch);
+        alert(`New branch from: ${activeBranch}`);
         break;
       case 'new-tag':
         // TODO: Implement new tag dialog
-        console.log('New tag on branch:', branchName);
+        alert(`New tag on branch: ${branchName}`);
         break;
       case 'rename':
         // TODO: Implement rename branch dialog
-        console.log('Rename branch:', branchName);
+        alert(`Rename branch: ${branchName}`);
         break;
       case 'delete':
         // TODO: Implement delete branch dialog
-        console.log('Delete branch:', branchName);
+        alert(`Delete branch: ${branchName}`);
         break;
       case 'copy-branch-name':
         // Copy branch name to clipboard
         navigator.clipboard.writeText(branchName).then(() => {
-          console.log('Branch name copied to clipboard:', branchName);
+          console.log(`Branch name copied to clipboard: ${branchName}`);
         }).catch(err => {
           console.error('Failed to copy branch name:', err);
         });
         break;
       default:
-        console.log('Unknown context menu action:', action);
+        alert(`Unknown context menu action: ${action}`);
     }
   };
 

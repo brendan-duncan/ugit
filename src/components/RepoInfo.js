@@ -38,17 +38,17 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
 
   const handleEditOrigin = () => {
     // TODO: Implement edit origin dialog
-    console.log('Edit origin - not implemented yet');
+    alert('Edit origin - not implemented yet');
   };
 
   const handleDeleteOrigin = () => {
     // TODO: Implement delete origin dialog
-    console.log('Delete origin - not implemented yet');
+    alert('Delete origin - not implemented yet');
   };
 
   const handleAddNewRemote = () => {
     // TODO: Implement add remote dialog
-    console.log('Add new remote - not implemented yet');
+    alert('Add new remote - not implemented yet');
   };
 
   const handleOpenRemoteInBrowser = () => {

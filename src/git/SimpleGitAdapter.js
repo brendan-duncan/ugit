@@ -174,6 +174,7 @@ class SimpleGitAdapter extends GitAdapter {
       result = await this.git.diff(['--', filePath]);
       this._logCommand(`git diff -- ${filePath}`, startTime);
     }
+    console.log(result);
     return result;
   }
 
@@ -205,22 +206,7 @@ class SimpleGitAdapter extends GitAdapter {
         .filter(file => file.length > 0);
       
       // Get diff for each file
-      const fileDiffs = {};
-      /*for (const file of files) {
-        try {
-          this._logCommand(`git diff "${stashRef}" -- "${file}"`, startTime);
-          const diff = await this.git.raw([
-            'diff',
-            stashRef,
-            '--',
-            file
-          ]);
-          fileDiffs[file] = diff;
-        } catch (error) {
-          fileDiffs[file] = `Error getting diff: ${error.message}.`;
-        }
-      }*/
-      
+      const fileDiffs = {};     
       const info = {};
 
       showOutput.split('\n').forEach(line => {
