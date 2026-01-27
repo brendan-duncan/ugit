@@ -10,8 +10,6 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
   const [loading, setLoading] = useState(true);
   const [diffHtml, setDiffHtml] = useState('');
 
-  //console.log('DiffViewer rendering for file:', file);
-
   useEffect(() => {
     const loadDiff = async () => {
       if (!file || !gitAdapter)
@@ -19,34 +17,39 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
 
       try {
         setLoading(true);
-        
+
         let diffResult;
-        
+
         // If diff is already provided in the file object (for stashes), use it
         if (file.diff) {
           diffResult = file.diff;
-          //console.log('DiffViewer using provided diff for file:', file.path);
         } else {
-          //console.log('DiffViewer fetching diff from git for file:', file.path);
           // Otherwise fetch the diff from git
           diffResult = await gitAdapter.diff(file.path, isStaged);
         }
 
         //console.log(diffResult);
         setDiff(diffResult);
-        
+
         // Generate HTML using diff2html
         if (diffResult && diffResult.trim() && !diffResult.startsWith('Error loading diff:')) {
           const html = Diff2Html.html(diffResult, {
             drawFileList: false,
+            fileListToggle: false,
+            fileListStartVisible: false,
+            fileContentToggle: false,
             matching: 'lines',
-            outputFormat: 'line-by-line'
+            colorScheme: 'dark',
+            outputFormat: 'side-by-side',
+            synchronisedScroll: true,
+            highlight: false,
+            renderNothingWhenEmpty: false,
           });
           setDiffHtml(html);
         } else {
           setDiffHtml('');
         }
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error loading diff:', error);
@@ -68,15 +71,17 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
 
   return (
     <div className="diff-viewer">
-      <div className="diff-header">
-        <span className="diff-filename">{file.path}</span>
-        <span className="diff-status-badge">{file.status}</span>
-      </div>
+      {file.path && (
+        <div className="diff-header">
+          <span className="diff-filename">{file.path}</span>
+          <span className="diff-status-badge">{file.status}</span>
+        </div>
+      )}
       <div className="diff-content">
         {loading ? (
           <div className="diff-loading">Loading diff...</div>
         ) : diffHtml ? (
-          <div 
+          <div
             className="diff2html-container"
             dangerouslySetInnerHTML={{ __html: diffHtml }}
           />

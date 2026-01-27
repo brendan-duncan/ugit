@@ -70,6 +70,7 @@
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.4;
+  position: relative;
 }
 
 /* Override diff2html colors for dark theme */
@@ -193,4 +194,14 @@
 /* Line number positioning */
 .diff2html-container .d2h-code-linenumber {
   position: relative;
+}
+
+.d2h-wrapper .d2h-code-side-emptyplaceholder {
+  /*border: none;*/
+  background-color: transparent;
+  /* or background-color: transparent; */
+}
+
+.d2h-file-header  {
+  display: none;
 }

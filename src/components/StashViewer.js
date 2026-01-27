@@ -119,19 +119,19 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
           </div>
         )}
       </div>
-      
+
       <div className="stash-files-section">
         <div className="stash-files-header">
           <div className="stash-files-label">
             Files ({stashInfo?.totalFiles || 0}):
           </div>
         </div>
-        
+
         {stashInfo?.files && stashInfo.files.length > 0 ? (
           <div className="stash-files-list">
             {stashInfo.files.map((fileName, index) => (
               <div key={index} className="stash-file-item">
-                <div 
+                <div
                   className="stash-file-header"
                   onClick={() => toggleFileExpansion(fileName)}
                 >
@@ -153,8 +153,8 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
                   <div className="stash-file-diff">
                     <DiffViewer
                       file={{
-                        path: fileName,
-                        status: 'MODIFIED',
+                        //path: fileName,
+                        //status: 'MODIFIED',
                         diff: stashInfo.fileDiffs[fileName]
                       }}
                       gitAdapter={gitAdapter}
