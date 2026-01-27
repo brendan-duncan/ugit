@@ -2,7 +2,14 @@
 
 Experiment writing a git client as an exercize of vibe coding. As this is both a learning experience, I have it record every command I give it to [all-user-commands.txt](all-user-commands.txt). I have been wanting a git client that is better tuned to my personal preferenecs and is reasonably fast for very large repositories, so I used that idea as my learning topic.
 
-I'm doing this in the open in case anyone is interested. I'll save my thoughts on "Vibe Coding" until I get to the end of this exercise and either give up on this project, or give up on AI coding and take over the programming myself. I will say that I really dislike the term "vibe coding".
+## Conclusion of AI Experiment
+
+I have concluded my "vibe coding" experiment. My conclusion: AI is useful for getting started, and helping come up with
+micro code updates. It's too easy for AI to start generating bad code, breaking structure, getting stuck in syntax or other
+errors where you have to just revert it and start over. I've had to manually fix up a lot of the code that was generated
+through the AI.
+
+Moving forward, I will switch to programming this project myself, and use AI for smaller updates.
 
 ## AI Coding Models
 
