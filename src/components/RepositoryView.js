@@ -152,6 +152,7 @@ function RepositoryView({ repoPath }) {
       return;
     }
 
+    console.log("Loading repository data for ", repoPath, "... (isRefresh:", isRefresh, ")");
     const cacheLoadTime = performance.now();
 
     if (isRefresh) {
@@ -188,7 +189,7 @@ function RepositoryView({ repoPath }) {
           }
 
           setLoading(false);
-
+          console.log(`Loaded repository data from cache in ${(performance.now() - cacheLoadTime).toFixed(2)} ms`);
           return;
         }
       }
@@ -319,12 +320,14 @@ function RepositoryView({ repoPath }) {
       console.error('Error loading repo data:', err);
       setError(err.message);
     }
-    if (refreshing) {
+
+    if (isRefresh) {
       setRefreshing(false);
-    }
-    if (loading) {
+    } else {
       setLoading(false);
     }
+
+    console.log(`Finished loading repository data in ${(performance.now() - cacheLoadTime).toFixed(2)} ms`);
   };
 
   // Periodic background check for local changes
