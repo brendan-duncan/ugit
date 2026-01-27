@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './BranchTree.css';
 
-function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem }) {
+function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem, onContextMenu }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
   const isCurrent = node.fullPath === currentBranch;
@@ -35,6 +35,15 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
     }
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only show context menu for leaf nodes (actual branches), not folders
+    if (!hasChildren && onContextMenu) {
+      onContextMenu(e, node.fullPath);
+    }
+  };
+
   return (
     <div className="tree-node">
       <div
@@ -42,6 +51,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
         style={{ paddingLeft: `${level * 20}px` }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
       >
         {hasChildren && (
           <span className="tree-node-icon">
@@ -97,7 +107,40 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   );
 }
 
-function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem, collapsed, onToggleCollapse }) {
+function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem, collapsed, onToggleCollapse, onContextMenu }) {
+  const [contextMenu, setContextMenu] = useState(null);
+  const menuRef = useRef(null);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setContextMenu(null);
+      }
+    };
+
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [contextMenu]);
+
+  const handleContextMenu = (e, branchName) => {
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      branchName: branchName
+    });
+  };
+
+  const handleMenuAction = (action) => {
+    if (onContextMenu) {
+      onContextMenu(action, contextMenu.branchName, currentBranch);
+    }
+    setContextMenu(null);
+  };
   if (!branches || branches.length === 0) {
     return <div className="branch-tree-empty">No branches found</div>;
   }
@@ -126,6 +169,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
   };
 
   const tree = buildTree(branches);
+  const activeBranch = currentBranch;
 
   return (
     <div className="branch-tree">
@@ -137,6 +181,54 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
       </div>
       {!collapsed && (
         <div className="branch-tree-content">
+          {contextMenu && (
+            <div
+              ref={menuRef}
+              className="context-menu"
+              style={{
+                position: 'fixed',
+                left: `${contextMenu.x}px`,
+                top: `${contextMenu.y}px`,
+                zIndex: 1000
+              }}
+            >
+              <div className="context-menu-item" onClick={() => handleMenuAction('checkout')}>
+                Checkout
+              </div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('push-to-origin')}>
+                Push to origin...
+              </div>
+              <div className="context-menu-separator"></div>
+              {currentBranch !== contextMenu.branchName && (
+                <div className="context-menu-item" onClick={() => handleMenuAction('merge-into-active')}>
+                  Merge '{contextMenu.branchName}' into '{currentBranch}'
+                </div>
+              )}
+              {currentBranch !== contextMenu.branchName && (
+                <div className="context-menu-item" onClick={() => handleMenuAction('rebase-active-onto-branch')}>
+                  Rebase '{currentBranch}' onto '{contextMenu.branchName}'
+                </div>
+              )}
+              <div className="context-menu-separator"></div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('new-branch')}>
+                New Branch...
+              </div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('new-tag')}>
+                New Tag...
+              </div>
+              <div className="context-menu-separator"></div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('rename')}>
+                Rename...
+              </div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('delete')}>
+                Delete...
+              </div>
+              <div className="context-menu-separator"></div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('copy-branch-name')}>
+                Copy Branch Name
+              </div>
+            </div>
+          )}
           {Object.keys(tree.children).sort().map(key => (
             <TreeNode
               key={key}
@@ -148,6 +240,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               pullingBranch={pullingBranch}
               onBranchSelect={onBranchSelect}
               selectedItem={selectedItem}
+              onContextMenu={handleContextMenu}
             />
           ))}
         </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import BranchTree from './BranchTree';
 import StashList from './StashList';
 
-function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown }) {
+function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown, onBranchContextMenu }) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
   const [stashesCollapsed, setStashesCollapsed] = useState(false);
 
@@ -19,6 +19,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           selectedItem={selectedItem}
           collapsed={branchesCollapsed}
           onToggleCollapse={() => setBranchesCollapsed(!branchesCollapsed)}
+          onContextMenu={onBranchContextMenu}
         />
       </div>
       {!branchesCollapsed && !stashesCollapsed && (
