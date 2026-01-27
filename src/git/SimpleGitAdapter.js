@@ -206,22 +206,20 @@ class SimpleGitAdapter extends GitAdapter {
       
       // Get diff for each file
       const fileDiffs = {};
-      for (const file of files) {
+      /*for (const file of files) {
         try {
+          this._logCommand(`git diff "${stashRef}" -- "${file}"`, startTime);
           const diff = await this.git.raw([
-            'stash',
-            'show',
-            '-p',
+            'diff',
             stashRef,
             '--',
             file
           ]);
-          this._logCommand(`git stash show -p ${stashRef} -- ${file}`, startTime);
           fileDiffs[file] = diff;
         } catch (error) {
-          fileDiffs[file] = `Error getting diff: ${error.message}`;
+          fileDiffs[file] = `Error getting diff: ${error.message}.`;
         }
-      }
+      }*/
       
       const info = {};
 
@@ -256,14 +254,23 @@ class SimpleGitAdapter extends GitAdapter {
     } catch (error) {
       throw new Error(`Failed to get stash info: ${error.message}`);
     }
-    console.log('!!!! getStashInfo completed', performance.now() - startTime, 'ms');
   }
 
-  async showStash(stashIndex) {
-    const startTime = performance.now();
-    const result = await this.git.show([`stash@{${stashIndex}}`]);
-    this._logCommand(`git show stash@{${stashIndex}}`, startTime);
-    return result;
+  async getStashFileDiff(stashIndex, filePath) {
+    try {
+      const stashRef = `stash@{${stashIndex}}`;
+      const startTime = performance.now();
+      this._logCommand(`git diff "${stashRef}" -- "${filePath}"`, startTime);
+      const diff = await this.git.raw([
+        'diff',
+        stashRef,
+        '--',
+        filePath
+      ]);
+      return diff;
+    } catch (error) {
+      return `Error getting diff: ${error.message}.`;
+    }
   }
 
   async discard(filePaths) {

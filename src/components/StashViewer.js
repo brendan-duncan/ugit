@@ -6,16 +6,15 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
   const [stashInfo, setStashInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedFiles, setExpandedFiles] = useState(new Set());
+  const [loadedDiffs, setLoadedDiffs] = useState(new Set());
 
   useEffect(() => {
     const loadStashInfo = async () => {
       try {
         setLoading(true);
-
         // Get detailed stash info including files and diffs
         const stashData = await gitAdapter.getStashInfo(stashIndex);
         setStashInfo(stashData);
-
         setLoading(false);
       } catch (error) {
         console.error('Error loading stash info:', error);
@@ -44,6 +43,9 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
       } else {
         newSet.add(fileName);
       }
+      if (!loadedDiffs.has(fileName)) {
+        loadDiff(fileName);
+      }
       return newSet;
     });
   };
@@ -52,47 +54,68 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
     return (
       <div className="stash-viewer">
         <div className="stash-message-section">
-          <div className="stash-message-text">No stash selected</div>
+          <div className="stash-message-text">Loading...</div>
         </div>
       </div>
     );
   }
 
   const isExpanded = (fileName) => expandedFiles.has(fileName);
+  const isLoaded = (fileName) => loadedDiffs.has(fileName);
+
+  const loadDiff = async (fileName) => {
+    try {
+      const diff = await gitAdapter.getStashFileDiff(stashIndex, fileName);
+      setStashInfo(prev => ({
+        ...prev,
+        fileDiffs: {
+          ...prev.fileDiffs,
+          [fileName]: diff
+        }
+      }));
+      setLoadedDiffs(prev => new Set(prev).add(fileName));
+    } catch (error) {
+      console.error(`Error loading diff for file ${fileName}:`, error);
+    }
+  };
+
+
+  let title = (stash?.message || stashInfo?.stashRef || `stash@${stashIndex}`);
+  title = title.substring(title.indexOf(':') + 1).trim();
 
   return (
     <div className="stash-viewer">
       <div className="stash-header">
-        <span className="stash-title">{stashInfo?.stashRef || `stash@${stashIndex}`}</span>
+        <span className="stash-title">{title}</span>
         <span className="stash-badge">STASH</span>
       </div>
       <div className="stash-info-section">
         <div className="stash-info-message">
-          <div className="stash-message-label">Message:</div>
-          <div className="stash-message-text">{stash?.message || 'No message'}</div>
+          <span className="stash-message-label">Message:</span>
+          <span className="stash-message-text">{stash?.message || 'No message'}</span>
         </div>
         {stashInfo?.info?.author && (
           <div className="stash-info-author">
-            <div className="stash-message-label">Author:</div>
-            <div className="stash-message-text">{stashInfo.info.author}</div>
+            <span className="stash-message-label">Author:</span>
+            <span className="stash-message-text">{stashInfo.info.author}</span>
           </div>
         )}
         {stashInfo?.info?.date && (
           <div className="stash-info-date">
-            <div className="stash-message-label">Date:</div>
-            <div className="stash-message-text">{stashInfo.info.date}</div>
+            <span className="stash-message-label">Date:</span>
+            <span className="stash-message-text">{stashInfo.info.date}</span>
           </div>
         )}
         {stashInfo?.info?.hash && (
           <div className="stash-info-hash">
-            <div className="stash-message-label">Commit:</div>
-            <div className="stash-message-text">{stashInfo.info.hash}</div>
+            <span className="stash-message-label">Commit:</span>
+            <span className="stash-message-text">{stashInfo.info.hash}</span>
           </div>
         )}
         {stashInfo?.info?.merge && (
           <div className="stash-info-merge">
-            <div className="stash-message-label">Merge:</div>
-            <div className="stash-message-text">{stashInfo.info.merge}</div>
+            <span className="stash-message-label">Parents:</span>
+            <span className="stash-message-text">{stashInfo.info.merge}</span>
           </div>
         )}
       </div>
@@ -117,7 +140,15 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
                     {isExpanded(fileName) ? '▼' : '▶'}
                   </span>
                 </div>
-                
+
+                {isExpanded(fileName) && !stashInfo.fileDiffs[fileName] && (
+                  <div className="stash-file-diff">
+                    <div className="stash-message-section">
+                      <div className="stash-message-text">Loading...</div>
+                    </div>
+                  </div>
+                )}
+
                 {isExpanded(fileName) && stashInfo.fileDiffs[fileName] && (
                   <div className="stash-file-diff">
                     <DiffViewer

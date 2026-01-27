@@ -206,10 +206,16 @@ class GitAdapter {
     throw new Error('getStashInfo() must be implemented');
   }
 
-  async showStash(stashIndex) {
-    throw new Error('showStash() must be implemented');
+  /**
+   * Get diff for a specific file in a stash
+   * @param {number} stashIndex - The stash index
+   * @param {string} filePath - Path to the file
+   * @returns {Promise<string>}
+   */
+  async getStashFileDiff(stashIndex, filePath) {
+    throw new Error('getStashFileDiff() must be implemented');
   }
-
+  
   /**
    * Discard changes for files (restore to HEAD)
    * @param {string[]} filePaths - Array of file paths to discard
