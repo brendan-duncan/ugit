@@ -1012,7 +1012,7 @@ function RepositoryView({ repoPath }) {
 
   return (
     <div className="repository-view">
-      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onResetToOrigin={() => setShowResetDialog(true)} onCreateBranch={() => setShowCreateBranchDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
+      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onCreateBranch={() => setShowCreateBranchDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}
@@ -1040,6 +1040,7 @@ function RepositoryView({ repoPath }) {
                 selectedItem={selectedItem}
                 onSelectItem={handleItemSelect}
                 usingCache={usingCache}
+                onResetToOrigin={() => setShowResetDialog(true)}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel
