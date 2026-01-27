@@ -6,9 +6,6 @@
   "scripts": {
     "start": "electron-forge start",
     "build": "webpack --mode development",
-    "dev": "webpack --mode development --watch",
-    "build:exe": "webpack --config webpack.prod.config.js && electron-builder",
-    "build:forge": "webpack --config webpack.prod.config.js && electron-forge make",
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
@@ -66,7 +63,6 @@
   },
   "dependencies": {
     "diff2html": "^3.4.55",
-    "electron-squirrel-startup": "^1.0.1",
     "es-git": "^0.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

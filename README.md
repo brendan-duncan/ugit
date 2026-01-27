@@ -27,9 +27,14 @@ I ran out of Claude budget for the month, so I'm trying [OpenCode](https://openc
 
 * Install node packages by running `npm install` from the project root folder.
 
-* Build the app with `npm run build`.
+* Build and run for development:
+  * Build the app with `npm run build`.
+  * Run the app with `npm start`.
 
-* Run the app with `npm start`.
+* Package into an executable:
+  * npm run package
+    * The output will be put into out/ugit-{os}-{arch}/
 
-* You can build it as an executable with `npm run build:exe`
-  * Alternatively you can build it as an executable with `npm run build:forge`. This uses Electron Forge instead of Electron Builder, and I don't know which is better at this point.
+* Package into a zip for distrobution:
+  * npm run make
+    * The output will be put into out/make/zip/{os}/{arch}/ugit-{os}-{arch}-{version}.zip
