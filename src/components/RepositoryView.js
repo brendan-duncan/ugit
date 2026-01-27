@@ -336,11 +336,11 @@ function RepositoryView({ repoPath }) {
     if (loading)
       return;
 
-    // Check for changes every 10 seconds
+    // Check for changes every 5 seconds
     const intervalId = setInterval(() => {
       // Silently refresh file status in the background
       refreshFileStatus();
-    }, 10000);
+    }, 5000);
 
     // Clean up interval on unmount
     return () => {
