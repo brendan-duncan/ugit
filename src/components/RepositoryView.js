@@ -44,7 +44,6 @@ function RepositoryView({ repoPath }) {
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
-  const hasLoadedCache = useRef(false);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
 
   // Helper function to update branch commits cache
@@ -149,7 +148,7 @@ function RepositoryView({ repoPath }) {
   }, []);
 
   const loadRepoData = async (isRefresh = false) => {
-    if (loading) {
+    if (loading || refreshing) {
       return;
     }
 
@@ -157,8 +156,9 @@ function RepositoryView({ repoPath }) {
 
     if (isRefresh) {
       setRefreshing(true);
+    } else {
+      setLoading(true);
     }
-    setLoading(true);
 
     try {
       // Wait for cache to be initialized
@@ -167,7 +167,7 @@ function RepositoryView({ repoPath }) {
       }
 
       // Load from cache first on initial load
-      if (!isRefresh /*&& !hasLoadedCache.current*/) {
+      if (!isRefresh) {
         const cachedData = cacheManager.loadCache(repoPath);
         if (cachedData) {
           // Apply cached data immediately
@@ -181,8 +181,6 @@ function RepositoryView({ repoPath }) {
           setStashes(cachedData.stashes || []);
           setUsingCache(true);
           
-          hasLoadedCache.current = true;
-
           // Always select local changes
           if (selectedItem == null) {
             setLastContentPanel('local-changes');
@@ -193,7 +191,6 @@ function RepositoryView({ repoPath }) {
 
           return;
         }
-        hasLoadedCache.current = true;
       }
 
       setError(null);
@@ -701,7 +698,7 @@ function RepositoryView({ repoPath }) {
       console.log('Branch switch completed successfully');
 
       // Refresh all data after branch switch
-      await loadRepoData(true);
+      //await loadRepoData(true);
     } catch (error) {
       console.error('Error switching branch:', error);
       setError(`Branch switch failed: ${error.message}`);
@@ -763,7 +760,7 @@ function RepositoryView({ repoPath }) {
           }
 
           // Refresh all data after stash operations
-          await loadRepoData(true);
+          //await loadRepoData(true);
           break;
 
         case 'discard':
