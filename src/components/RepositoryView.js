@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import RepoInfo from './RepoInfo';
 import BranchStashPanel from './BranchStashPanel';
+import ErrorDialog from './ErrorDialog';
 import CreateBranchDialog from './CreateBranchDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
@@ -36,6 +37,7 @@ function RepositoryView({ repoPath }) {
   const [showPushDialog, setShowPushDialog] = useState(false);
   const [showStashDialog, setShowStashDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [showLocalChangesDialog, setShowLocalChangesDialog] = useState(false);
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
   const [pullingBranch, setPullingBranch] = useState(null);
@@ -957,7 +959,15 @@ function RepositoryView({ repoPath }) {
         onMouseLeave={handleMouseUp}
       >
         {loading && <div className="loading">Loading repository...</div>}
-        {error && <div className="error">Error: {error}</div>}
+        {error && !showErrorDialog && (
+          <ErrorDialog
+            error={error}
+            onClose={() => {
+              setError(null);
+              setShowErrorDialog(false);
+            }}
+          />
+        )}
         {!loading && !error && (
           <>
             <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
