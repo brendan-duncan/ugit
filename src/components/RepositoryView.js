@@ -340,7 +340,7 @@ function RepositoryView({ repoPath }) {
     const intervalId = setInterval(() => {
       // Silently refresh file status in the background
       refreshFileStatus();
-    }, 5000);
+    }, 5000); // The interval time should be a setting...
 
     // Clean up interval on unmount
     return () => {
@@ -404,6 +404,19 @@ function RepositoryView({ repoPath }) {
       // Count total modified files (unique paths)
       const allPaths = new Set([...unstaged.map(f => f.path), ...staged.map(f => f.path)]);
       setModifiedCount(allPaths.size);
+
+      // Update persistent cache with file status data
+      try {
+        const cacheData = cacheManager.loadCache(repoPath) || {};
+        cacheData.currentBranch = status.current;
+        cacheData.originUrl = url;
+        cacheData.unstagedFiles = unstaged;
+        cacheData.stagedFiles = staged;
+        cacheData.modifiedCount = allPaths.size;
+        cacheManager.saveCache(repoPath, cacheData);
+      } catch (cacheErr) {
+        console.warn('Failed to update file status cache:', cacheErr);
+      }
     } catch (err) {
       console.error('Error refreshing file status:', err);
     }
