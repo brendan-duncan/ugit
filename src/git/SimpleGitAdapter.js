@@ -168,11 +168,11 @@ class SimpleGitAdapter extends GitAdapter {
     const startTime = performance.now();
     let result;
     if (isStaged) {
-      result = await this.git.diff(['--cached', '--', filePath]);
-      this._logCommand(`git diff --cached -- ${filePath}`, startTime);
+      result = await this.git.diff(['--cached', '--ignore-space-at-eol', '--', filePath]);
+      this._logCommand(`git diff --cached --ignore-space-at-eol -- ${filePath}`, startTime);
     } else {
-      result = await this.git.diff(['--', filePath]);
-      this._logCommand(`git diff -- ${filePath}`, startTime);
+      result = await this.git.diff(['--ignore-space-at-eol', '--', filePath]);
+      this._logCommand(`git diff --ignore-space-at-eol -- ${filePath}`, startTime);
     }
     console.log(result);
     return result;
