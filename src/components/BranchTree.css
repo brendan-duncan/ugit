@@ -48,7 +48,7 @@
   color: #ffffff;
   font-size: 1.0rem;
   margin: 0;
-  margin-bottom: 16px;
+  /*margin-bottom: 16px;*/
   padding-bottom: 8px;
   border-bottom: 1px solid #3d3d3d;
   flex-shrink: 0;
