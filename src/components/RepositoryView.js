@@ -37,7 +37,7 @@ function RepositoryView({ repoPath, isActiveTab }) {
   const [branchesHeight, setBranchesHeight] = useState(50);
   const [leftWidth, setLeftWidth] = useState(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
-  const [showPushDialog, setShowPushDialog] = useState(false);
+  const [showPushDialog, setShowPushDialog] = useState(null);
   const [showStashDialog, setShowStashDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
@@ -566,7 +566,7 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
   };
 
   const handlePushClick = () => {
-    setShowPushDialog(true);
+    setShowPushDialog(currentBranch);
   };
 
   const handlePull = async (branch, stashAndReapply) => {
@@ -641,7 +641,7 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
   };
 
   const handlePush = async (branch, remoteBranch, pushAllTags) => {
-    setShowPushDialog(false);
+    setShowPushDialog(null);
 
     try {
       const git = gitAdapter.current;
@@ -1075,8 +1075,7 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
         handleBranchSwitch(branchName);
         break;
       case 'push-to-origin':
-        // TODO: Implement push to origin dialog
-        alert(`Push to origin: ${branchName}`);
+        setShowPushDialog(branchName);
         break;
       case 'merge-into-active':
         // TODO: Implement merge into active branch
@@ -1193,10 +1192,10 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
       )}
       {showPushDialog && (
         <PushDialog
-          onClose={() => setShowPushDialog(false)}
+          onClose={() => setShowPushDialog(null)}
           onPush={handlePush}
           branches={branches}
-          currentBranch={currentBranch}
+          currentBranch={showPushDialog}
         />
       )}
       {showStashDialog && (
@@ -1252,10 +1251,10 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
       )}
       {showPushDialog && (
         <PushDialog
-          onClose={() => setShowPushDialog(false)}
+          onClose={() => setShowPushDialog(null)}
           onPush={handlePush}
           branches={branches}
-          currentBranch={currentBranch}
+          currentBranch={showPushDialog}
         />
       )}
       {showStashDialog && (
