@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './PullDialog.css';
+import './ApplyStashDialog.css';
 
 function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
   const STORAGE_KEY = 'apply-stash-delete-after';
@@ -43,7 +43,7 @@ function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
         </div>
 
         <div className="dialog-body">
-          <div className="dialog-field">
+          <div className="dialog-field apply-stash-message-field">
             <label>Stash to Apply:</label>
             <input
               type="text"
@@ -54,7 +54,7 @@ function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
             />
           </div>
           
-          <div className="dialog-field">
+          <div className="dialog-field apply-stash-delete-after-field">
             <label className="dialog-checkbox-label">
               <input
                 type="checkbox"
