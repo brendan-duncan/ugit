@@ -14,7 +14,7 @@ class SimpleGitAdapter extends GitAdapter {
   }
 
   async open() {
-    this.git = simpleGit(this.repoPath);
+    this.git = simpleGit({ baseDir: this.repoPath });
     this.isOpen = true;
   }
 
