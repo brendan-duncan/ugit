@@ -94,7 +94,7 @@ class SimpleGitAdapter extends GitAdapter {
       idFetch = this._startCommand('git fetch origin', startTime);
       await this.git.fetch('origin');
       this._endCommand(idFetch, startTime);
-      
+
       // Hard reset to origin/branch
       idReset = this._startCommand(`git reset --hard origin/${branch}`, startTime);
       await this.git.raw(['reset', '--hard', `origin/${branch}`]);
@@ -223,7 +223,7 @@ class SimpleGitAdapter extends GitAdapter {
     try {
       // Get basic stash info using git show
       const showOutput = await this.git.show([stashRef]);
-      
+
       // Get the list of files in the stash
       const stashShowOutput = await this.git.raw([
         'stash',
@@ -231,14 +231,14 @@ class SimpleGitAdapter extends GitAdapter {
         '--name-only',
         stashRef
       ]);
-      
+
       const files = stashShowOutput
         .trim()
         .split('\n')
         .filter(file => file.length > 0);
-      
+
       // Get diff for each file
-      const fileDiffs = {};     
+      const fileDiffs = {};
       const info = {};
 
       showOutput.split('\n').forEach(line => {
@@ -261,7 +261,7 @@ class SimpleGitAdapter extends GitAdapter {
       });
 
       this._endCommand(id, startTime);
-      
+
       return {
         stashRef,
         stashIndex,
@@ -304,11 +304,11 @@ class SimpleGitAdapter extends GitAdapter {
     // Get the current status to identify new vs modified files
     const statusResult = await this.git.status();
     this._logCommand('git status', startTime);
-    
+
     for (const filePath of filePaths) {
       const fileStatus = statusResult.files.find(f => f.path === filePath);
       const isStaged = fileStatus?.index !== ' ';
-      
+
       if (fileStatus?.working_dir === '?' || (fileStatus?.index === 'A' && !isStaged)) {
         // New untracked file or new staged file - delete it from filesystem
         const fullPath = path.join(this.repoPath, filePath);
@@ -345,7 +345,7 @@ class SimpleGitAdapter extends GitAdapter {
   async log(branchName, maxCount = 100) {
     const startTime = performance.now();
     const id = this._startCommand(`git log ${branchName} --max-count=${maxCount}`, startTime);
-    
+
     const result = await this.git.log({
       [branchName]: null,
       maxCount: maxCount,
@@ -358,7 +358,7 @@ class SimpleGitAdapter extends GitAdapter {
         author_email: '%ae'
       }
     });
-    
+
     // Check which commits exist on origin
     const commitsWithRemoteStatus = await Promise.all(
       result.all.map(async (commit) => {
@@ -373,7 +373,7 @@ class SimpleGitAdapter extends GitAdapter {
         }
       })
     );
-    
+
     this._endCommand(id, startTime);
     return commitsWithRemoteStatus;
   }
@@ -438,7 +438,7 @@ class SimpleGitAdapter extends GitAdapter {
       return result;
     } catch (error) {
       this._endCommand(id, startTime);
-      console.error(`Error loading diff for ${filePath} in commit ${commitHash}:`, error);
+      //console.error(`Error loading diff for ${filePath} in commit ${commitHash}:`, error);
       return `Error loading diff for ${filePath} in commit ${commitHash}: ${error.message}`;
     }
   }
@@ -449,14 +449,21 @@ class SimpleGitAdapter extends GitAdapter {
     // Clone into the specific folder within parent directory
     const localFolder = parentFolder + "/" + repoName;
     const git = simpleGit();
-    await git.clone(repoUrl, localFolder);
+    try {
+      await git.clone(repoUrl, localFolder);
+    } catch (error) {
+    }
     this._endCommand(id, startTime);
   }
 
   async raw(args) {
     const startTime = performance.now();
     const id = this._startCommand(`git ${args.join(' ')}`, startTime);
-    const result = await this.git.raw(args);
+    let result = null;
+    try {
+      result = await this.git.raw(args);
+    } catch (error) {
+    }
     this._endCommand(id, startTime);
     return result;
   }

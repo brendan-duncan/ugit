@@ -3,6 +3,7 @@ import RepoInfo from './RepoInfo';
 import BranchStashPanel from './BranchStashPanel';
 import ErrorDialog from './ErrorDialog';
 import CreateBranchDialog from './CreateBranchDialog';
+import DeleteBranchDialog from './DeleteBranchDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -43,6 +44,8 @@ function RepositoryView({ repoPath, isActiveTab }) {
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
+  const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
+  const [branchToDelete, setBranchToDelete] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -804,6 +807,55 @@ function RepositoryView({ repoPath, isActiveTab }) {
       console.error('Error handling local changes:', error);
       setError(`Failed to handle local changes: ${error.message}`);
     }
+};
+
+  const handleDeleteBranchDialog = async ({ deleteRemote }) => {
+    setShowDeleteBranchDialog(false);
+
+    if (!branchToDelete) {
+      return;
+    }
+
+    const branchName = branchToDelete;
+    setBranchToDelete(null);
+
+    try {
+      const git = gitAdapter.current;
+
+      // Check if trying to delete the current branch
+      if (branchName === currentBranch) {
+        setError('Cannot delete the currently active branch');
+        return;
+      }
+
+      // Delete local branch
+      console.log(`Deleting local branch: ${branchName}`);
+      await git.raw(['branch', '-D', branchName]);
+
+      // Delete remote branch if requested
+      if (deleteRemote) {
+        try {
+          console.log(`Deleting remote branch: origin/${branchName}`);
+          await git.raw(['push', 'origin', '--delete', branchName]);
+        } catch (remoteError) {
+          console.warn(`Failed to delete remote branch origin/${branchName}:`, remoteError);
+          // Continue with local deletion success, but warn about remote
+          setError(`Local branch deleted successfully, but failed to delete remote branch: ${remoteError.message}`);
+          // Still refresh the data to show the local deletion
+          await loadRepoData(true);
+          return;
+        }
+      }
+
+      console.log(`Branch ${branchName} deleted successfully`);
+      
+      // Refresh repository data to show updated branch list
+      await loadRepoData(true);
+      
+    } catch (error) {
+      console.error('Error deleting branch:', error);
+      setError(`Failed to delete branch '${branchName}': ${error.message}`);
+    }
   };
 
   const handleItemSelect = (item) => {
@@ -999,8 +1051,8 @@ function RepositoryView({ repoPath, isActiveTab }) {
         alert(`Rename branch: ${branchName}`);
         break;
       case 'delete':
-        // TODO: Implement delete branch dialog
-        alert(`Delete branch: ${branchName}`);
+        setBranchToDelete(branchName);
+        setShowDeleteBranchDialog(true);
         break;
       case 'copy-branch-name':
         // Copy branch name to clipboard
@@ -1128,6 +1180,16 @@ function RepositoryView({ repoPath, isActiveTab }) {
           onCreateBranch={handleCreateBranch}
           currentBranch={currentBranch}
           gitAdapter={gitAdapter.current}
+        />
+      )}
+      {showDeleteBranchDialog && (
+        <DeleteBranchDialog
+          onClose={() => {
+            setShowDeleteBranchDialog(false);
+            setBranchToDelete(null);
+          }}
+          onConfirm={handleDeleteBranchDialog}
+          branchName={branchToDelete}
         />
       )}
       {showPushDialog && (
