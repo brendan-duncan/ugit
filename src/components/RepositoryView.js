@@ -7,7 +7,7 @@ import DeleteBranchDialog from './DeleteBranchDialog';
 import RenameBranchDialog from './RenameBranchDialog';
 import MergeBranchDialog from './MergeBranchDialog';
 import ApplyStashDialog from './ApplyStashDialog';
-import RenameStashDialog from './RenameStashDialog';
+import DeleteStashDialog from './DeleteStashDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -56,8 +56,10 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
   const [mergeSourceBranch, setMergeSourceBranch] = useState(null);
   const [showApplyStashDialog, setShowApplyStashDialog] = useState(false);
   const [stashToApply, setStashToApply] = useState(null);
-  const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
+const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
   const [stashToRename, setStashToRename] = useState(null);
+  const [showDeleteStashDialog, setShowDeleteStashDialog] = useState(false);
+  const [stashToDelete, setStashToDelete] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -819,7 +821,7 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
       console.error('Error handling local changes:', error);
       setError(`Failed to handle local changes: ${error.message}`);
     }
-};
+  };
 
   const handleDeleteBranchDialog = async ({ deleteRemote }) => {
     setShowDeleteBranchDialog(false);
@@ -860,15 +862,15 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
       }
 
       console.log(`Branch ${branchName} deleted successfully`);
-      
+
       // Refresh repository data to show updated branch list
       await loadRepoData(true);
-      
+
     } catch (error) {
       console.error('Error deleting branch:', error);
       setError(`Failed to delete branch '${branchName}': ${error.message}`);
     }
-};
+  };
 
   const handleRenameBranchDialog = async (newName) => {
     setShowRenameBranchDialog(false);
@@ -900,7 +902,7 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
       }
 
       console.log(`Branch renamed successfully from '${oldName}' to '${newName}'`);
-      
+
       // Clear branch commits cache since branch operations may affect commits
       if (branchCommitsCache.current.has(oldName)) {
         branchCommitsCache.current.delete(oldName);
@@ -908,12 +910,12 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
 
       // Refresh repository data to show updated branch list
       await loadRepoData(true);
-      
+
     } catch (error) {
       console.error('Error renaming branch:', error);
       setError(`Failed to rename branch '${oldName}' to '${newName}': ${error.message}`);
     }
-};
+  };
 
   const handleMergeBranchDialog = async ({ sourceBranch, targetBranch, mergeOption, flag }) => {
     setShowMergeBranchDialog(false);
@@ -940,18 +942,18 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
       await git.raw(mergeArgs);
 
       console.log(`Merge completed successfully: '${sourceBranch}' into '${targetBranch}'`);
-      
+
       // Clear branch commits cache since merge affects commits
       clearBranchCache();
 
       // Refresh repository data to show updated state
       await loadRepoData(true);
-      
+
       // If we're on the target branch, refresh the commits view
       if (selectedItem?.type === 'branch' && selectedItem.branchName === targetBranch) {
         await handleBranchSelect(targetBranch);
       }
-      
+
     } catch (error) {
       console.error('Error merging branch:', error);
       setError(`Failed to merge '${sourceBranch}' into '${targetBranch}': ${error.message}`);
@@ -1129,7 +1131,7 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
       case 'push-to-origin':
         setShowPushDialog(branchName);
         break;
-case 'merge-into-active':
+      case 'merge-into-active':
         setMergeSourceBranch(branchName);
         setShowMergeBranchDialog(true);
         break;
@@ -1179,8 +1181,8 @@ case 'merge-into-active':
         setShowRenameStashDialog(true);
         break;
       case 'delete':
-        // TODO: Implement delete stash confirmation
-        alert(`Delete stash: ${stash.message}`);
+        setStashToDelete({ ...stash, index: stashIndex });
+        setShowDeleteStashDialog(true);
         break;
       default:
         alert(`Unknown stash context menu action: ${action}`);
@@ -1221,10 +1223,10 @@ case 'merge-into-active':
 
       // Refresh the file statuses to show applied changes
       await refreshFileStatus();
-      
+
       // Refresh repository data to show updated stash list
       await loadRepoData(true);
-      
+
     } catch (error) {
       console.error('Error applying stash:', error);
       setError(`Failed to apply stash '${stash.message}': ${error.message}`);
@@ -1254,21 +1256,50 @@ case 'merge-into-active':
       // Rename the stash using git stash drop and git stash store
       // First, get the current stash content
       const stashContent = await git.raw(['show', `stash@{${stash.index}}`]);
-      
+
       // Drop the old stash
       await git.raw(['stash', 'drop', `stash@{${stash.index}}`]);
-      
+
       // Create a new stash with the new name
       await git.raw(['stash', 'store', '-m', newName, stashContent]);
 
       console.log(`Stash renamed successfully from "${stash.message}" to "${newName}"`);
-      
+
       // Refresh repository data to show updated stash list
       await loadRepoData(true);
-      
+
     } catch (error) {
       console.error('Error renaming stash:', error);
       setError(`Failed to rename stash from '${stash.message}' to '${newName}': ${error.message}`);
+    }
+};
+
+  const handleDeleteStashDialog = async (stashIndex) => {
+    setShowDeleteStashDialog(false);
+
+    if (stashToDelete === null) {
+      return;
+    }
+
+    const stash = stashToDelete;
+    setStashToDelete(null);
+
+    try {
+      const git = gitAdapter.current;
+
+      console.log(`Deleting stash: ${stash.message} (index: ${stashIndex})`);
+
+      // Delete the stash
+      await git.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
+
+      console.log(`Stash deleted successfully: ${stash.message}`);
+
+      // Refresh repository data to show updated stash list
+      await loadRepoData(true);
+
+    } catch (error) {
+      console.error('Error deleting stash:', error);
+      setError(`Failed to delete stash '${stash.message}': ${error.message}`);
     }
   };
 
@@ -1440,6 +1471,17 @@ case 'merge-into-active':
           onRename={handleRenameStashDialog}
           currentStashName={stashToRename?.message.replace(/^On [^:]+:\s*/, '') || ''}
           stashIndex={stashToRename?.index || 0}
+        />
+      )}
+      {showDeleteStashDialog && (
+        <DeleteStashDialog
+          onClose={() => {
+            setShowDeleteStashDialog(false);
+            setStashToDelete(null);
+          }}
+          onDelete={handleDeleteStashDialog}
+          stashMessage={stashToDelete?.message || ''}
+          stashIndex={stashToDelete?.index || 0}
         />
       )}
       {showPushDialog && (
