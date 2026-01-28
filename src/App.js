@@ -50,7 +50,7 @@ function App() {
 
         // Reverse recent repos to restore original tab order
         const orderedRepos = [...validRecent].reverse();
-        
+
         orderedRepos.forEach((repoPath, index) => {
           const tabId = Date.now() + index;
           const newTab = {
@@ -211,7 +211,7 @@ function App() {
   const handleClone = async (repoUrl, parentFolder, repoName) => {
     try {
       const result = await ipcRenderer.invoke('clone-repository', repoUrl, parentFolder, repoName);
-      
+
       if (result.success) {
         // Close dialog and open the cloned repository
         setShowCloneDialog(false);
@@ -269,12 +269,12 @@ function App() {
       });
 
       if (invalidTabs.length > 0) {
-        const validTabs = tabs.filter(tab => 
+        const validTabs = tabs.filter(tab =>
           !invalidTabs.some(invalidTab => invalidTab.id === tab.id)
         );
-        
+
         setTabs(validTabs);
-        
+
         // If the active tab was invalid, clear the saved active tab
         const wasActiveTabInvalid = invalidTabs.some(tab => tab.id === activeTabId);
         if (wasActiveTabInvalid && validTabs.length > 0) {
@@ -284,7 +284,7 @@ function App() {
           localStorage.removeItem(ACTIVE_TAB_KEY);
         }
 
-        console.log(`Closed ${invalidTabs.length} invalid tab(s):`, 
+        console.log(`Closed ${invalidTabs.length} invalid tab(s):`,
           invalidTabs.map(tab => tab.path));
       }
     };
@@ -318,7 +318,7 @@ function App() {
                 key={tab.id}
                 style={{ display: tab.id === activeTabId ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}
               >
-                <RepositoryView repoPath={tab.path} />
+                <RepositoryView repoPath={tab.path} isActiveTab={tab.id === activeTabId} />
               </div>
             ))}
           </>

@@ -16,7 +16,7 @@ const GitFactory = window.require('./src/git/GitFactory');
 const { ipcRenderer } = window.require('electron');
 const cacheManager = window.require('./src/utils/cacheManager');
 
-function RepositoryView({ repoPath }) {
+function RepositoryView({ repoPath, isActiveTab }) {
   const [commandState, setCommandState] = useState([]);
   const [branches, setBranches] = useState([]);
   const [currentBranch, setCurrentBranch] = useState('');
@@ -52,7 +52,7 @@ function RepositoryView({ repoPath }) {
   // Helper function to update branch commits cache
   const updateBranchCache = (branchName, commits) => {
     branchCommitsCache.current.set(branchName, commits);
-    
+
     // Persist to cache manager (merge with existing)
     const cacheData = cacheManager.loadCache(repoPath) || {};
     cacheData.branchCommits = {
@@ -66,7 +66,7 @@ function RepositoryView({ repoPath }) {
   const clearBranchCache = (branchName = null) => {
     if (branchName) {
       branchCommitsCache.current.delete(branchName);
-      
+
       // Remove from persistent cache
       const cacheData = cacheManager.loadCache(repoPath) || {};
       if (cacheData.branchCommits) {
@@ -75,7 +75,7 @@ function RepositoryView({ repoPath }) {
       }
     } else {
       branchCommitsCache.current.clear();
-      
+
       // Clear all from persistent cache
       const cacheData = cacheManager.loadCache(repoPath) || {};
       delete cacheData.branchCommits;
@@ -142,7 +142,7 @@ function RepositoryView({ repoPath }) {
     };
 
     initRepository();
-    
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]); // Load repo when path changes
 
@@ -194,7 +194,7 @@ function RepositoryView({ repoPath }) {
           setBranchStatus(cachedData.branchStatus || {});
           setStashes(cachedData.stashes || []);
           setUsingCache(true);
-          
+
           // Always select local changes
           if (selectedItem == null) {
             setLastContentPanel('local-changes');
@@ -314,14 +314,14 @@ function RepositoryView({ repoPath }) {
         branchStatus: statusMap,
         stashes: stashList.all
       };
-      
+
       // Include all branch commits from memory cache
       const currentBranchCommits = {};
       branchCommitsCache.current.forEach((commits, branchName) => {
         currentBranchCommits[branchName] = commits;
       });
       cacheData.branchCommits = currentBranchCommits;
-      
+
       cacheManager.saveCache(repoPath, cacheData);
 
     } catch (err) {
@@ -344,17 +344,23 @@ function RepositoryView({ repoPath }) {
     if (loading)
       return;
 
-    // Check for changes every 10 seconds
-    const intervalId = setInterval(async () => {
-      // Silently refresh file status in the background
-      await refreshFileStatus();
-    }, 10000); // The interval time should be a setting...
+    let intervalId = null;
+    // Only run if this tab is active
+    if (isActiveTab) {
+      // Check for changes every 10 seconds
+      intervalId = setInterval(async () => {
+        // Silently refresh file status in the background
+        await refreshFileStatus();
+      }, 10000); // The interval time should be a setting...
+    }
 
     // Clean up interval on unmount
     return () => {
-      clearInterval(intervalId);
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
     };
-  }, [loading]); // Re-run if loading state changes
+  }, [loading, isActiveTab]); // Re-run if loading state or active tab changes
 
   const refreshFileStatus = async () => {
     // Ensure git adapter is available before attempting to use it
@@ -963,7 +969,7 @@ function RepositoryView({ repoPath }) {
 
   const handleBranchContextMenu = (action, branchName, activeBranch) => {
     console.log('Branch context menu action:', action, 'on branch:', branchName);
-    
+
     switch (action) {
       case 'checkout':
         handleBranchSwitch(branchName);

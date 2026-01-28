@@ -80,7 +80,7 @@ class SimpleGitAdapter extends GitAdapter {
       return result.trim();
     } catch (error) {
       this._endCommand(id, startTime);
-      console.error('Error getting origin URL:', error);
+      //console.error('Error getting origin URL:', error);
       return '';
     }
   }
