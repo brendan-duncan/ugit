@@ -4,6 +4,7 @@ import BranchStashPanel from './BranchStashPanel';
 import ErrorDialog from './ErrorDialog';
 import CreateBranchDialog from './CreateBranchDialog';
 import DeleteBranchDialog from './DeleteBranchDialog';
+import RenameBranchDialog from './RenameBranchDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -44,8 +45,10 @@ function RepositoryView({ repoPath, isActiveTab }) {
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
-  const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
+const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState(null);
+  const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
+  const [branchToRename, setBranchToRename] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -856,6 +859,51 @@ function RepositoryView({ repoPath, isActiveTab }) {
       console.error('Error deleting branch:', error);
       setError(`Failed to delete branch '${branchName}': ${error.message}`);
     }
+};
+
+  const handleRenameBranchDialog = async (newName) => {
+    setShowRenameBranchDialog(false);
+
+    if (!branchToRename) {
+      return;
+    }
+
+    const oldName = branchToRename;
+    setBranchToRename(null);
+
+    try {
+      const git = gitAdapter.current;
+
+      console.log(`Renaming branch '${oldName}' to '${newName}'`);
+      await git.raw(['branch', '-m', oldName, newName]);
+
+      // Update selected item if it was the renamed branch
+      if (selectedItem?.type === 'branch' && selectedItem.branchName === oldName) {
+        _setSelectedItem({
+          ...selectedItem,
+          branchName: newName
+        });
+      }
+
+      // Update current branch if it was the renamed branch
+      if (currentBranch === oldName) {
+        setCurrentBranch(newName);
+      }
+
+      console.log(`Branch renamed successfully from '${oldName}' to '${newName}'`);
+      
+      // Clear branch commits cache since branch operations may affect commits
+      if (branchCommitsCache.current.has(oldName)) {
+        branchCommitsCache.current.delete(oldName);
+      }
+
+      // Refresh repository data to show updated branch list
+      await loadRepoData(true);
+      
+    } catch (error) {
+      console.error('Error renaming branch:', error);
+      setError(`Failed to rename branch '${oldName}' to '${newName}': ${error.message}`);
+    }
   };
 
   const handleItemSelect = (item) => {
@@ -1047,8 +1095,8 @@ function RepositoryView({ repoPath, isActiveTab }) {
         alert(`New tag on branch: ${branchName}`);
         break;
       case 'rename':
-        // TODO: Implement rename branch dialog
-        alert(`Rename branch: ${branchName}`);
+        setBranchToRename(branchName);
+        setShowRenameBranchDialog(true);
         break;
       case 'delete':
         setBranchToDelete(branchName);
@@ -1190,6 +1238,16 @@ function RepositoryView({ repoPath, isActiveTab }) {
           }}
           onConfirm={handleDeleteBranchDialog}
           branchName={branchToDelete}
+        />
+      )}
+      {showRenameBranchDialog && (
+        <RenameBranchDialog
+          onClose={() => {
+            setShowRenameBranchDialog(false);
+            setBranchToRename(null);
+          }}
+          onRename={handleRenameBranchDialog}
+          currentBranchName={branchToRename}
         />
       )}
       {showPushDialog && (
