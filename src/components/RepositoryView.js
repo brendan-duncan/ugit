@@ -7,6 +7,7 @@ import DeleteBranchDialog from './DeleteBranchDialog';
 import RenameBranchDialog from './RenameBranchDialog';
 import MergeBranchDialog from './MergeBranchDialog';
 import ApplyStashDialog from './ApplyStashDialog';
+import RenameStashDialog from './RenameStashDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -55,6 +56,8 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
   const [mergeSourceBranch, setMergeSourceBranch] = useState(null);
   const [showApplyStashDialog, setShowApplyStashDialog] = useState(false);
   const [stashToApply, setStashToApply] = useState(null);
+  const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
+  const [stashToRename, setStashToRename] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -1172,8 +1175,8 @@ case 'merge-into-active':
         setShowApplyStashDialog(true);
         break;
       case 'rename':
-        // TODO: Implement rename stash dialog
-        alert(`Rename stash: ${stash.message}`);
+        setStashToRename({ ...stash, index: stashIndex });
+        setShowRenameStashDialog(true);
         break;
       case 'delete':
         // TODO: Implement delete stash confirmation
@@ -1228,6 +1231,47 @@ case 'merge-into-active':
     }
   };
 
+  const handleRenameStashDialog = async (newName) => {
+    setShowRenameStashDialog(false);
+
+    if (!stashToRename) {
+      return;
+    }
+
+    const stash = stashToRename;
+    setStashToRename(null);
+
+    try {
+      const git = gitAdapter.current;
+
+      const currentMessage = stash.message;
+      const currentName = currentMessage.replace(/^On [^:]+:\s*/, '');
+      const currentPrfix = currentMessage.substring(0, currentMessage.indexOf(currentName));
+      newName = currentPrfix + newName;
+
+      console.log(`Renaming stash: "${stash.message}" to "${newName}"`);
+
+      // Rename the stash using git stash drop and git stash store
+      // First, get the current stash content
+      const stashContent = await git.raw(['show', `stash@{${stash.index}}`]);
+      
+      // Drop the old stash
+      await git.raw(['stash', 'drop', `stash@{${stash.index}}`]);
+      
+      // Create a new stash with the new name
+      await git.raw(['stash', 'store', '-m', newName, stashContent]);
+
+      console.log(`Stash renamed successfully from "${stash.message}" to "${newName}"`);
+      
+      // Refresh repository data to show updated stash list
+      await loadRepoData(true);
+      
+    } catch (error) {
+      console.error('Error renaming stash:', error);
+      setError(`Failed to rename stash from '${stash.message}' to '${newName}': ${error.message}`);
+    }
+  };
+
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
   return (
@@ -1273,7 +1317,7 @@ case 'merge-into-active':
                   stashes={stashes}
                   onSelectStash={(stash) => handleItemSelect(stash)}
                   selectedItem={selectedItem}
-onMouseDown={handleMouseDown}
+                  onMouseDown={handleMouseDown}
                   onBranchContextMenu={handleBranchContextMenu}
                   onStashContextMenu={handleStashContextMenu}
                 />
@@ -1354,7 +1398,7 @@ onMouseDown={handleMouseDown}
           branchName={branchToDelete}
         />
       )}
-{showRenameBranchDialog && (
+      {showRenameBranchDialog && (
         <RenameBranchDialog
           onClose={() => {
             setShowRenameBranchDialog(false);
@@ -1385,6 +1429,17 @@ onMouseDown={handleMouseDown}
           onApply={handleApplyStashDialog}
           stashMessage={stashToApply?.message || ''}
           stashIndex={stashToApply?.index || 0}
+        />
+      )}
+      {showRenameStashDialog && (
+        <RenameStashDialog
+          onClose={() => {
+            setShowRenameStashDialog(false);
+            setStashToRename(null);
+          }}
+          onRename={handleRenameStashDialog}
+          currentStashName={stashToRename?.message.replace(/^On [^:]+:\s*/, '') || ''}
+          stashIndex={stashToRename?.index || 0}
         />
       )}
       {showPushDialog && (
