@@ -1158,6 +1158,27 @@ case 'merge-into-active':
       default:
         alert(`Unknown context menu action: ${action}`);
     }
+};
+
+  const handleStashContextMenu = (action, stash, stashIndex) => {
+    console.log('Stash context menu action:', action, 'on stash:', stash);
+
+    switch (action) {
+      case 'apply':
+        // TODO: Implement apply stash dialog
+        alert(`Apply stash: ${stash.message}`);
+        break;
+      case 'rename':
+        // TODO: Implement rename stash dialog
+        alert(`Rename stash: ${stash.message}`);
+        break;
+      case 'delete':
+        // TODO: Implement delete stash confirmation
+        alert(`Delete stash: ${stash.message}`);
+        break;
+      default:
+        alert(`Unknown stash context menu action: ${action}`);
+    }
   };
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
@@ -1205,8 +1226,9 @@ case 'merge-into-active':
                   stashes={stashes}
                   onSelectStash={(stash) => handleItemSelect(stash)}
                   selectedItem={selectedItem}
-                  onMouseDown={handleMouseDown}
+onMouseDown={handleMouseDown}
                   onBranchContextMenu={handleBranchContextMenu}
+                  onStashContextMenu={handleStashContextMenu}
                 />
               </div>
             </div>

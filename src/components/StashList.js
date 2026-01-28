@@ -1,7 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './StashList.css';
 
-function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCollapse }) {
+function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCollapse, onStashContextMenu }) {
+  const [contextMenu, setContextMenu] = useState(null);
+
+  const handleStashContextMenu = (e, stash, index) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({
+      x: rect.left,
+      y: rect.top + rect.height,
+      stash,
+      index
+    });
+  };
+
+  const handleContextMenuAction = (action) => {
+    if (onStashContextMenu && contextMenu) {
+      onStashContextMenu(action, contextMenu.stash, contextMenu.index);
+    }
+    setContextMenu(null);
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => closeContextMenu();
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
   if (!stashes || stashes.length === 0) {
     return (
       <div className="stash-list">
@@ -37,12 +71,34 @@ function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCo
                 key={index}
                 className={`stash-item ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelectStash && onSelectStash({type: 'stash', index, stash})}
+                onContextMenu={(e) => handleStashContextMenu(e, stash, index)}
               >
                 <span className="stash-item-icon">🗂️</span>
                 <span className="stash-message">{displayMessage}</span>
               </div>
             );
           })}
+        </div>
+      )}
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 1000
+          }}
+        >
+          <div className="context-menu-item" onClick={() => handleContextMenuAction('apply')}>
+            Apply '{contextMenu.stash.message.replace(/^On [^:]+:\s*/, '')}'...
+          </div>
+          <div className="context-menu-item" onClick={() => handleContextMenuAction('rename')}>
+            Rename '{contextMenu.stash.message.replace(/^On [^:]+:\s*/, '')}'...
+          </div>
+          <div className="context-menu-item" onClick={() => handleContextMenuAction('delete')}>
+            Delete '{contextMenu.stash.message.replace(/^On [^:]+:\s*/, '')}'...
+          </div>
         </div>
       )}
     </div>
