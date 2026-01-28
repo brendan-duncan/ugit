@@ -6,6 +6,7 @@ import CreateBranchDialog from './CreateBranchDialog';
 import DeleteBranchDialog from './DeleteBranchDialog';
 import RenameBranchDialog from './RenameBranchDialog';
 import MergeBranchDialog from './MergeBranchDialog';
+import ApplyStashDialog from './ApplyStashDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -52,6 +53,8 @@ const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
   const [branchToRename, setBranchToRename] = useState(null);
   const [showMergeBranchDialog, setShowMergeBranchDialog] = useState(false);
   const [mergeSourceBranch, setMergeSourceBranch] = useState(null);
+  const [showApplyStashDialog, setShowApplyStashDialog] = useState(false);
+  const [stashToApply, setStashToApply] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -1165,8 +1168,8 @@ case 'merge-into-active':
 
     switch (action) {
       case 'apply':
-        // TODO: Implement apply stash dialog
-        alert(`Apply stash: ${stash.message}`);
+        setStashToApply({ ...stash, index: stashIndex });
+        setShowApplyStashDialog(true);
         break;
       case 'rename':
         // TODO: Implement rename stash dialog
@@ -1178,6 +1181,50 @@ case 'merge-into-active':
         break;
       default:
         alert(`Unknown stash context menu action: ${action}`);
+    }
+  };
+
+  const handleApplyStashDialog = async ({ stashIndex, deleteAfterApplying }) => {
+    setShowApplyStashDialog(false);
+
+    if (stashToApply === null) {
+      return;
+    }
+
+    const stash = stashToApply;
+    setStashToApply(null);
+
+    try {
+      const git = gitAdapter.current;
+
+      console.log(`Applying stash: ${stash.message} (index: ${stashIndex})`);
+
+      // Apply the stash
+      await git.raw(['stash', 'apply', `stash@{${stashIndex}}`]);
+
+      console.log(`Stash applied successfully: ${stash.message}`);
+
+      // Only delete the stash if it was requested and there were no errors
+      if (deleteAfterApplying) {
+        try {
+          console.log(`Deleting stash after successful apply: ${stash.message}`);
+          await git.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
+          console.log(`Stash deleted successfully after apply: ${stash.message}`);
+        } catch (dropError) {
+          console.warn(`Failed to delete stash after apply: ${dropError.message}`);
+          setError(`Stash applied successfully, but failed to delete it: ${dropError.message}`);
+        }
+      }
+
+      // Refresh the file statuses to show applied changes
+      await refreshFileStatus();
+      
+      // Refresh repository data to show updated stash list
+      await loadRepoData(true);
+      
+    } catch (error) {
+      console.error('Error applying stash:', error);
+      setError(`Failed to apply stash '${stash.message}': ${error.message}`);
     }
   };
 
@@ -1327,6 +1374,17 @@ onMouseDown={handleMouseDown}
           sourceBranch={mergeSourceBranch}
           targetBranch={currentBranch}
           gitAdapter={gitAdapter.current}
+        />
+      )}
+      {showApplyStashDialog && (
+        <ApplyStashDialog
+          onClose={() => {
+            setShowApplyStashDialog(false);
+            setStashToApply(null);
+          }}
+          onApply={handleApplyStashDialog}
+          stashMessage={stashToApply?.message || ''}
+          stashIndex={stashToApply?.index || 0}
         />
       )}
       {showPushDialog && (
