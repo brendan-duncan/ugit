@@ -57,7 +57,7 @@ function MergeBranchDialog({ onClose, onMerge, sourceBranch, targetBranch, gitAd
         ]);
 
         // If the result contains conflict markers, there are conflicts
-        const hasConflicts = result.includes('<<<<<<< ');
+        const hasConflicts = !!result?.includes('<<<<<<< ');
         
         setConflictCheck({ 
           loading: false, 
