@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Toolbar.css';
+const { clipboard } = window.require('electron');
 
-function Toolbar({ onRefresh, onFetch, onPull, onPush, onStash, refreshing, currentBranch, branchStatus, onCreateBranch }) {
+function Toolbar({ onRefresh, onFetch, onPull, onPush, onStash, refreshing, currentBranch, branchStatus, onCreateBranch, runningCommands }) {
   const [showRepositoryMenu, setShowRepositoryMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -18,12 +19,22 @@ function Toolbar({ onRefresh, onFetch, onPull, onPush, onStash, refreshing, curr
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showRepositoryMenu]);
+
   // Get status for current branch
   const currentBranchStatus = branchStatus[currentBranch] || { ahead: 0, behind: 0 };
   
   // Create labels with counts
   const pullLabel = currentBranchStatus.behind > 0 ? `Pull (${currentBranchStatus.behind})` : 'Pull';
   const pushLabel = currentBranchStatus.ahead > 0 ? `Push (${currentBranchStatus.ahead})` : 'Push';
+
+  const commandStatus = runningCommands.length > 0
+    ? `${runningCommands.map(cmd => cmd.command).join('\n')}`
+    : '';
+
+  const onCopyCommands = async () => {
+    console.log('Copying commands to clipboard:', commandStatus);
+    await clipboard.writeText(commandStatus);
+  };
 
   return (
     <div className="toolbar">
@@ -54,6 +65,9 @@ function Toolbar({ onRefresh, onFetch, onPull, onPush, onStash, refreshing, curr
         <span className="toolbar-button-label">Branch</span>
       </button>
       <div className="toolbar-separator"></div>
+      {runningCommands.length > 0 &&
+        <div className="toolbar-status"><span className="toolbar-busy-spinner" title={commandStatus} onClick={onCopyCommands}>↻</span></div>
+      }
     </div>
   );
 }

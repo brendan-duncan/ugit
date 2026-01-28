@@ -17,6 +17,7 @@ const { ipcRenderer } = window.require('electron');
 const cacheManager = window.require('./src/utils/cacheManager');
 
 function RepositoryView({ repoPath }) {
+  const [commandState, setCommandState] = useState([]);
   const [branches, setBranches] = useState([]);
   const [currentBranch, setCurrentBranch] = useState('');
   const [branchStatus, setBranchStatus] = useState({});
@@ -45,6 +46,8 @@ function RepositoryView({ repoPath }) {
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
+
+  let runningCommands = null;
 
   // Helper function to update branch commits cache
   const updateBranchCache = (branchName, commits) => {
@@ -109,6 +112,16 @@ function RepositoryView({ repoPath }) {
         if (gitAdapter.current) {
           await gitAdapter.current.open();
         }
+
+        gitAdapter.current.commandStateCallback = (isStarting, id, command, time) => {
+          setCommandState(prev => {
+            const newState = isStarting
+              ? [...prev, { id, command, time }]
+              : prev.filter(cmd => cmd.id !== id);
+            runningCommands = newState;
+            return newState;
+          });
+        };
       }
 
       // Initialize cache manager with user data path
@@ -260,18 +273,13 @@ function RepositoryView({ repoPath }) {
 
       // Get ahead/behind status for each branch (parallel)
       const statusPromises = branchNames.map(async (branchName) => {
-        try {
-          // Check if branch has a remote tracking branch
-          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
+        // Check if branch has a remote tracking branch
+        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
 
-          if (ahead > 0 || behind > 0) {
-            return { branchName, ahead, behind };
-          } else {
-            // Branch is in sync, don't include in status
-            return null;
-          }
-        } catch (error) {
-          // Branch doesn't have a remote tracking branch, skip it
+        if (ahead > 0 || behind > 0) {
+          return { branchName, ahead, behind };
+        } else {
+          // Branch is in sync or isn't tracked, don't include in status
           return null;
         }
       });
@@ -336,11 +344,11 @@ function RepositoryView({ repoPath }) {
     if (loading)
       return;
 
-    // Check for changes every 5 seconds
-    const intervalId = setInterval(() => {
+    // Check for changes every 10 seconds
+    const intervalId = setInterval(async () => {
       // Silently refresh file status in the background
-      refreshFileStatus();
-    }, 5000); // The interval time should be a setting...
+      await refreshFileStatus();
+    }, 10000); // The interval time should be a setting...
 
     // Clean up interval on unmount
     return () => {
@@ -350,7 +358,7 @@ function RepositoryView({ repoPath }) {
 
   const refreshFileStatus = async () => {
     // Ensure git adapter is available before attempting to use it
-    if (!gitAdapter.current) {
+    if (!gitAdapter.current || runningCommands?.length > 0) {
       return;
     }
 
@@ -437,18 +445,13 @@ function RepositoryView({ repoPath }) {
 
       // Get ahead/behind status for each branch (parallel)
       const statusPromises = branchNames.map(async (branchName) => {
-        try {
-          // Check if branch has a remote tracking branch
-          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
+        // Check if branch has a remote tracking branch
+        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
 
-          if (ahead > 0 || behind > 0) {
-            return { branchName, ahead, behind };
-          } else {
-            // Branch is in sync, don't include in status
-            return null;
-          }
-        } catch (error) {
-          // Branch doesn't have a remote tracking branch, skip it
+        if (ahead > 0 || behind > 0) {
+          return { branchName, ahead, behind };
+        } else {
+          // Branch is in sync or isn't tracked, don't include in status
           return null;
         }
       });
@@ -516,24 +519,22 @@ function RepositoryView({ repoPath }) {
 
       // Refresh branch status after fetch (parallel, update UI incrementally)
       branches.forEach(async (branchName) => {
-        try {
-          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-          if (ahead > 0 || behind > 0) {
-            setBranchStatus(prev => ({
-              ...prev,
-              [branchName]: { ahead, behind }
-            }));
-          } else {
-            // Remove status if branch is now in sync
-            setBranchStatus(prev => {
-              const newStatus = { ...prev };
-              delete newStatus[branchName];
-              return newStatus;
-            });
-          }
-        } catch (error) {
+        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
+        if (ahead > 0 || behind > 0) {
+          setBranchStatus(prev => ({
+            ...prev,
+            [branchName]: { ahead, behind }
+          }));
+        } else if (ahead < 0 || behind < 0) {
           // Branch doesn't have a remote tracking branch
           // Remove status for this branch
+          setBranchStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[branchName];
+            return newStatus;
+          });
+        } else {
+          // Remove status if branch is now in sync
           setBranchStatus(prev => {
             const newStatus = { ...prev };
             delete newStatus[branchName];
@@ -581,8 +582,10 @@ function RepositoryView({ repoPath }) {
       // Clear branch commits cache since pull may have changed commits
       clearBranchCache();
 
+      await loadRepoData(true);
+
       // Refresh all data after pull
-      const status = await git.status();
+      /*const status = await git.status();
       setCurrentBranch(status.current);
 
       // Refresh file status
@@ -594,22 +597,13 @@ function RepositoryView({ repoPath }) {
 
       // Refresh branch status (parallel, update UI incrementally)
       branches.forEach(async (branchName) => {
-        try {
-          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-          if (ahead > 0 || behind > 0) {
-            setBranchStatus(prev => ({
-              ...prev,
-              [branchName]: { ahead, behind }
-            }));
-          } else {
-            // Remove status if branch is now in sync
-            setBranchStatus(prev => {
-              const newStatus = { ...prev };
-              delete newStatus[branchName];
-              return newStatus;
-            });
-          }
-        } catch (error) {
+        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
+        if (ahead > 0 || behind > 0) {
+          setBranchStatus(prev => ({
+            ...prev,
+            [branchName]: { ahead, behind }
+          }));
+        } else if (ahead < 0 || behind < 0) {
           // Branch doesn't have a remote tracking branch
           // Remove status for this branch
           setBranchStatus(prev => {
@@ -617,14 +611,21 @@ function RepositoryView({ repoPath }) {
             delete newStatus[branchName];
             return newStatus;
           });
+        } else {
+          // Remove status if branch is now in sync
+          setBranchStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[branchName];
+            return newStatus;
+          });
         }
-      });
+      });*/
 
     } catch (error) {
       console.error('Error during pull:', error);
       setError(`Pull failed: ${error.message}`);
-      setPullingBranch(null);
     }
+    setPullingBranch(null);
   };
 
   const handlePush = async (branch, remoteBranch, pushAllTags) => {
@@ -646,24 +647,17 @@ function RepositoryView({ repoPath }) {
       // Clear branch commits cache since push may have changed commits
       clearBranchCache();
 
+      await loadRepoData(true);
+
       // Refresh branch status after push (parallel, update UI incrementally)
-      branches.forEach(async (branchName) => {
-        try {
-          const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-          if (ahead > 0 || behind > 0) {
-            setBranchStatus(prev => ({
-              ...prev,
-              [branchName]: { ahead, behind }
-            }));
-          } else {
-            // Remove status if branch is now in sync
-            setBranchStatus(prev => {
-              const newStatus = { ...prev };
-              delete newStatus[branchName];
-              return newStatus;
-            });
-          }
-        } catch (error) {
+      /*branches.forEach(async (branchName) => {
+        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
+        if (ahead > 0 || behind > 0) {
+          setBranchStatus(prev => ({
+            ...prev,
+            [branchName]: { ahead, behind }
+          }));
+        } else if (ahead < 0 || behind < 0) {
           // Branch doesn't have a remote tracking branch
           // Remove status for this branch
           setBranchStatus(prev => {
@@ -671,8 +665,15 @@ function RepositoryView({ repoPath }) {
             delete newStatus[branchName];
             return newStatus;
           });
+        } else {
+          // Remove status if branch is now in sync
+          setBranchStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[branchName];
+            return newStatus;
+          });
         }
-      });
+      });*/
 
     } catch (error) {
       console.error('Error during push:', error);
@@ -1012,7 +1013,7 @@ function RepositoryView({ repoPath }) {
 
   return (
     <div className="repository-view">
-      <Toolbar onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onCreateBranch={() => setShowCreateBranchDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
+      <Toolbar runningCommands={commandState} onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onCreateBranch={() => setShowCreateBranchDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}

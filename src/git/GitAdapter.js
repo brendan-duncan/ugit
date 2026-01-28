@@ -3,9 +3,31 @@
  * Defines the interface that all Git adapters must implement
  */
 class GitAdapter {
-  constructor(repoPath) {
+  constructor(repoPath, commandStateCallback = null) {
     this.repoPath = repoPath;
     this.isOpen = false;
+    this.commandStateCallback = commandStateCallback;
+    this._id = 0;
+    this._pendingCommands = new Map();
+  }
+
+  _startCommand(command, startTime) {
+    this._pendingCommands.set(this._id, command);
+    if (this.commandStateCallback) {
+      this.commandStateCallback(true, this._id, command, startTime);
+    }
+    return this._id++;
+  }
+
+  _endCommand(id, startTime) {
+    const command = this._pendingCommands.get(id);
+    this._pendingCommands.delete(id);
+
+    if (this.commandStateCallback) {
+      this.commandStateCallback(false, id, command, performance.now() - startTime);
+    }
+
+    this._logCommand(command, performance.now() - startTime);
   }
 
   /**
