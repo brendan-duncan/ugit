@@ -5,6 +5,7 @@ import ErrorDialog from './ErrorDialog';
 import CreateBranchDialog from './CreateBranchDialog';
 import DeleteBranchDialog from './DeleteBranchDialog';
 import RenameBranchDialog from './RenameBranchDialog';
+import MergeBranchDialog from './MergeBranchDialog';
 import ContentViewer from './ContentViewer';
 import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
@@ -47,8 +48,10 @@ function RepositoryView({ repoPath, isActiveTab }) {
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
 const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState(null);
-  const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
+const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
   const [branchToRename, setBranchToRename] = useState(null);
+  const [showMergeBranchDialog, setShowMergeBranchDialog] = useState(false);
+  const [mergeSourceBranch, setMergeSourceBranch] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -904,6 +907,49 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
       console.error('Error renaming branch:', error);
       setError(`Failed to rename branch '${oldName}' to '${newName}': ${error.message}`);
     }
+};
+
+  const handleMergeBranchDialog = async ({ sourceBranch, targetBranch, mergeOption, flag }) => {
+    setShowMergeBranchDialog(false);
+
+    if (!sourceBranch || !targetBranch) {
+      return;
+    }
+
+    setMergeSourceBranch(null);
+
+    try {
+      const git = gitAdapter.current;
+
+      console.log(`Merging '${sourceBranch}' into '${targetBranch}' with option: ${mergeOption}`);
+
+      // Build merge command
+      const mergeArgs = ['merge'];
+      if (flag) {
+        mergeArgs.push(flag);
+      }
+      mergeArgs.push(sourceBranch);
+
+      // Perform the merge
+      await git.raw(mergeArgs);
+
+      console.log(`Merge completed successfully: '${sourceBranch}' into '${targetBranch}'`);
+      
+      // Clear branch commits cache since merge affects commits
+      clearBranchCache();
+
+      // Refresh repository data to show updated state
+      await loadRepoData(true);
+      
+      // If we're on the target branch, refresh the commits view
+      if (selectedItem?.type === 'branch' && selectedItem.branchName === targetBranch) {
+        await handleBranchSelect(targetBranch);
+      }
+      
+    } catch (error) {
+      console.error('Error merging branch:', error);
+      setError(`Failed to merge '${sourceBranch}' into '${targetBranch}': ${error.message}`);
+    }
   };
 
   const handleItemSelect = (item) => {
@@ -1077,9 +1123,9 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
       case 'push-to-origin':
         setShowPushDialog(branchName);
         break;
-      case 'merge-into-active':
-        // TODO: Implement merge into active branch
-        alert(`Merge '${branchName}' into '${activeBranch}'`);
+case 'merge-into-active':
+        setMergeSourceBranch(branchName);
+        setShowMergeBranchDialog(true);
         break;
       case 'rebase-active-onto-branch':
         // TODO: Implement rebase active branch onto branch
@@ -1239,7 +1285,7 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
           branchName={branchToDelete}
         />
       )}
-      {showRenameBranchDialog && (
+{showRenameBranchDialog && (
         <RenameBranchDialog
           onClose={() => {
             setShowRenameBranchDialog(false);
@@ -1247,6 +1293,18 @@ const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
           }}
           onRename={handleRenameBranchDialog}
           currentBranchName={branchToRename}
+        />
+      )}
+      {showMergeBranchDialog && (
+        <MergeBranchDialog
+          onClose={() => {
+            setShowMergeBranchDialog(false);
+            setMergeSourceBranch(null);
+          }}
+          onMerge={handleMergeBranchDialog}
+          sourceBranch={mergeSourceBranch}
+          targetBranch={currentBranch}
+          gitAdapter={gitAdapter.current}
         />
       )}
       {showPushDialog && (

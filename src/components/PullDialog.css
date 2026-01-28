@@ -186,3 +186,34 @@
 .dialog-button-primary:active {
   background-color: #3eb9a0;
 }
+
+.conflict-check {
+  padding: 8px 12px;
+  border-radius: 3px;
+  font-size: 0.9rem;
+  border: 1px solid #3d3d3d;
+  background-color: #1e1e1e;
+}
+
+.conflict-check-loading {
+  color: #cccccc;
+  border-color: #3d3d3d;
+}
+
+.conflict-check-success {
+  color: #4ec9b0;
+  border-color: #4ec9b0;
+  background-color: rgba(78, 201, 176, 0.1);
+}
+
+.conflict-check-warning {
+  color: #d16969;
+  border-color: #d16969;
+  background-color: rgba(209, 105, 105, 0.1);
+}
+
+.conflict-check-unknown {
+  color: #ce9178;
+  border-color: #ce9178;
+  background-color: rgba(206, 145, 120, 0.1);
+}
