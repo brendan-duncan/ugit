@@ -21,14 +21,11 @@ const GitFactory = window.require('./src/git/GitFactory');
 const { ipcRenderer } = window.require('electron');
 const cacheManager = window.require('./src/utils/cacheManager');
 
-
-
-
-
 function RepositoryView({ repoPath, isActiveTab }) {
   const [commandState, setCommandState] = useState([]);
   const [branches, setBranches] = useState([]);
   const [currentBranch, setCurrentBranch] = useState('');
+  const [remotes, setRemotes] = useState([]);
   const [branchStatus, setBranchStatus] = useState({});
   const [originUrl, setOriginUrl] = useState('');
   const [stashes, setStashes] = useState([]);
@@ -212,6 +209,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
           setStagedFiles(cachedData.stagedFiles || []);
           setModifiedCount(cachedData.modifiedCount || 0);
           setBranches(cachedData.branches || []);
+          setRemotes(cachedData.remotes || []);
           setBranchStatus(cachedData.branchStatus || {});
           setStashes(cachedData.stashes || []);
           setUsingCache(true);
@@ -292,6 +290,27 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
       const branchNames = branchSummary.all;
       setBranches(branchNames);
 
+      // Get remotes
+      let remotesList = null;
+      try {
+        const remotesOutput = await git.raw(['remote', '-v']);
+        remotesList = remotesOutput
+          .split('\n')
+          .filter(line => line.trim())
+          .map(line => {
+            const match = line.match(/^([^\s]+)\s+([^\s]+)(?:\s+\(fetch\))?$/);
+            return match ? { name: match[1], url: match[2] } : null;
+          })
+          .filter(Boolean);
+        
+        setRemotes(remotesList);
+        console.log(`Loaded ${remotesList.length} remotes`);
+      } catch (error) {
+        console.warn('Failed to load remotes:', error);
+        setRemotes([]);
+        remotesList = [];
+      }
+
       // Get ahead/behind status for each branch (parallel)
       const statusPromises = branchNames.map(async (branchName) => {
         // Check if branch has a remote tracking branch
@@ -332,6 +351,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
         stagedFiles: staged,
         modifiedCount: allPaths.size,
         branches: branchNames,
+        remotes: remotesList,
         branchStatus: statusMap,
         stashes: stashList.all
       };
@@ -525,7 +545,12 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
       const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
 
       if (activeSplitter.current === 1) {
-        // Branches/Stashes splitter
+        // Branches/Remotes splitter
+        if (mouseY >= 20 && mouseY <= 80) {
+          setBranchesHeight(mouseY);
+        }
+      } else if (activeSplitter.current === 2) {
+        // Remotes/Stashes splitter
         if (mouseY >= 20 && mouseY <= 80) {
           setBranchesHeight(mouseY);
         }
@@ -1305,6 +1330,11 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
       console.error('Error deleting stash:', error);
       setError(`Failed to delete stash '${stash.message}': ${error.message}`);
     }
+};
+
+  const handleRemoteBranchSelect = (remoteBranchInfo) => {
+    console.log('Remote branch selected:', remoteBranchInfo);
+    _setSelectedItem(remoteBranchInfo);
   };
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
@@ -1342,7 +1372,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
                 onResetToOrigin={() => setShowResetDialog(true)}
               />
               <div className="branch-stash-panel">
-                <BranchStashPanel
+<BranchStashPanel
                   branches={branches}
                   currentBranch={currentBranch}
                   branchStatus={branchStatus}
@@ -1355,6 +1385,9 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
                   onMouseDown={handleMouseDown}
                   onBranchContextMenu={handleBranchContextMenu}
                   onStashContextMenu={handleStashContextMenu}
+                  remotes={remotes}
+                  onSelectRemoteBranch={handleRemoteBranchSelect}
+                  gitAdapter={gitAdapter.current}
                 />
               </div>
             </div>

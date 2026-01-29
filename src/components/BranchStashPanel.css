@@ -51,6 +51,16 @@
   min-height: auto;
 }
 
+.remotes-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.remotes-panel.collapsed {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
 .stashes-panel {
   flex: 1;
   min-height: 0;
