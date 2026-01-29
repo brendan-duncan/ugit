@@ -1,24 +1,14 @@
 import React, { useState } from 'react';
+import RemoteBranchContextMenu from './RemoteBranchContextMenu';
 import './RemoteList.css';
 
-function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter }) {
+function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch }) {
   const [expandedRemotes, setExpandedRemotes] = useState({});
   const [remoteBranchesCache, setRemoteBranchesCache] = useState({});
   const [loadingRemotes, setLoadingRemotes] = useState({});
+  const [contextMenu, setContextMenu] = useState(null);
 
-  if (!remotes || remotes.length === 0) {
-    return (
-      <div className="remote-list">
-        <div className="panel-header">
-          <h3>Remotes</h3>
-          <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
-            {collapsed ? '▶' : '▼'}
-          </button>
-        </div>
-        {!collapsed && <div className="remote-list-empty">No remotes found</div>}
-      </div>
-    );
-  }
+  const contextMenuRef = { current: null };
 
   const handleRemoteToggle = async (remoteName) => {
     const isCurrentlyExpanded = expandedRemotes[remoteName];
@@ -88,6 +78,44 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     }
   };
 
+  const handleRemoteBranchContextMenu = (e, remoteName, branchName) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const fullName = `${remoteName}/${branchName}`;
+    
+    // Check if current branch is tracking this remote branch
+    // This is a simplified check - in a real implementation, you'd check git config for tracking branches
+    const isTracking = currentBranch && fullName === `origin/${currentBranch}`;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({
+      x: rect.left,
+      y: rect.top + rect.height,
+      remoteName,
+      branchName,
+      fullName,
+      currentBranch: currentBranch || '',
+      isTracking
+    });
+  };
+
+  const handleContextMenuAction = (action, ...args) => {
+    if (onRemoteBranchAction) {
+      onRemoteBranchAction(action, contextMenu?.remoteName, contextMenu?.branchName, contextMenu?.fullName, ...args);
+    }
+    setContextMenu(null);
+  };
+
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
+
   return (
     <div className="remote-list">
       <div className="panel-header">
@@ -98,7 +126,10 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
       </div>
       {!collapsed && (
         <div className="remote-list-content">
-          {remotes.map((remote) => (
+          {(!remotes || remotes.length === 0) ? (
+            <div className="remote-list-empty">No remotes found</div>
+          ) : (
+            remotes.map((remote) => (
             <div key={remote.name} className="remote-item">
               <div 
                 className="remote-header"
@@ -129,6 +160,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                             key={branch}
                             className={`remote-branch-item ${isSelected ? 'selected' : ''}`}
                             onClick={() => handleRemoteBranchSelect(remote.name, branch)}
+                            onContextMenu={(e) => handleRemoteBranchContextMenu(e, remote.name, branch)}
                           >
                             <span className="remote-branch-icon">🌿</span>
                             <span className="remote-branch-name">{branch}</span>
@@ -144,8 +176,27 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                 </div>
               )}
             </div>
-          ))}
+          )))}
         </div>
+      )}
+      
+      {contextMenu && (
+        <RemoteBranchContextMenu
+          remoteName={contextMenu.remoteName}
+          branchName={contextMenu.branchName}
+          fullName={contextMenu.fullName}
+          currentBranch={contextMenu.currentBranch}
+          isTracking={contextMenu.isTracking}
+          onCheckout={() => handleContextMenuAction('checkout')}
+          onPull={() => handleContextMenuAction('pull')}
+          onMerge={() => handleContextMenuAction('merge')}
+          onNewBranch={() => handleContextMenuAction('new-branch')}
+          onNewTag={() => handleContextMenuAction('new-tag')}
+          onDelete={() => handleContextMenuAction('delete')}
+          onCopyName={() => handleContextMenuAction('copy-name')}
+          onClose={() => setContextMenu(null)}
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+        />
       )}
     </div>
   );

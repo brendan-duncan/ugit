@@ -224,6 +224,15 @@
   background-color: #2a2d2e;
 }
 
+.context-menu-item.disabled {
+  color: #666666;
+  cursor: default;
+}
+
+.context-menu-item.disabled:hover {
+  background-color: transparent;
+}
+
 .context-menu-separator {
   height: 1px;
   background-color: #454545;

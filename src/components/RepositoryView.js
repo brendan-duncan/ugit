@@ -1335,6 +1335,47 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
   const handleRemoteBranchSelect = (remoteBranchInfo) => {
     console.log('Remote branch selected:', remoteBranchInfo);
     _setSelectedItem(remoteBranchInfo);
+};
+
+  const handleRemoteBranchContextMenu = (action, remoteName, branchName, fullName, ...args) => {
+    console.log('Remote branch context menu action:', action, 'on branch:', fullName);
+
+    switch (action) {
+      case 'checkout':
+        // TODO: Implement checkout remote branch
+        alert(`Check out remote branch: ${fullName}`);
+        break;
+      case 'pull':
+        // TODO: Implement pull remote branch into current branch
+        alert(`Pull '${fullName}' into '${currentBranch}'`);
+        break;
+      case 'merge':
+        // TODO: Implement merge remote branch into current branch
+        alert(`Merge '${fullName}' into '${currentBranch}'`);
+        break;
+      case 'new-branch':
+        // TODO: Implement new branch from remote branch
+        alert(`New branch from: ${fullName}`);
+        break;
+      case 'new-tag':
+        // TODO: Implement new tag from remote branch
+        alert(`New tag from: ${fullName}`);
+        break;
+      case 'delete':
+        // TODO: Implement delete remote branch confirmation
+        alert(`Delete remote branch: ${fullName}`);
+        break;
+      case 'copy-name':
+        // Copy remote branch name to clipboard
+        navigator.clipboard.writeText(fullName).then(() => {
+          console.log(`Remote branch name copied to clipboard: ${fullName}`);
+        }).catch(err => {
+          console.error('Failed to copy remote branch name:', err);
+        });
+        break;
+      default:
+        alert(`Unknown remote branch context menu action: ${action}`);
+    }
   };
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
@@ -1372,7 +1413,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
                 onResetToOrigin={() => setShowResetDialog(true)}
               />
               <div className="branch-stash-panel">
-<BranchStashPanel
+                <BranchStashPanel
                   branches={branches}
                   currentBranch={currentBranch}
                   branchStatus={branchStatus}
@@ -1387,6 +1428,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
                   onStashContextMenu={handleStashContextMenu}
                   remotes={remotes}
                   onSelectRemoteBranch={handleRemoteBranchSelect}
+                  onRemoteBranchAction={handleRemoteBranchContextMenu}
                   gitAdapter={gitAdapter.current}
                 />
               </div>
