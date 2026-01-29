@@ -104,11 +104,11 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
       </div>
       {originUrl ? (
           <div className="repo-origin">
-            Origin: <strong>{originUrl}</strong>
+            Remote: <strong>{originUrl}</strong>
           </div>
         ) : (
           <div className="repo-origin">
-            Origin: <strong>none</strong>
+            Remote: <strong>none</strong>
           </div>
         )}
       {currentBranch && (
