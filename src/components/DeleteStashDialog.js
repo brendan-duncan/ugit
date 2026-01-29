@@ -1,4 +1,5 @@
 import React from 'react';
+import './Dialog.css';
 import './DeleteStashDialog.css';
 
 function DeleteStashDialog({ onClose, onDelete, stashMessage, stashIndex }) {

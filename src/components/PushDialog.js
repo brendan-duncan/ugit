@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './Dialog.css';
 import './PushDialog.css';
 
 function PushDialog({ onClose, onPush, branches, currentBranch }) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './Dialog.css';
 import './RenameBranchDialog.css';
 
 function RenameBranchDialog({ onClose, onRename, currentBranchName }) {

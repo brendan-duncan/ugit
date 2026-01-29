@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './PullDialog.css';
+import './Dialog.css';
 
 function MergeBranchDialog({ onClose, onMerge, sourceBranch, targetBranch, gitAdapter }) {
   const [selectedOption, setSelectedOption] = useState('default');

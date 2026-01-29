@@ -21,6 +21,10 @@ const GitFactory = window.require('./src/git/GitFactory');
 const { ipcRenderer } = window.require('electron');
 const cacheManager = window.require('./src/utils/cacheManager');
 
+
+
+
+
 function RepositoryView({ repoPath, isActiveTab }) {
   const [commandState, setCommandState] = useState([]);
   const [branches, setBranches] = useState([]);

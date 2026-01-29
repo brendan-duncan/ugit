@@ -1,0 +1,138 @@
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog-content {
+  background-color: #252526;
+  border-radius: 4px;
+  border: 1px solid #3d3d3d;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-header {
+  padding: 16px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.dialog-body {
+  padding: 20px 16px;
+}
+
+.dialog-field {
+  margin-bottom: 16px;
+}
+
+.dialog-field:last-child {
+  margin-bottom: 0;
+  display: flex;
+}
+
+.dialog-field label {
+  color: #cccccc;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.dialog-field input {
+  flex: 1 auto;
+  padding: 8px 12px;
+  color: #cccccc;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.dialog-select {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 3px;
+  color: #cccccc;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  outline: none;
+}
+
+.dialog-select:focus {
+  border-color: #4ec9b0;
+}
+
+.dialog-checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 0 !important;
+}
+
+.dialog-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.dialog-checkbox-label span {
+  color: #cccccc;
+  font-size: 0.9rem;
+}
+
+.dialog-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #3d3d3d;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-button {
+  padding: 8px 16px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  outline: none;
+}
+
+.dialog-button-cancel {
+  background-color: #2d2d2d;
+  color: #cccccc;
+  border: 1px solid #3d3d3d;
+}
+
+.dialog-button-cancel:hover {
+  background-color: #3d3d3d;
+}
+
+.dialog-button-primary {
+  background-color: #4ec9b0;
+  color: #1e1e1e;
+  border: 1px solid #4ec9b0;
+}
+
+.dialog-button-primary:hover {
+  background-color: #5fd9c0;
+}
+
+.dialog-button-primary:active {
+  background-color: #3eb9a0;
+}

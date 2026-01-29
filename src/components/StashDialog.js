@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './PullDialog.css';
+import './Dialog.css';
 
 function StashDialog({ onClose, onStash }) {
   const [message, setMessage] = useState('');

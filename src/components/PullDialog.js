@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './Dialog.css';
 import './PullDialog.css';
 
 function PullDialog({ onClose, onPull, branches, currentBranch }) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './Dialog.css';
 import './ApplyStashDialog.css';
 
 function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {

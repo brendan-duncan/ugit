@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './Dialog.css';
 import './CreateBranchDialog.css';
 
 const CHECKOUT_AFTER_KEY = 'ugit-create-branch-checkout-after';

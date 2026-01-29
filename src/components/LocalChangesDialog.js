@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import './PullDialog.css';
+import './Dialog.css';
+import './LocalChangesDialog.css';
 
 function LocalChangesDialog({ onClose, onProceed, targetBranch }) {
   const STORAGE_KEY = 'local-changes-dialog-option';
-  
+
   // Load saved option from localStorage on mount
   const getSavedOption = () => {
     try {
@@ -12,9 +13,9 @@ function LocalChangesDialog({ onClose, onProceed, targetBranch }) {
       return 'leave-alone';
     }
   };
-  
+
   const [selectedOption, setSelectedOption] = useState(getSavedOption());
-  
+
   // Save to localStorage whenever option changes
   const handleOptionChange = (option) => {
     setSelectedOption(option);
@@ -37,8 +38,10 @@ function LocalChangesDialog({ onClose, onProceed, targetBranch }) {
         </div>
 
         <div className="dialog-body">
-          <p>You have local changes. What would you like to do before switching to <strong>{targetBranch}</strong>?</p>
-          
+          <div className="dialog-field">
+            <p>You have local changes. What would you like to do before switching to <strong>{targetBranch}</strong>?</p>
+          </div>
+
           <div className="dialog-field">
             <label className="dialog-radio-label">
               <input
