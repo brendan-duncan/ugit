@@ -1,7 +1,41 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './CommitList.css';
 
-function CommitList({ commits, selectedCommit, onSelectCommit }) {
+function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, currentBranch }) {
+  const [contextMenu, setContextMenu] = useState(null);
+  const contextMenuRef = useRef(null);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setContextMenu(null);
+      }
+    };
+
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [contextMenu]);
+
+  const handleContextMenu = (e, commit) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      commit
+    });
+  };
+
+  const handleMenuAction = (action) => {
+    if (onContextMenu && contextMenu) {
+      onContextMenu(action, contextMenu.commit, currentBranch);
+    }
+    setContextMenu(null);
+  };
+
   if (!commits || commits.length === 0) {
     return (
       <div className="commit-list">
@@ -22,6 +56,7 @@ function CommitList({ commits, selectedCommit, onSelectCommit }) {
               key={commit.hash}
               className={`commit-item ${isSelected ? 'selected' : ''} ${!commit.onOrigin ? 'not-on-origin' : ''}`}
               onClick={() => onSelectCommit(commit)}
+              onContextMenu={(e) => handleContextMenu(e, commit)}
             >
               {!commit.onOrigin && <span className="commit-remote-indicator">⚡</span>}
               <span className={`commit-message ${!commit.onOrigin ? 'italic' : ''}`}>{commit.message}</span>
@@ -32,6 +67,55 @@ function CommitList({ commits, selectedCommit, onSelectCommit }) {
           );
         })}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+            zIndex: 1000
+          }}
+        >
+          <div className="context-menu-item" onClick={() => handleMenuAction('new-branch')}>
+            New Branch...
+          </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('new-tag')}>
+            New Tag...
+          </div>
+          <div className="context-menu-separator"></div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('rebase-to-here')}>
+            Rebase '{currentBranch || 'current'}' to Here
+          </div>
+          <div className="context-menu-separator"></div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('reset-to-here')}>
+            Reset '{currentBranch || 'current'}' to Here
+          </div>
+          <div className="context-menu-separator"></div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('checkout-commit')}>
+            Checkout Commit...
+          </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('cherry-pick')}>
+            Cherry-pick Commit...
+          </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('revert-commit')}>
+            Revert Commit...
+          </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('save-patch')}>
+            Save as Patch...
+          </div>
+          <div className="context-menu-separator"></div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('copy-sha')}>
+            Copy Commit SHA
+          </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('copy-info')}>
+            Copy Commit Info
+          </div>
+        </div>
+      )}
     </div>
   );
 }

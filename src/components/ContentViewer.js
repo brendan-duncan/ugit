@@ -4,7 +4,7 @@ import StashViewer from './StashViewer';
 import BranchView from './BranchView';
 import './ContentViewer.css';
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh }) {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch }) {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -43,6 +43,8 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           loading={item.loading}
           gitAdapter={gitAdapter}
           onRefresh={onRefresh}
+          onContextMenu={onContextMenu}
+          currentBranch={currentBranch}
         />
       )}
       {item.type !== 'local-changes' && item.type !== 'stash' && item.type !== 'branch' && (

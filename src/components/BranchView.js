@@ -5,7 +5,7 @@ import './BranchView.css';
 
 
 
-function BranchView({ branchName, commits, loading, gitAdapter, onRefresh }) {
+function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, currentBranch }) {
   const [selectedCommit, setSelectedCommit] = useState(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [topHeight, setTopHeight] = useState(60);
@@ -69,6 +69,8 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh }) {
               commits={commits}
               selectedCommit={selectedCommit}
               onSelectCommit={handleCommitSelect}
+              onContextMenu={onContextMenu}
+              currentBranch={currentBranch}
             />
           </div>
 

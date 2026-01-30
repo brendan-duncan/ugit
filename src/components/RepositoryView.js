@@ -1207,6 +1207,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
       default:
         alert(`Unknown context menu action: ${action}`);
     }
+<<<<<<< Updated upstream
 };
 
   const handleStashContextMenu = (action, stash, stashIndex) => {
@@ -1391,6 +1392,156 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
   };
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
+=======
+  };
+
+  const handleCommitContextMenu = async (action, commit, currentBranch) => {
+    console.log('Commit context menu action:', action, 'on commit:', commit.hash);
+
+    try {
+      const git = gitAdapter.current;
+
+      switch (action) {
+        case 'new-branch':
+          const branchName = prompt(`Enter new branch name (from commit ${commit.hash.substring(0, 7)}):`);
+          if (branchName && branchName.trim()) {
+            await git.raw(['checkout', '-b', branchName.trim(), commit.hash]);
+            console.log(`Created branch '${branchName}' from commit ${commit.hash.substring(0, 7)}`);
+            await loadRepoData(true);
+          }
+          break;
+
+        case 'new-tag':
+          const tagName = prompt(`Enter tag name (for commit ${commit.hash.substring(0, 7)}):`);
+          if (tagName && tagName.trim()) {
+            await git.raw(['tag', tagName.trim(), commit.hash]);
+            console.log(`Created tag '${tagName}' on commit ${commit.hash.substring(0, 7)}`);
+            await loadRepoData(true);
+          }
+          break;
+
+        case 'rebase-to-here':
+          if (currentBranch) {
+            const confirmed = window.confirm(
+              `Are you sure you want to rebase '${currentBranch}' onto commit ${commit.hash.substring(0, 7)}?\n\nThis will rewrite the history of '${currentBranch}'.`
+            );
+            if (confirmed) {
+              await git.raw(['rebase', '--interactive', '--onto', commit.hash, `$(git merge-base ${currentBranch} ${commit.hash})`, currentBranch]);
+              console.log(`Rebased '${currentBranch}' onto commit ${commit.hash.substring(0, 7)}`);
+              await loadRepoData(true);
+            }
+          } else {
+            alert('No current branch found for rebase');
+          }
+          break;
+
+        case 'reset-to-here':
+          if (currentBranch) {
+            const confirmed = window.confirm(
+              `Are you sure you want to reset '${currentBranch}' to commit ${commit.hash.substring(0, 7)}?\n\nThis will discard all commits after this point.`
+            );
+            if (confirmed) {
+              await git.raw(['reset', '--hard', commit.hash]);
+              console.log(`Reset '${currentBranch}' to commit ${commit.hash.substring(0, 7)}`);
+              await loadRepoData(true);
+            }
+          } else {
+            alert('No current branch found for reset');
+          }
+          break;
+
+        case 'checkout-commit':
+          const confirmed = window.confirm(
+            `Are you sure you want to checkout commit ${commit.hash.substring(0, 7)}?\n\nThis will put you in a 'detached HEAD' state.`
+          );
+          if (confirmed) {
+            await git.checkoutBranch(commit.hash);
+            console.log(`Checked out commit ${commit.hash.substring(0, 7)}`);
+            await loadRepoData(true);
+          }
+          break;
+
+        case 'cherry-pick':
+          if (currentBranch) {
+            const confirmed = window.confirm(
+              `Are you sure you want to cherry-pick commit ${commit.hash.substring(0, 7)} onto '${currentBranch}'?`
+            );
+            if (confirmed) {
+              await git.raw(['cherry-pick', commit.hash]);
+              console.log(`Cherry-picked commit ${commit.hash.substring(0, 7)} onto '${currentBranch}'`);
+              await loadRepoData(true);
+            }
+          } else {
+            alert('No current branch found for cherry-pick');
+          }
+          break;
+
+        case 'revert-commit':
+          if (currentBranch) {
+            const confirmed = window.confirm(
+              `Are you sure you want to revert commit ${commit.hash.substring(0, 7)} on '${currentBranch}'?`
+            );
+            if (confirmed) {
+              await git.raw(['revert', commit.hash]);
+              console.log(`Reverted commit ${commit.hash.substring(0, 7)} on '${currentBranch}'`);
+              await loadRepoData(true);
+            }
+          } else {
+            alert('No current branch found for revert');
+          }
+          break;
+
+        case 'save-patch':
+          try {
+            const patchContent = await git.raw(['format-patch', '-1', commit.hash]);
+            const blob = new Blob([patchContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${commit.hash.substring(0, 7)}.patch`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log(`Saved patch for commit ${commit.hash.substring(0, 7)}`);
+          } catch (error) {
+            console.error('Error creating patch:', error);
+            alert('Failed to create patch: ' + error.message);
+          }
+          break;
+
+        case 'copy-sha':
+          try {
+            await navigator.clipboard.writeText(commit.hash);
+            console.log(`Copied commit SHA to clipboard: ${commit.hash}`);
+          } catch (error) {
+            console.error('Failed to copy SHA:', error);
+            alert('Failed to copy SHA to clipboard');
+          }
+          break;
+
+        case 'copy-info':
+          try {
+            const commitInfo = `Commit: ${commit.hash.substring(0, 7)} (${commit.hash})\nAuthor: ${commit.author_name}\nDate: ${commit.date}\n\n${commit.message}`;
+            await navigator.clipboard.writeText(commitInfo);
+            console.log(`Copied commit info to clipboard: ${commit.hash.substring(0, 7)}`);
+          } catch (error) {
+            console.error('Failed to copy commit info:', error);
+            alert('Failed to copy commit info to clipboard');
+          }
+          break;
+
+        default:
+          alert(`Unknown context menu action: ${action}`);
+      }
+    } catch (error) {
+      console.error(`Error handling commit context menu action '${action}':`, error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
+>>>>>>> Stashed changes
 
   return (
     <div className="repository-view">
@@ -1458,6 +1609,8 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
                 stagedFiles={stagedFiles}
                 gitAdapter={gitAdapter.current}
                 onRefresh={refreshFileStatus}
+                onContextMenu={handleCommitContextMenu}
+                currentBranch={currentBranch}
               />
             </div>
           </>
