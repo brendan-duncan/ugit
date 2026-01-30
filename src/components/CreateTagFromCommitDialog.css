@@ -1,0 +1,28 @@
+.dialog-textarea {
+  width: 100%;
+  background-color: #3c3c3c;
+  border: 1px solid #5d5d5d;
+  color: #cccccc;
+  padding: 8px 12px;
+  border-radius: 3px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.dialog-textarea:focus {
+  outline: none;
+  border-color: #007acc;
+  box-shadow: 0 0 0 1px #007acc;
+}
+
+.tag-exists-warning {
+  color: #f48771;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.dialog-input.error {
+  border-color: #f48771;
+}

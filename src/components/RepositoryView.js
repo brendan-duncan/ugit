@@ -15,6 +15,8 @@ import PushDialog from './PushDialog';
 import StashDialog from './StashDialog';
 import ResetToOriginDialog from './ResetToOriginDialog';
 import LocalChangesDialog from './LocalChangesDialog';
+import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
+import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import './RepositoryView.css';
 
 const GitFactory = window.require('./src/git/GitFactory');
@@ -61,6 +63,9 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
   const [stashToRename, setStashToRename] = useState(null);
   const [showDeleteStashDialog, setShowDeleteStashDialog] = useState(false);
   const [stashToDelete, setStashToDelete] = useState(null);
+  const [showCreateBranchFromCommitDialog, setShowCreateBranchFromCommitDialog] = useState(false);
+  const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
+  const [commitForDialog, setCommitForDialog] = useState(null);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -1162,6 +1167,59 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
     }
   };
 
+  const handleCreateBranchFromCommit = async (branchName, checkoutAfterCreate) => {
+    if (!commitForDialog) return;
+
+    try {
+      const git = gitAdapter.current;
+      await git.raw(['checkout', '-b', branchName, commitForDialog.hash]);
+      console.log(`Created branch '${branchName}' from commit ${commitForDialog.hash.substring(0, 7)}`);
+
+      if (checkoutAfterCreate) {
+        // Select newly checked out branch to update branch view
+        await handleBranchSelect(branchName);
+      }
+
+      // Clear branch commits cache since branch operations may affect commits
+      clearBranchCache();
+
+      // Refresh all data after branch operations
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error creating branch from commit:', error);
+      setError(`Branch creation failed: ${error.message}`);
+    } finally {
+      setShowCreateBranchFromCommitDialog(false);
+      setCommitForDialog(null);
+    }
+  };
+
+  const handleCreateTagFromCommit = async (tagName, tagMessage) => {
+    if (!commitForDialog) return;
+
+    try {
+      const git = gitAdapter.current;
+      
+      // Create tag with optional message
+      if (tagMessage) {
+        await git.raw(['tag', '-a', tagName, '-m', tagMessage, commitForDialog.hash]);
+      } else {
+        await git.raw(['tag', tagName, commitForDialog.hash]);
+      }
+      
+      console.log(`Created tag '${tagName}' on commit ${commitForDialog.hash.substring(0, 7)}`);
+
+      // Refresh all data to show new tag
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error creating tag from commit:', error);
+      setError(`Tag creation failed: ${error.message}`);
+    } finally {
+      setShowCreateTagFromCommitDialog(false);
+      setCommitForDialog(null);
+    }
+  };
+
   const handleBranchContextMenu = (action, branchName, activeBranch) => {
     console.log('Branch context menu action:', action, 'on branch:', branchName);
 
@@ -1207,8 +1265,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
       default:
         alert(`Unknown context menu action: ${action}`);
     }
-<<<<<<< Updated upstream
-};
+  };
 
   const handleStashContextMenu = (action, stash, stashIndex) => {
     console.log('Stash context menu action:', action, 'on stash:', stash);
@@ -1392,8 +1449,6 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
   };
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
-=======
-  };
 
   const handleCommitContextMenu = async (action, commit, currentBranch) => {
     console.log('Commit context menu action:', action, 'on commit:', commit.hash);
@@ -1403,21 +1458,13 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
 
       switch (action) {
         case 'new-branch':
-          const branchName = prompt(`Enter new branch name (from commit ${commit.hash.substring(0, 7)}):`);
-          if (branchName && branchName.trim()) {
-            await git.raw(['checkout', '-b', branchName.trim(), commit.hash]);
-            console.log(`Created branch '${branchName}' from commit ${commit.hash.substring(0, 7)}`);
-            await loadRepoData(true);
-          }
+          setCommitForDialog(commit);
+          setShowCreateBranchFromCommitDialog(true);
           break;
 
         case 'new-tag':
-          const tagName = prompt(`Enter tag name (for commit ${commit.hash.substring(0, 7)}):`);
-          if (tagName && tagName.trim()) {
-            await git.raw(['tag', tagName.trim(), commit.hash]);
-            console.log(`Created tag '${tagName}' on commit ${commit.hash.substring(0, 7)}`);
-            await loadRepoData(true);
-          }
+          setCommitForDialog(commit);
+          setShowCreateTagFromCommitDialog(true);
           break;
 
         case 'rebase-to-here':
@@ -1540,9 +1587,6 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
     }
   };
 
-  const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
->>>>>>> Stashed changes
-
   return (
     <div className="repository-view">
       <Toolbar runningCommands={commandState} onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onCreateBranch={() => setShowCreateBranchDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
@@ -1655,12 +1699,34 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
           targetBranch={pendingBranchSwitch}
         />
       )}
-      {showCreateBranchDialog && (
+{showCreateBranchDialog && (
         <CreateBranchDialog
           onClose={() => setShowCreateBranchDialog(false)}
           onCreateBranch={handleCreateBranch}
           currentBranch={currentBranch}
           gitAdapter={gitAdapter.current}
+        />
+      )}
+      {showCreateBranchFromCommitDialog && (
+        <CreateBranchFromCommitDialog
+          onClose={() => {
+            setShowCreateBranchFromCommitDialog(false);
+            setCommitForDialog(null);
+          }}
+          onCreateBranch={handleCreateBranchFromCommit}
+          commitHash={commitForDialog ? commitForDialog.hash : ''}
+          commitMessage={commitForDialog ? commitForDialog.message : ''}
+        />
+      )}
+      {showCreateTagFromCommitDialog && (
+        <CreateTagFromCommitDialog
+          onClose={() => {
+            setShowCreateTagFromCommitDialog(false);
+            setCommitForDialog(null);
+          }}
+          onCreateTag={handleCreateTagFromCommit}
+          commitHash={commitForDialog ? commitForDialog.hash : ''}
+          commitMessage={commitForDialog ? commitForDialog.message : ''}
         />
       )}
       {showDeleteBranchDialog && (

@@ -1,0 +1,37 @@
+.commit-info {
+  background-color: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.commit-hash {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  color: #858585;
+  margin-bottom: 8px;
+}
+
+.commit-message {
+  font-size: 13px;
+  color: #cccccc;
+  font-style: italic;
+  word-break: break-word;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.branch-exists-warning {
+  color: #f48771;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.dialog-input.error {
+  border-color: #f48771;
+}
