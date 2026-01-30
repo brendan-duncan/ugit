@@ -257,6 +257,14 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
             case 'D': return 'deleted';
             case 'R': return 'renamed';
             case '?': return 'created';
+            case 'U': return 'conflict';
+            case 'AA': return 'conflict';
+            case 'DD': return 'conflict';
+            case 'UU': return 'conflict';
+            case 'AU': return 'conflict';
+            case 'UA': return 'conflict';
+            case 'DU': return 'conflict';
+            case 'UD': return 'conflict';
             default: return 'modified';
           }
         };
@@ -267,10 +275,8 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
             path: file.path,
             status: getStatusType(file.working_dir)
           });
-        }
-
-        // Check if file has staged changes (index is not empty/space)
-        if (file.index && file.index !== ' ' && file.index !== '?') {
+        } else if (file.index && file.index !== ' ' && file.index !== '?') {
+          // Check if file has staged changes (index is not empty/space)
           staged.push({
             path: file.path,
             status: getStatusType(file.index)
@@ -432,6 +438,14 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
             case 'D': return 'deleted';
             case 'R': return 'renamed';
             case '?': return 'created';
+            case 'U': return 'conflict';
+            case 'AA': return 'conflict';
+            case 'DD': return 'conflict';
+            case 'UU': return 'conflict';
+            case 'AU': return 'conflict';
+            case 'UA': return 'conflict';
+            case 'DU': return 'conflict';
+            case 'UD': return 'conflict';
             default: return 'modified';
           }
         };
@@ -442,10 +456,8 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
             path: file.path,
             status: getStatusType(file.working_dir)
           });
-        }
-
-        // Check if file has staged changes (index is not empty/space)
-        if (file.index && file.index !== ' ' && file.index !== '?') {
+        } else if (file.index && file.index !== ' ' && file.index !== '?') {
+          // Check if file has staged changes (index is not empty/space)
           staged.push({
             path: file.path,
             status: getStatusType(file.index)

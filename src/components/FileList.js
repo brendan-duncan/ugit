@@ -432,7 +432,7 @@ function FileList({
       items.push(
         <div
           key={`file-${file.path}-${index}`}
-          className={`file-item ${isFileSelected ? 'selected' : ''}`}
+          className={`file-item ${isFileSelected ? 'selected' : ''} ${file.status === 'conflict' ? 'conflict' : ''}`}
           style={{ paddingLeft: `${depth * 16}px` }}
           draggable={false}
           onMouseDown={handleMouseDown}
@@ -443,7 +443,7 @@ function FileList({
           onClick={(e) => handleItemClick(e, file.path, false)}
           onContextMenu={(e) => handleContextMenuOpen(e, file.path, false)}
         >
-          <span className="file-status">{getStatusIcon(file.status)}</span>
+          <span className={`file-status ${file.status === 'conflict' ? 'conflict' : ''}`}>{getStatusIcon(file.status)}</span>
           <span className="file-path">{fileName}</span>
         </div>
       );
@@ -533,6 +533,7 @@ function getStatusIcon(status) {
     case 'created': return 'A';
     case 'deleted': return 'D';
     case 'renamed': return 'R';
+    case 'conflict': return 'C';
     default: return '?';
   }
 }
