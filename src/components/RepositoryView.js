@@ -46,6 +46,7 @@ function RepositoryView({ repoPath, isActiveTab }) {
   const [showPushDialog, setShowPushDialog] = useState(null);
   const [showStashDialog, setShowStashDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [showCleanWorkingDirectoryDialog, setShowCleanWorkingDirectoryDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [showLocalChangesDialog, setShowLocalChangesDialog] = useState(false);
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
@@ -1613,6 +1614,7 @@ function RepositoryView({ repoPath, isActiveTab }) {
                 onSelectItem={handleItemSelect}
                 usingCache={usingCache}
                 onResetToOrigin={() => setShowResetDialog(true)}
+                onCleanWorkingDirectory={() => setShowCleanWorkingDirectoryDialog(true)}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel

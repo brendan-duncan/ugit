@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownItem, DropdownSeparator } from './DropdownMenu';
 const { exec } = require('child_process');
 const { shell } = window.require('electron');
 
-function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin }) {
+function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
@@ -94,6 +94,9 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
             📋 Copy Remote Address
           </DropdownItem>
           <DropdownSeparator />
+          <DropdownItem onClick={onCleanWorkingDirectory}>
+            🧹Clean Working Directory...
+          </DropdownItem>
           <DropdownItem onClick={onResetToOrigin}>
             ❗Reset to origin...
           </DropdownItem>
