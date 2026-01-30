@@ -1,22 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import './DiffViewer.css';
 import 'diff2html/bundles/css/diff2html.min.css';
-
+const fs = require('fs');
 
 const Diff2Html = window.require('diff2html');
+
+// Helper function to check if file is an image
+function isImageFile(filePath) {
+  if (!filePath) return false;
+  const imageExtensions = /\.(png|jpg|jpeg|gif|bmp|svg|ico|webp|tiff|tif)$/i;
+  return imageExtensions.test(filePath);
+}
 
 function DiffViewer({ file, gitAdapter, isStaged }) {
   const [diff, setDiff] = useState('');
   const [loading, setLoading] = useState(true);
   const [diffHtml, setDiffHtml] = useState('');
+  const [fileContent, setFileContent] = useState('');
+  const [fileType, setFileType] = useState(''); // 'text' or 'image'
 
   useEffect(() => {
-    const loadDiff = async () => {
+    const loadContent = async () => {
       if (!file || !gitAdapter)
         return;
 
       try {
         setLoading(true);
+        setDiff('');
+        setDiffHtml('');
+        setFileContent('');
+        setFileType('');
+
+        // Check if file is an image
+        if (isImageFile(file.path)) {
+          setFileType('image');
+          setFileContent(file.path);
+          setLoading(false);
+          return;
+        }
 
         let diffResult;
 
@@ -28,11 +49,24 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
           diffResult = await gitAdapter.diff(file.path, isStaged);
         }
 
-        //console.log(diffResult);
         setDiff(diffResult);
 
-        // Generate HTML using diff2html
-        if (diffResult && diffResult.trim() && !diffResult.startsWith('Error loading diff:')) {
+        // If diff is empty or indicates no changes, try to show file contents
+        if (!diffResult || diffResult.trim() === '' || diffResult.startsWith('Error loading diff:')) {
+          console.log('!!!! No diff available, attempting to load file contents.');
+          // Try to read the file contents for new files
+          try {
+            setFileType('text');
+            const content = fs.readFileSync(file.path, 'utf8');
+            setFileContent(content);
+          } catch (contentError) {
+            console.error('Error loading file content:', contentError);
+            setFileType('none');
+            setFileContent(`Error loading '${file.path}' content: ${contentError.message}`);
+          }
+          setDiffHtml('');
+        } else {
+          // Generate HTML using diff2html
           const html = Diff2Html.html(diffResult, {
             drawFileList: false,
             fileListToggle: false,
@@ -46,19 +80,19 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
             renderNothingWhenEmpty: false,
           });
           setDiffHtml(html);
-        } else {
-          setDiffHtml('');
+          setFileType('diff');
         }
 
         setLoading(false);
       } catch (error) {
         console.error('Error loading diff:', error);
-        setDiff('Error loading diff: ' + error.message);
+        setFileType('none');
+        setFileContent('Error loading diff: ' + error.message);
         setLoading(false);
       }
     };
 
-    loadDiff();
+    loadContent();
   }, [file, gitAdapter, isStaged]);
 
   if (!file) {
@@ -79,12 +113,42 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
       )}
       <div className="diff-content">
         {loading ? (
-          <div className="diff-loading">Loading diff...</div>
-        ) : diffHtml ? (
+          <div className="diff-loading">Loading...</div>
+        ) : fileType === 'image' ? (
+          <div className="diff-image-container">
+            <div className="diff-image-display">
+              <img 
+                src={`file://${gitAdapter.repoPath}/${file.path}`} 
+                alt={file.path}
+                className="diff-image"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'block';
+                }}
+              />
+            </div>
+          </div>
+        ) : fileType === 'text' ? (
+          <div className="diff-file-content">
+            <div className="diff-file-content-display">
+              <pre className="diff-file-content-text">{fileContent}</pre>
+            </div>
+          </div>
+        ) : fileType === 'diff' && diffHtml ? (
           <div
             className="diff2html-container"
             dangerouslySetInnerHTML={{ __html: diffHtml }}
           />
+        ) : fileContent ? (
+          <div className="diff-file-content">
+            <div className="diff-header">
+              <span className="diff-filename">{file.path}</span>
+              <span className="diff-status-badge">{file.status}</span>
+            </div>
+            <div className="diff-file-content-display">
+              <pre className="diff-file-content-text">{fileContent}</pre>
+            </div>
+          </div>
         ) : (
           <div className="diff-empty">No changes to display</div>
         )}

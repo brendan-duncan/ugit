@@ -51,15 +51,15 @@ function RepositoryView({ repoPath, isActiveTab }) {
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
-const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
+  const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState(null);
-const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
+  const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
   const [branchToRename, setBranchToRename] = useState(null);
   const [showMergeBranchDialog, setShowMergeBranchDialog] = useState(false);
   const [mergeSourceBranch, setMergeSourceBranch] = useState(null);
   const [showApplyStashDialog, setShowApplyStashDialog] = useState(false);
   const [stashToApply, setStashToApply] = useState(null);
-const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
+  const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
   const [stashToRename, setStashToRename] = useState(null);
   const [showDeleteStashDialog, setShowDeleteStashDialog] = useState(false);
   const [stashToDelete, setStashToDelete] = useState(null);
@@ -396,20 +396,20 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
     if (loading)
       return;
 
-    let intervalId = null;
+    let refreshFileStatusId = null;
     // Only run if this tab is active
     if (isActiveTab) {
-      // Check for changes every 10 seconds
-      intervalId = setInterval(async () => {
+      // Check for changes every 5 seconds
+      refreshFileStatusId = setInterval(async () => {
         // Silently refresh file status in the background
         await refreshFileStatus();
-      }, 10000); // The interval time should be a setting...
+      }, 5000); // The interval time should be a setting...
     }
 
     // Clean up interval on unmount
     return () => {
-      if (intervalId !== null) {
-        clearInterval(intervalId);
+      if (refreshFileStatusId !== null) {
+        clearInterval(refreshFileStatusId);
       }
     };
   }, [loading, isActiveTab]); // Re-run if loading state or active tab changes
@@ -426,10 +426,6 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
       // Get current branch and modified files
       const status = await git.status();
       setCurrentBranch(status.current);
-
-      // Update origin URL (refresh it in case it changed)
-      const url = await git.getOriginUrl();
-      setOriginUrl(url);
 
       // Parse files using status.files array for accurate staging info
       const unstaged = [];
@@ -481,7 +477,6 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
       try {
         const cacheData = cacheManager.loadCache(repoPath) || {};
         cacheData.currentBranch = status.current;
-        cacheData.originUrl = url;
         cacheData.unstagedFiles = unstaged;
         cacheData.stagedFiles = staged;
         cacheData.modifiedCount = allPaths.size;
@@ -1699,7 +1694,7 @@ const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
           targetBranch={pendingBranchSwitch}
         />
       )}
-{showCreateBranchDialog && (
+      {showCreateBranchDialog && (
         <CreateBranchDialog
           onClose={() => setShowCreateBranchDialog(false)}
           onCreateBranch={handleCreateBranch}
