@@ -1,9 +1,10 @@
 # UGit
 
-I want a decent and free Git GUI and dislike the available options, so I thought I'd see how far I could get making one. 
+I want a decent and free Git GUI and dislike the available options, so I thought I'd see how far I could get making one.
 
-I started this as an exercise to try out vibe coding. As this was a learning experience, I had record every command I give it to [all-user-commands.txt](all-user-commands.txt).
-Was I "vibe coding" correctly? Probably not, but I don't care. Vibe coding is terrible.
+<a href="ugit.png">
+<img src="ugit.png" style="width:800px">
+</a>
 
 ## Building
 
