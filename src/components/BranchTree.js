@@ -99,6 +99,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
               pullingBranch={pullingBranch}
               onBranchSelect={onBranchSelect}
               selectedItem={selectedItem}
+              onContextMenu={onContextMenu}
             />
           ))}
         </div>

@@ -21,7 +21,12 @@ class SimpleGitAdapter extends GitAdapter {
   async status() {
     const startTime = performance.now();
     const id = this._startCommand('git status', startTime);
-    const result = await this.git.status();
+    let result = null;
+    try {
+      result = await this.git.status();
+    } catch (error) {
+      console.error('Error getting status:', error);
+    }
     this._endCommand(id, startTime);
     this.currentBranch = result.current; // Track current branch
     return result;
@@ -30,7 +35,12 @@ class SimpleGitAdapter extends GitAdapter {
   async branchLocal() {
     const startTime = performance.now();
     const id = this._startCommand('git branch --list', startTime);
-    const result = await this.git.branchLocal();
+    let result = null;
+    try {
+      result = await this.git.branchLocal();
+    } catch (error) {
+      console.error('Error getting local branches:', error);
+    }
     this._endCommand(id, startTime);
     return result;
   }
@@ -110,7 +120,12 @@ class SimpleGitAdapter extends GitAdapter {
   async stashList() {
     const startTime = performance.now();
     const id = this._startCommand('git stash list', startTime);
-    const result = await this.git.stashList();
+    let result = null;
+    try {
+      result = await this.git.stashList();
+    } catch (error) {
+      console.error('Error getting stash list:', error);
+    }
     this._endCommand(id, startTime);
     return result;
   }
@@ -118,14 +133,22 @@ class SimpleGitAdapter extends GitAdapter {
   async fetch(remote) {
     const startTime = performance.now();
     const id = this._startCommand(`git fetch ${remote}`, startTime);
-    await this.git.fetch(remote);
+    try {
+      await this.git.fetch(remote);
+    } catch (error) {
+      console.error(`Error fetching from ${remote}:`, error);
+    }
     this._endCommand(id, startTime);
   }
 
   async pull(remote, branch) {
     const startTime = performance.now();
     const id = this._startCommand(`git pull ${remote} ${branch}`, startTime);
-    await this.git.pull(remote, branch);
+    try {
+      await this.git.pull(remote, branch);
+    } catch (error) {
+      console.error(`Error pulling from ${remote}/${branch}:`, error);
+    }
     this._endCommand(id, startTime);
   }
 
@@ -133,11 +156,19 @@ class SimpleGitAdapter extends GitAdapter {
     const startTime = performance.now();
     if (options.length > 0) {
       const id = this._startCommand(`git push ${remote} ${refspec} ${options.join(' ')}`, startTime);
-      await this.git.push(remote, refspec, options);
+      try {
+        await this.git.push(remote, refspec, options);
+      } catch (error) {
+        console.error(`Error pushing to ${remote} ${refspec} with options ${options.join(' ')}:`, error);
+      }
       this._endCommand(id, startTime);
     } else {
       const id = this._startCommand(`git push ${remote} ${refspec}`, startTime);
-      await this.git.push(remote, refspec);
+      try {
+        await this.git.push(remote, refspec);
+      } catch (error) {
+        console.error(`Error pushing to ${remote} ${refspec}:`, error);
+      }
       this._endCommand(id, startTime);
     }
   }
@@ -146,11 +177,19 @@ class SimpleGitAdapter extends GitAdapter {
     const startTime = performance.now();
     if (filePaths && filePaths.length > 0) {
       const id = this._startCommand(`git stash push -m "${message}" -- ${filePaths.length} files`, startTime);
-      await this.git.stash(['push', '-m', message, '--', ...filePaths]);
+      try {
+        await this.git.stash(['push', '-m', message, '--', ...filePaths]);
+      } catch (error) {
+        console.error(`Error pushing stash with message "${message}" for ${filePaths.length} files:`, error);
+      }
       this._endCommand(id, startTime);
     } else {
       const id = this._startCommand(`git stash push -m "${message}"`, startTime);
-      await this.git.stash(['push', '-m', message]);
+      try {
+        await this.git.stash(['push', '-m', message]);
+      } catch (error) {
+        console.error(`Error pushing stash with message "${message}":`, error);
+      }
       this._endCommand(id, startTime);
     }
   }
@@ -158,14 +197,22 @@ class SimpleGitAdapter extends GitAdapter {
   async stashPop() {
     const startTime = performance.now();
     const id = this._startCommand('git stash pop', startTime);
-    await this.git.stash(['pop']);
+    try {
+      await this.git.stash(['pop']);
+    } catch (error) {
+      console.error('Error popping stash:', error);
+    } 
     this._endCommand(id, startTime);
   }
 
   async stashApply() {
     const startTime = performance.now();
     const id = this._startCommand('git stash apply', startTime);
-    await this.git.stash(['apply']);
+    try {
+      await this.git.stash(['apply']);
+    } catch (error) {
+      console.error('Error applying stash:', error);
+    }
     this._endCommand(id, startTime);
   }
 
@@ -174,7 +221,12 @@ class SimpleGitAdapter extends GitAdapter {
     // Support both single string and array of file paths for backward compatibility
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
     const id = this._startCommand(`git add ${paths.length === 1 ? paths[0] : paths.length + ' files'}`, startTime);
-    await this.git.add(paths);
+    try {
+      await this.git.add(paths);
+    } catch (error) {
+      console.error('Error staging files:', error);
+      throw error;
+    }
     this._endCommand(id, startTime);
   }
 
@@ -183,14 +235,22 @@ class SimpleGitAdapter extends GitAdapter {
     // Support both single string and array of file paths for backward compatibility
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
     const id = this._startCommand(`git reset HEAD ${paths.length === 1 ? paths[0] : paths.length + ' files'}`, startTime);
-    await this.git.reset(['HEAD', ...paths]);
+    try {
+      await this.git.reset(['HEAD', ...paths]);
+    } catch (error) {
+      console.error('Error unstaging files:', error);
+    }
     this._endCommand(id, startTime);
   }
 
   async commit(message) {
     const startTime = performance.now();
     const id = this._startCommand(`git commit -m "${message}"`, startTime);
-    await this.git.commit(message);
+    try {
+      await this.git.commit(message);
+    } catch (error) {
+      console.error('Error committing changes:', error);
+    }
     this._endCommand(id, startTime);
   }
 
@@ -199,11 +259,21 @@ class SimpleGitAdapter extends GitAdapter {
     let result;
     if (isStaged) {
       const id = this._startCommand(`git diff --cached --ignore-space-at-eol -- ${filePath}`, startTime);
-      result = await this.git.diff(['--cached', '--ignore-space-at-eol', '--', filePath]);
+      try {
+        result = await this.git.diff(['--cached', '--ignore-space-at-eol', '--', filePath]);
+      } catch (error) {
+        console.log("Error getting staged diff for", filePath, error);
+        result = `Error getting staged diff for ${filePath}: ${error.message}`;
+      }
       this._endCommand(id, startTime);
     } else {
       const id = this._startCommand(`git diff --ignore-space-at-eol -- ${filePath}`, startTime);
-      result = await this.git.diff(['--ignore-space-at-eol', '--', filePath]);
+      try {
+        result = await this.git.diff(['--ignore-space-at-eol', '--', filePath]);
+      } catch (error) {
+        console.log("Error getting diff for", filePath, error);
+        result = `Error getting diff for ${filePath}: ${error.message}`;
+      }
       this._endCommand(id, startTime);
     }
     //console.log(result);
@@ -452,6 +522,7 @@ class SimpleGitAdapter extends GitAdapter {
     try {
       await git.clone(repoUrl, localFolder);
     } catch (error) {
+      console.error(`Error cloning repository from ${repoUrl} to ${localFolder}:`, error);
     }
     this._endCommand(id, startTime);
   }
@@ -463,6 +534,7 @@ class SimpleGitAdapter extends GitAdapter {
     try {
       result = await this.git.raw(args);
     } catch (error) {
+      console.error(`Error executing git ${args.join(' ')}:`, error);
     }
     this._endCommand(id, startTime);
     return result;
