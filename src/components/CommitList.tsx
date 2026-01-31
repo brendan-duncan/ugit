@@ -1,13 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Commit } from '../git/GitAdapter';
 import './CommitList.css';
 
-function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, currentBranch }) {
+interface CommitListProps {
+  commits: Array<Commit>;
+  selectedCommit: Commit | null;
+  onSelectCommit: (commit: Commit | null) => void;
+  onContextMenu: (action: string, commit: Commit, currentBranch: string) => void;
+  currentBranch: string;
+}
+
+function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, currentBranch }: CommitListProps) {
   const [contextMenu, setContextMenu] = useState(null);
   const contextMenuRef = useRef(null);
 
   // Close context menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e) => {
+    const handleClickOutside = (e: MouseEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
         setContextMenu(null);
       }
@@ -19,7 +28,7 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
     }
   }, [contextMenu]);
 
-  const handleContextMenu = (e, commit) => {
+  const handleContextMenu = (e: React.MouseEvent, commit: Commit) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({
@@ -29,7 +38,7 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
     });
   };
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = (action: string) => {
     if (onContextMenu && contextMenu) {
       onContextMenu(action, contextMenu.commit, currentBranch);
     }

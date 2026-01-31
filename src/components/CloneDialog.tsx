@@ -9,13 +9,13 @@ interface CloneDialogProps {
   onClone: (repoUrl: string, parentFolder: string, repoName: string) => Promise<void>;
 }
 
-const CloneDialog: React.FC<CloneDialogProps> = ({ onClose, onClone }) => {
+function CloneDialog({ onClose, onClone }: CloneDialogProps) {
   const [repoUrl, setRepoUrl] = useState<string>('');
   const [parentFolder, setParentFolder] = useState<string>('');
   const [repoName, setRepoName] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-// Load saved parent folder on mount
+  // Load saved parent folder on mount
   useEffect(() => {
     const savedParentFolder = localStorage.getItem(PARENT_FOLDER_KEY);
     if (savedParentFolder) {

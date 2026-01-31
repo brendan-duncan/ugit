@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import './StashViewer.css';
 import DiffViewer from './DiffViewer';
+import { StashInfo } from '../git/GitAdapter';
+import './StashViewer.css';
+
 
 function StashViewer({ stash, stashIndex, gitAdapter }) {
-  const [stashInfo, setStashInfo] = useState(null);
+  const [stashInfo, setStashInfo] = useState<StashInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedFiles, setExpandedFiles] = useState(new Set());
   const [loadedDiffs, setLoadedDiffs] = useState(new Set());
@@ -18,14 +20,7 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
         setLoading(false);
       } catch (error) {
         console.error('Error loading stash info:', error);
-        setStashInfo({
-          stashRef: `stash@${stashIndex}`,
-          stashIndex,
-          info: { message: 'Error loading stash info' },
-          files: [],
-          fileDiffs: {},
-          totalFiles: 0
-        });
+        setStashInfo(null);
         setLoading(false);
       }
     };
@@ -35,7 +30,7 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
     }
   }, [stash, stashIndex, gitAdapter]);
 
-  const toggleFileExpansion = (fileName) => {
+  const toggleFileExpansion = (fileName: string) => {
     setExpandedFiles(prev => {
       const newSet = new Set(prev);
       if (newSet.has(fileName)) {
@@ -60,19 +55,16 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
     );
   }
 
-  const isExpanded = (fileName) => expandedFiles.has(fileName);
-  const isLoaded = (fileName) => loadedDiffs.has(fileName);
+  const isExpanded = (fileName: string) => expandedFiles.has(fileName);
 
-  const loadDiff = async (fileName) => {
+  const loadDiff = async (fileName: string) => {
     try {
       const diff = await gitAdapter.getStashFileDiff(stashIndex, fileName);
-      setStashInfo(prev => ({
-        ...prev,
-        fileDiffs: {
-          ...prev.fileDiffs,
-          [fileName]: diff
-        }
-      }));
+      setStashInfo((prev) => {
+        const newDiffs = prev.fileDiffs;
+        newDiffs[fileName] = diff;
+        return {...prev, fileDiffs: newDiffs };
+      });
       setLoadedDiffs(prev => new Set(prev).add(fileName));
     } catch (error) {
       console.error(`Error loading diff for file ${fileName}:`, error);
@@ -94,28 +86,28 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
           <span className="stash-message-label">Message: </span>
           <span className="stash-message-text">{stash?.message || 'No message'}</span>
         </div>
-        {stashInfo?.info?.author && (
+        {stashInfo?.author && (
           <div className="stash-info-author">
             <span className="stash-message-label">Author: </span>
-            <span className="stash-message-text">{stashInfo.info.author}</span>
+            <span className="stash-message-text">{stashInfo.author}</span>
           </div>
         )}
-        {stashInfo?.info?.date && (
+        {stashInfo?.date && (
           <div className="stash-info-date">
             <span className="stash-message-label">Date: </span>
-            <span className="stash-message-text">{stashInfo.info.date}</span>
+            <span className="stash-message-text">{stashInfo.date}</span>
           </div>
         )}
-        {stashInfo?.info?.hash && (
+        {stashInfo?.hash && (
           <div className="stash-info-hash">
             <span className="stash-message-label">Commit: </span>
-            <span className="stash-message-text">{stashInfo.info.hash}</span>
+            <span className="stash-message-text">{stashInfo.hash}</span>
           </div>
         )}
-        {stashInfo?.info?.merge && (
+        {stashInfo?.merge && (
           <div className="stash-info-merge">
             <span className="stash-message-label">Parents: </span>
-            <span className="stash-message-text">{stashInfo.info.merge}</span>
+            <span className="stash-message-text">{stashInfo.merge}</span>
           </div>
         )}
       </div>

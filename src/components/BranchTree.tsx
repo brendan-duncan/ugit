@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { SelectedItem } from './types';
 import './BranchTree.css';
 
 interface TreeNodeProps {
@@ -9,7 +10,7 @@ interface TreeNodeProps {
   onBranchSwitch: (branchName: string) => void;
   pullingBranch: string | null;
   onBranchSelect: (branchName: string) => void;
-  selectedItem: any;
+  selectedItem: SelectedItem | null;
   onContextMenu: (e: React.MouseEvent, branchName: string) => void;
 }
 
@@ -128,7 +129,7 @@ interface BranchTreeProps {
   onBranchSwitch: (branchName: string) => void;
   pullingBranch: string | null;
   onBranchSelect: (branchName: string) => void;
-  selectedItem: string | null;
+  selectedItem: SelectedItem | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onContextMenu?: (action: string, branchName: string, currentBranch: string) => void;

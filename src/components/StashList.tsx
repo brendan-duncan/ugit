@@ -1,10 +1,21 @@
 import React, { useState } from 'react';
+import { StashInfo } from '../git/GitAdapter';
+import { SelectedItem } from './types';
 import './StashList.css';
 
-function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCollapse, onStashContextMenu }) {
-  const [contextMenu, setContextMenu] = useState(null);
+interface StashListProps {
+  stashes: Array<StashInfo>;
+  onSelectStash: (item: SelectedItem) => void;
+  selectedItem: SelectedItem | null;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onStashContextMenu: (action: string, stash: StashInfo, stashIndex: number) => void;
+}
 
-  const handleStashContextMenu = (e, stash, index) => {
+function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCollapse, onStashContextMenu }: StashListProps) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; stash: StashInfo; index: number } | null>(null);
+
+  const handleStashContextMenu = (e: React.MouseEvent, stash: StashInfo, index: number) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -17,7 +28,7 @@ function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCo
     });
   };
 
-  const handleContextMenuAction = (action) => {
+  const handleContextMenuAction = (action: string) => {
     if (onStashContextMenu && contextMenu) {
       onStashContextMenu(action, contextMenu.stash, contextMenu.index);
     }
@@ -60,7 +71,7 @@ function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCo
       </div>
       {!collapsed && (
         <div className="stash-list-content">
-          {stashes.map((stash, index) => {
+          {stashes.map((stash: StashInfo, index: number) => {
             const isSelected = selectedItem &&
                              selectedItem.type === 'stash' &&
                              selectedItem.index === index;
@@ -71,7 +82,7 @@ function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCo
                 key={index}
                 className={`stash-item ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelectStash && onSelectStash({type: 'stash', index, stash})}
-                onContextMenu={(e) => handleStashContextMenu(e, stash, index)}
+                onContextMenu={(e: React.MouseEvent<HTMLDivElement>) => handleStashContextMenu(e, stash, index)}
               >
                 <span className="stash-item-icon">🗂️</span>
                 <span className="stash-message">{displayMessage}</span>
