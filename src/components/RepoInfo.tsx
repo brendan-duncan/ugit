@@ -1,11 +1,30 @@
 import React, { useState } from 'react';
-import './RepoInfo.css';
 import { DropdownMenu, DropdownItem, DropdownSeparator } from './DropdownMenu';
 import EditOriginDialog from './EditOriginDialog';
-const { exec } = require('child_process');
-const { shell } = window.require('electron');
+import GitAdapter from '../git/GitAdapter';
+import { exec } from 'child_process';
+import { shell, clipboard } from 'electron';
+import './RepoInfo.css';
 
-function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged }) {
+interface SelectedItem {
+  type: string;
+  [key: string]: any;
+}
+
+interface RepoInfoProps {
+  gitAdapter: GitAdapter | null;
+  currentBranch: string;
+  originUrl: string;
+  modifiedCount: number;
+  selectedItem: SelectedItem | null;
+  onSelectItem: (item: SelectedItem) => void;
+  usingCache: boolean;
+  onResetToOrigin: () => void;
+  onCleanWorkingDirectory: () => void;
+  onOriginChanged?: () => Promise<void>;
+}
+
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
@@ -15,7 +34,6 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
 
   // Menu item handlers
   const handleOpenInFileExplorer = () => {
-    const { shell } = window.require('electron');
     shell.openPath(gitAdapter?.repoPath);
   };
 
@@ -34,7 +52,6 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
   };
 
   const handleCopyLocalPath = async () => {
-    const { clipboard } = window.require('electron');
     await clipboard.writeText(gitAdapter?.repoPath || '');
   };
 
@@ -42,11 +59,12 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
     setShowEditOriginDialog(true);
   };
 
-  const handleEditOriginDialog = async (newUrl) => {
+  const handleEditOriginDialog = async (newUrl: string) => {
     setShowEditOriginDialog(false);
 
     try {
       const git = gitAdapter;
+      if (!git) return;
 
       if (originUrl) {
         // Update existing origin
@@ -62,9 +80,9 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
       if (onOriginChanged) {
         await onOriginChanged();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error editing origin:', error);
-      alert(`Error editing origin: ${error.message}`);
+      alert(`Error editing origin: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -80,13 +98,11 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
 
   const handleOpenRemoteInBrowser = () => {
     if (originUrl) {
-      const { shell } = window.require('electron');
       shell.openExternal(originUrl);
     }
   };
 
   const handleCopyRemoteAddress = async () => {
-    const { clipboard } = window.require('electron');
     await clipboard.writeText(originUrl || '');
   };
 

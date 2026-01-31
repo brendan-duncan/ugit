@@ -1,7 +1,12 @@
 import React from 'react';
 import './ErrorDialog.css';
 
-function ErrorDialog({ error, onClose }) {
+interface ErrorDialogProps {
+  error: string;
+  onClose: () => void;
+}
+
+const ErrorDialog: React.FC<ErrorDialogProps> = ({ error, onClose }) => {
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
@@ -19,6 +24,6 @@ function ErrorDialog({ error, onClose }) {
       </div>
     </div>
   );
-}
+};
 
 export default ErrorDialog;

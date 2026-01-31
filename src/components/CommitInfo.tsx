@@ -1,10 +1,31 @@
 import React, { useState } from 'react';
-import './CommitInfo.css';
 import DiffViewer from './DiffViewer';
+import GitAdapter from '../git/GitAdapter';
+import './CommitInfo.css';
 
-function CommitInfo({ commit, files, gitAdapter }) {
-  const [expandedFiles, setExpandedFiles] = useState({});
-  const [fileDiffs, setFileDiffs] = useState({});
+interface CommitFile {
+  path: string;
+  status: string;
+}
+
+interface Commit {
+  hash: string;
+  author_name: string;
+  author_email: string;
+  date: string;
+  message: string;
+  body?: string;
+}
+
+interface CommitInfoProps {
+  commit: Commit | null;
+  files: CommitFile[];
+  gitAdapter: GitAdapter;
+}
+
+const CommitInfo: React.FC<CommitInfoProps> = ({ commit, files, gitAdapter }) => {
+  const [expandedFiles, setExpandedFiles] = useState<{[key: string]: boolean}>({});
+  const [fileDiffs, setFileDiffs] = useState<{[key: string]: string}>({});
 
   if (!commit) {
     return (
@@ -14,7 +35,7 @@ function CommitInfo({ commit, files, gitAdapter }) {
     );
   }
 
-  const getStatusLabel = (status) => {
+  const getStatusLabel = (status: string): string => {
     switch (status) {
       case 'M': return 'Modified';
       case 'A': return 'Added';
@@ -25,7 +46,7 @@ function CommitInfo({ commit, files, gitAdapter }) {
     }
   };
 
-  const getStatusClass = (status) => {
+  const getStatusClass = (status: string): string => {
     switch (status) {
       case 'M': return 'file-modified';
       case 'A': return 'file-added';
@@ -36,7 +57,7 @@ function CommitInfo({ commit, files, gitAdapter }) {
     }
   };
 
-  const toggleFileExpansion = async (filePath, index) => {
+  const toggleFileExpansion = async (filePath: string, index: number): Promise<void> => {
     const key = `${filePath}-${index}`;
     
     if (expandedFiles[key]) {
@@ -55,7 +76,7 @@ function CommitInfo({ commit, files, gitAdapter }) {
             ...prev,
             [key]: diffResult
           }));
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error loading diff for ${filePath}:`, error);
           setFileDiffs(prev => ({
             ...prev,

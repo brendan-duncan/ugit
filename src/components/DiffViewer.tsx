@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import './DiffViewer.css';
-import 'diff2html/bundles/css/diff2html.min.css';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -11,19 +9,21 @@ import { html } from '@codemirror/lang-html';
 import { cpp } from "@codemirror/lang-cpp";
 import { csharp } from "@replit/codemirror-lang-csharp";
 import { oneDark } from '@codemirror/theme-one-dark';
-const fs = require('fs');
-
-const Diff2Html = window.require('diff2html');
+import * as Diff2Html from 'diff2html';
+import * as Diff2HtmlTypes from 'diff2html/lib/types';
+import fs from 'fs';
+import './DiffViewer.css';
+import 'diff2html/bundles/css/diff2html.min.css';
 
 // Helper function to check if file is an image
-function isImageFile(filePath) {
+function isImageFile(filePath: string): boolean {
   if (!filePath) return false;
   const imageExtensions = /\.(png|jpg|jpeg|gif|bmp|svg|ico|webp|tiff|tif)$/i;
   return imageExtensions.test(filePath);
 }
 
 // Helper function to get CodeMirror language extension based on file extension
-function getCodeMirrorLanguage(filePath) {
+function getCodeMirrorLanguage(filePath: string): any[] {
   if (!filePath) return [];
   
   const extension = filePath.split('.').pop().toLowerCase();
@@ -64,7 +64,7 @@ function getCodeMirrorLanguage(filePath) {
   }
 }
 
-function DiffViewer({ file, gitAdapter, isStaged }) {
+function DiffViewer({ file, gitAdapter, isStaged }: { file: any; gitAdapter: any; isStaged: boolean }) {
   const [diff, setDiff] = useState('');
   const [loading, setLoading] = useState(true);
   const [diffHtml, setDiffHtml] = useState('');
@@ -121,15 +121,11 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
           // Generate HTML using diff2html
           const html = Diff2Html.html(diffResult, {
             drawFileList: false,
-            fileListToggle: false,
-            fileListStartVisible: false,
-            fileContentToggle: false,
-            matching: 'lines',
-            colorScheme: 'dark',
             outputFormat: 'side-by-side',
-            synchronisedScroll: true,
-            highlight: false,
+            matching: 'lines',
+            diffStyle: 'word',
             renderNothingWhenEmpty: false,
+            colorScheme: Diff2HtmlTypes.ColorSchemeType.DARK
           });
           setDiffHtml(html);
           setFileType('diff');
@@ -174,8 +170,10 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
                 alt={file.path}
                 className="diff-image"
                 onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextElementSibling.style.display = 'block';
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const nextElement = target.nextElementSibling as HTMLElement;
+                  nextElement.style.display = 'block';
                 }}
               />
             </div>

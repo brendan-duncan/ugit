@@ -1,20 +1,34 @@
 import React, { useState } from 'react';
 import './TabBar.css';
 
-function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabReorder }) {
-  const [draggedTabId, setDraggedTabId] = useState(null);
-  const [dragOverTabId, setDragOverTabId] = useState(null);
+interface Tab {
+  id: string;
+  name: string;
+  path: string;
+}
+
+interface TabBarProps {
+  tabs: Tab[];
+  activeTabId: string | null;
+  onTabSelect: (tabId: string) => void;
+  onTabClose: (tabId: string) => void;
+  onTabReorder?: (tabs: Tab[]) => void;
+}
+
+const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabClose, onTabReorder }) => {
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
 
   if (tabs.length === 0) {
     return null;
   }
 
-  const handleDragStart = (e, tabId) => {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, tabId: string): void => {
     setDraggedTabId(tabId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e, tabId) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, tabId: string): void => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
@@ -23,11 +37,11 @@ function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabReorder }) {
     }
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (): void => {
     setDragOverTabId(null);
   };
 
-  const handleDrop = (e, dropTabId) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, dropTabId: string): void => {
     e.preventDefault();
 
     if (draggedTabId && draggedTabId !== dropTabId && onTabReorder) {
@@ -46,7 +60,7 @@ function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabReorder }) {
     setDragOverTabId(null);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (): void => {
     setDraggedTabId(null);
     setDragOverTabId(null);
   };
@@ -79,6 +93,6 @@ function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabReorder }) {
       ))}
     </div>
   );
-}
+};
 
 export default TabBar;

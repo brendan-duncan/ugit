@@ -1,31 +1,29 @@
-const fs = require('fs');
-const path = require('path');
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Manages persistent cache for repository data
  */
-class CacheManager {
-  constructor() {
-    this.cacheDir = null;
-  }
+export class CacheManager {
+  private cacheDir: string | null = null;
 
   /**
    * Set cache directory (must be called from main process)
-   * @param {string} userDataPath - User data path from app.getPath('userData')
+   * @param userDataPath - User data path from app.getPath('userData')
    */
-  setCacheDir(userDataPath) {
+  setCacheDir(userDataPath: string): void {
     this.cacheDir = path.join(userDataPath, 'repo-cache');
 
     // Ensure cache directory exists
-    if (!fs.existsSync(this.cacheDir)) {
-      fs.mkdirSync(this.cacheDir, { recursive: true });
+    if (!fs.existsSync(this.cacheDir!)) {
+      fs.mkdirSync(this.cacheDir!, { recursive: true });
     }
   }
 
   /**
    * Get cache directory
    */
-  getCacheDir() {
+  getCacheDir(): string {
     if (!this.cacheDir) {
       throw new Error('Cache directory not initialized. Call setCacheDir first.');
     }
@@ -34,11 +32,11 @@ class CacheManager {
 
   /**
    * Get cache file path for a repository
-   * @param {string} repoPath - Repository path
-   * @returns {string} Cache file path
+   * @param repoPath - Repository path
+   * @returns Cache file path
    */
-  getCacheFilePath(repoPath) {
-    // Create a safe filename from the repo path
+  getCacheFilePath(repoPath: string): string {
+    // Create a safe filename from repo path
     const safeName = repoPath.replace(/[^a-zA-Z0-9]/g, '_');
     const hash = this.hashString(repoPath);
     return path.join(this.getCacheDir(), `${safeName}_${hash}.json`);
@@ -46,10 +44,10 @@ class CacheManager {
 
   /**
    * Simple hash function for strings
-   * @param {string} str - String to hash
-   * @returns {string} Hash
+   * @param str - String to hash
+   * @returns Hash
    */
-  hashString(str) {
+  private hashString(str: string): string {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
@@ -61,10 +59,10 @@ class CacheManager {
 
   /**
    * Save repository data to cache
-   * @param {string} repoPath - Repository path
-   * @param {object} data - Data to cache
+   * @param repoPath - Repository path
+   * @param data - Data to cache
    */
-  saveCache(repoPath, data) {
+  saveCache(repoPath: string, data: any): void {
     try {
       const cacheFile = this.getCacheFilePath(repoPath);
       const cacheData = {
@@ -81,10 +79,10 @@ class CacheManager {
 
   /**
    * Load repository data from cache
-   * @param {string} repoPath - Repository path
-   * @returns {object|null} Cached data or null if not found/invalid
+   * @param repoPath - Repository path
+   * @returns Cached data or null if not found/invalid
    */
-  loadCache(repoPath) {
+  loadCache(repoPath: string): any {
     try {
       const cacheFile = this.getCacheFilePath(repoPath);
 
@@ -115,9 +113,9 @@ class CacheManager {
 
   /**
    * Clear cache for a specific repository
-   * @param {string} repoPath - Repository path
+   * @param repoPath - Repository path
    */
-  clearCache(repoPath) {
+  clearCache(repoPath: string): void {
     try {
       const cacheFile = this.getCacheFilePath(repoPath);
       if (fs.existsSync(cacheFile)) {
@@ -131,7 +129,7 @@ class CacheManager {
   /**
    * Clear all caches
    */
-  clearAllCaches() {
+  clearAllCaches(): void {
     try {
       const cacheDir = this.getCacheDir();
       const files = fs.readdirSync(cacheDir);
@@ -147,4 +145,4 @@ class CacheManager {
 }
 
 // Export singleton instance
-module.exports = new CacheManager();
+export default new CacheManager();

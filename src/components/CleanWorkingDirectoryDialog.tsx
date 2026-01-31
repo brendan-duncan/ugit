@@ -1,8 +1,13 @@
 import React from 'react';
-import './PullDialog.css';
+import './Dialog.css';
 
-function CleanWorkingDirectoryDialog({ onClose, onClean }) {
-  const handleOverlayClick = (e) => {
+interface CleanWorkingDirectoryDialogProps {
+  onClose: () => void;
+  onClean: () => Promise<void>;
+}
+
+const CleanWorkingDirectoryDialog: React.FC<CleanWorkingDirectoryDialogProps> = ({ onClose, onClean }) => {
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>): void => {
     if (e.target === e.currentTarget) {
       onClose();
     }

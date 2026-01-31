@@ -2,11 +2,18 @@ import React, { useState } from 'react';
 import './Dialog.css';
 import './PullDialog.css';
 
-function PullDialog({ onClose, onPull, branches, currentBranch }) {
-  const [selectedBranch, setSelectedBranch] = useState(currentBranch || '');
-  const [stashAndReapply, setStashAndReapply] = useState(false);
+interface PullDialogProps {
+  onClose: () => void;
+  onPull: (branch: string, stashAndReapply: boolean) => void;
+  branches: string[];
+  currentBranch: string;
+}
 
-  const handlePull = () => {
+const PullDialog: React.FC<PullDialogProps> = ({ onClose, onPull, branches, currentBranch }) => {
+  const [selectedBranch, setSelectedBranch] = useState<string>(currentBranch || '');
+  const [stashAndReapply, setStashAndReapply] = useState<boolean>(false);
+
+  const handlePull = (): void => {
     onPull(selectedBranch, stashAndReapply);
   };
 

@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import GitAdapter from '../git/GitAdapter';
 import './Dialog.css';
 import './CreateBranchDialog.css';
 
 const CHECKOUT_AFTER_KEY = 'ugit-create-branch-checkout-after';
 
-function CreateBranchDialog({ onClose, onCreateBranch, currentBranch, gitAdapter }) {
-  const [branchName, setBranchName] = useState('');
-  const [checkoutAfterCreate, setCheckoutAfterCreate] = useState(() => {
+interface CreateBranchDialogProps {
+  onClose: () => void;
+  onCreateBranch: (branchName: string, checkoutAfterCreate: boolean) => Promise<void>;
+  currentBranch: string;
+  gitAdapter: GitAdapter;
+}
+
+const CreateBranchDialog: React.FC<CreateBranchDialogProps> = ({ onClose, onCreateBranch, currentBranch, gitAdapter }) => {
+  const [branchName, setBranchName] = useState<string>('');
+  const [checkoutAfterCreate, setCheckoutAfterCreate] = useState<boolean>(() => {
     const saved = localStorage.getItem(CHECKOUT_AFTER_KEY);
     return saved === 'true';
   });
-  const [branchExists, setBranchExists] = useState(false);
-  const [existingBranchName, setExistingBranchName] = useState('');
+  const [branchExists, setBranchExists] = useState<boolean>(false);
+  const [existingBranchName, setExistingBranchName] = useState<string>('');
 
   // Use an empty name by default
   useEffect(() => {
@@ -24,7 +32,7 @@ function CreateBranchDialog({ onClose, onCreateBranch, currentBranch, gitAdapter
   }, [checkoutAfterCreate]);
 
   // Check if branch name already exists
-  const checkBranchExists = async (name) => {
+  const checkBranchExists = async (name: string): Promise<void> => {
     if (!name.trim()) {
       setBranchExists(false);
       setExistingBranchName('');
@@ -64,7 +72,7 @@ function CreateBranchDialog({ onClose, onCreateBranch, currentBranch, gitAdapter
     await onCreateBranch(branchName, checkoutAfterCreate);
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       onClose();
     }

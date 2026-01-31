@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import './Dialog.css';
 import './PushDialog.css';
 
-function PushDialog({ onClose, onPush, branches, currentBranch }) {
-  const [selectedBranch, setSelectedBranch] = useState(currentBranch || '');
-  const [remoteBranch, setRemoteBranch] = useState(currentBranch || '');
-  const [pushAllTags, setPushAllTags] = useState(false);
+interface PushDialogProps {
+  onClose: () => void;
+  onPush: (branch: string, remoteBranch: string, pushAllTags: boolean) => void;
+  branches: string[];
+  currentBranch: string;
+}
 
-  const handlePush = () => {
+const PushDialog: React.FC<PushDialogProps> = ({ onClose, onPush, branches, currentBranch }) => {
+  const [selectedBranch, setSelectedBranch] = useState<string>(currentBranch || '');
+  const [remoteBranch, setRemoteBranch] = useState<string>(currentBranch || '');
+  const [pushAllTags, setPushAllTags] = useState<boolean>(false);
+
+  const handlePush = (): void => {
     onPush(selectedBranch, remoteBranch, pushAllTags);
   };
 

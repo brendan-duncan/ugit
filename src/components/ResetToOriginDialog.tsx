@@ -1,8 +1,13 @@
 import React from 'react';
-import './PullDialog.css';
+import './Dialog.css';
 
-function ResetToOriginDialog({ onClose, onReset }) {
-  const handleOverlayClick = (e) => {
+interface ResetToOriginDialogProps {
+  onClose: () => void;
+  onReset: () => Promise<void>;
+}
+
+const ResetToOriginDialog: React.FC<ResetToOriginDialogProps> = ({ onClose, onReset }) => {
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>): void => {
     if (e.target === e.currentTarget) {
       onClose();
     }

@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import './Dialog.css';
 
-function StashDialog({ onClose, onStash }) {
-  const [message, setMessage] = useState('');
-  const [stageNewFiles, setStageNewFiles] = useState(true);
+interface StashDialogProps {
+  onClose: () => void;
+  onStash: (message: string, stageNewFiles: boolean) => Promise<void>;
+}
 
-  const handleStash = () => {
+const StashDialog: React.FC<StashDialogProps> = ({ onClose, onStash }) => {
+  const [message, setMessage] = useState<string>('');
+  const [stageNewFiles, setStageNewFiles] = useState<boolean>(true);
+
+  const handleStash = (): void => {
     onStash(message, stageNewFiles);
   };
 

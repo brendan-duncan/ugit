@@ -13,21 +13,27 @@ import Toolbar from './Toolbar';
 import PullDialog from './PullDialog';
 import PushDialog from './PushDialog';
 import StashDialog from './StashDialog';
+import RenameStashDialog from './RenameStashDialog';
 import ResetToOriginDialog from './ResetToOriginDialog';
 import LocalChangesDialog from './LocalChangesDialog';
 import CleanWorkingDirectoryDialog from './CleanWorkingDirectoryDialog';
 import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
 import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
+import GitFactory from '../git/GitFactory';
+import cacheManager from '../utils/cacheManager';
+import { RunningCommand } from './types';
+import { ipcRenderer } from 'electron';
 import './RepositoryView.css';
 
-const GitFactory = window.require('./src/git/GitFactory');
-const { ipcRenderer } = window.require('electron');
-const cacheManager = window.require('./src/utils/cacheManager');
+interface RepositoryViewProps {
+  repoPath: string;
+  isActiveTab: boolean;
+}
 
-function RepositoryView({ repoPath, isActiveTab }) {
-  const [commandState, setCommandState] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [currentBranch, setCurrentBranch] = useState('');
+const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }) => {
+  const [commandState, setCommandState] = useState<RunningCommand[]>([]);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [currentBranch, setCurrentBranch] = useState<string>('');
   const [remotes, setRemotes] = useState([]);
   const [branchStatus, setBranchStatus] = useState({});
   const [originUrl, setOriginUrl] = useState('');
@@ -366,7 +372,8 @@ function RepositoryView({ repoPath, isActiveTab }) {
         branches: branchNames,
         remotes: remotesList,
         branchStatus: statusMap,
-        stashes: stashList.all
+        stashes: stashList.all,
+        branchCommits: {}
       };
 
       // Include all branch commits from memory cache
@@ -1722,7 +1729,6 @@ function RepositoryView({ repoPath, isActiveTab }) {
         <ResetToOriginDialog
           onClose={() => setShowResetDialog(false)}
           onReset={handleResetToOrigin}
-          currentBranch={currentBranch}
         />
       )}
       {showLocalChangesDialog && (

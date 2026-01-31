@@ -1,14 +1,17 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
-const path = require('path');
-const fs = require('fs');
+import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { shell } from 'electron';
+import cacheManager from './utils/cacheManager';
+import GitFactory from './git/GitFactory';
 
-let mainWindow;
-let recentRepos = [];
-let windowStatePath;
+let mainWindow: Electron.BrowserWindow | null = null;
+let recentRepos: string[] = [];
+let windowStatePath: string;
 
 // Parse command-line arguments for git backend selection
 // Usage: npm start -- --git-backend=simple-git
-let gitBackend = 'simple-git'; // default
+let gitBackend: string = 'simple-git'; // default
 const args = process.argv.slice(1);
 for (const arg of args) {
   if (arg.startsWith('--git-backend=')) {
@@ -17,8 +20,16 @@ for (const arg of args) {
   }
 }
 
+interface WindowState {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+  isMaximized: boolean;
+}
+
 // Load window state from file
-function loadWindowState() {
+function loadWindowState(): WindowState {
   try {
     if (fs.existsSync(windowStatePath)) {
       const data = fs.readFileSync(windowStatePath, 'utf8');
@@ -38,10 +49,12 @@ function loadWindowState() {
 }
 
 // Save window state to file
-function saveWindowState() {
+function saveWindowState(): void {
+  if (!mainWindow) return;
+
   try {
     const bounds = mainWindow.getBounds();
-    const state = {
+    const state: WindowState = {
       width: bounds.width,
       height: bounds.height,
       x: bounds.x,
@@ -54,7 +67,7 @@ function saveWindowState() {
   }
 }
 
-function createWindow() {
+function createWindow(): void {
   const windowState = loadWindowState();
 
   mainWindow = new BrowserWindow({
@@ -80,13 +93,13 @@ function createWindow() {
 
   // Save window state on resize/move
   mainWindow.on('resize', () => {
-    if (!mainWindow.isMaximized()) {
+    if (mainWindow && !mainWindow.isMaximized()) {
       saveWindowState();
     }
   });
 
   mainWindow.on('move', () => {
-    if (!mainWindow.isMaximized()) {
+    if (mainWindow && !mainWindow.isMaximized()) {
       saveWindowState();
     }
   });
@@ -99,7 +112,7 @@ function createWindow() {
   });
 }
 
-function createMenu() {
+function createMenu(): void {
   // Build recent repos submenu
   const recentSubmenu = recentRepos.length > 0
     ? recentRepos.map((repoPath) => ({
@@ -112,7 +125,7 @@ function createMenu() {
       }))
     : [{ label: 'No recent repositories', enabled: false }];
 
-  const template = [
+  const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: 'File',
       submenu: [
@@ -153,14 +166,15 @@ function createMenu() {
           label: 'Toggle Developer Tools',
           accelerator: 'F12',
           click: () => {
-            mainWindow.webContents.toggleDevTools();
+            if (mainWindow) {
+              mainWindow.webContents.toggleDevTools();
+            }
           }
         },
         { type: 'separator' },
         {
           label: 'Clear All Caches',
           click: () => {
-            const cacheManager = require('./utils/cacheManager');
             cacheManager.clearAllCaches();
             if (mainWindow) {
               mainWindow.webContents.send('caches-cleared');
@@ -175,13 +189,15 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-async function openRepository() {
+async function openRepository(): Promise<void> {
+  if (!mainWindow) return;
+
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
     title: 'Open Repository'
-  });
+  }) as any;
 
-  if (!result.canceled && result.filePaths.length > 0) {
+  if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
     const repoPath = result.filePaths[0];
     // Send the repository path to the renderer process
     mainWindow.webContents.send('open-repository', repoPath);
@@ -194,7 +210,6 @@ app.commandLine.appendSwitch('disable-software-rasterizer');
 
 app.whenReady().then(() => {
   // Initialize cache manager with user data path
-  const cacheManager = require('./utils/cacheManager');
   cacheManager.setCacheDir(app.getPath('userData'));
 
   // Set window state file path
@@ -223,7 +238,7 @@ app.on('before-quit', () => {
 });
 
 // Listen for recent repos updates from renderer
-ipcMain.on('update-recent-repos', (event, repos) => {
+ipcMain.on('update-recent-repos', (event: any, repos: string[]) => {
   recentRepos = repos;
   createMenu(); // Rebuild menu with updated recent repos
 });
@@ -239,8 +254,7 @@ ipcMain.handle('get-user-data-path', () => {
 });
 
 // Show item in file explorer
-ipcMain.handle('show-item-in-folder', async (event, itemPath) => {
-  const { shell } = require('electron');
+ipcMain.handle('show-item-in-folder', async (event: any, itemPath: string) => {
   try {
     // Check if the path exists
     if (fs.existsSync(itemPath)) {
@@ -258,42 +272,42 @@ ipcMain.handle('show-item-in-folder', async (event, itemPath) => {
 });
 
 // Show save dialog
-ipcMain.handle('show-save-dialog', async (event, options) => {
+ipcMain.handle('show-save-dialog', async (event: any, options: any) => {
+  if (!mainWindow) return { canceled: true };
   return await dialog.showSaveDialog(mainWindow, options);
 });
 
 // Show open dialog for directory selection
-ipcMain.handle('show-open-dialog', async (event, options) => {
+ipcMain.handle('show-open-dialog', async (event: any, options: any) => {
+  if (!mainWindow) return { canceled: true, filePaths: [] };
   return await dialog.showOpenDialog(mainWindow, options);
 });
 
 // Clone repository
-ipcMain.handle('clone-repository', async (event, repoUrl, parentFolder, repoName) => {
-  const GitFactory = require('./git/GitFactory');
-  const path = require('path');
-  
+ipcMain.handle('clone-repository', async (event: any, repoUrl: string, parentFolder: string, repoName: string) => {
+
+
   try {
     const targetPath = path.join(parentFolder, repoName);
-    
+
     // Check if target directory already exists
-    const fs = require('fs');
     if (fs.existsSync(targetPath)) {
       throw new Error(`Directory '${repoName}' already exists in the selected location.`);
     }
-    
+
     // Create git adapter with temporary path (will be overridden by clone)
     const gitAdapter = await GitFactory.createAdapter(parentFolder, gitBackend);
-    
+
     // Perform clone
     console.log(`Cloning ${repoUrl} to ${targetPath}`);
     await gitAdapter.clone(repoUrl, parentFolder, repoName);
     console.log('Clone completed successfully');
-    
+
     return {
       success: true,
       path: targetPath
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Clone failed:', error);
     return {
       success: false,

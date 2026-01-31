@@ -1,5 +1,5 @@
 import React from 'react';
-import './PullDialog.css';
+import './Dialog.css';
 
 export default function RemoteBranchContextMenu({ 
   remoteName, 

@@ -1,7 +1,7 @@
 const RECENT_REPOS_KEY = 'ugit-recent-repos';
 const MAX_RECENT_REPOS = 10;
 
-export function getRecentRepos() {
+export function getRecentRepos(): string[] {
   try {
     const stored = localStorage.getItem(RECENT_REPOS_KEY);
     return stored ? JSON.parse(stored) : [];
@@ -11,7 +11,7 @@ export function getRecentRepos() {
   }
 }
 
-export function addRecentRepo(repoPath) {
+export function addRecentRepo(repoPath: string): string[] {
   try {
     let recent = getRecentRepos();
 
@@ -33,7 +33,7 @@ export function addRecentRepo(repoPath) {
   }
 }
 
-export function setRecentRepos(repoPaths) {
+export function setRecentRepos(repoPaths: string[]): string[] {
   try {
     // Limit to max and ensure no duplicates
     const uniquePaths = [...new Set(repoPaths)];
@@ -46,7 +46,7 @@ export function setRecentRepos(repoPaths) {
   }
 }
 
-export function clearRecentRepos() {
+export function clearRecentRepos(): void {
   try {
     localStorage.removeItem(RECENT_REPOS_KEY);
   } catch (error) {

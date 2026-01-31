@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import './PullDialog.css';
+import './Dialog.css';
 
-function DeleteBranchDialog({ onClose, onConfirm, branchName }) {
+interface DeleteBranchDialogProps {
+  onClose: () => void;
+  onConfirm: (options: { deleteRemote: boolean }) => void;
+  branchName: string;
+}
+
+const DeleteBranchDialog: React.FC<DeleteBranchDialogProps> = ({ onClose, onConfirm, branchName }) => {
   const STORAGE_KEY = 'delete-branch-dialog-option';
   
   // Load saved option from localStorage on mount
-  const getSavedOption = () => {
+  const getSavedOption = (): boolean => {
     try {
       return localStorage.getItem(STORAGE_KEY) === 'true';
     } catch {
@@ -13,10 +19,10 @@ function DeleteBranchDialog({ onClose, onConfirm, branchName }) {
     }
   };
   
-  const [deleteRemote, setDeleteRemote] = useState(getSavedOption());
+  const [deleteRemote, setDeleteRemote] = useState<boolean>(getSavedOption());
   
   // Save to localStorage whenever option changes
-  const handleDeleteRemoteChange = (checked) => {
+  const handleDeleteRemoteChange = (checked: boolean): void => {
     setDeleteRemote(checked);
     try {
       localStorage.setItem(STORAGE_KEY, checked.toString());

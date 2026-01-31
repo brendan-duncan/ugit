@@ -3,14 +3,26 @@ import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
+import { ipcRenderer } from 'electron';
+import fs from 'fs';
 import './App.css';
 
 const ACTIVE_TAB_KEY = 'ugit-active-tab-path';
-const { ipcRenderer } = window.require('electron');
+
+interface Tab {
+  id: string;
+  path: string;
+  name: string;
+}
+
+interface CloneResult {
+  success: boolean;
+  path?: string;
+  error?: string;
+}
 
 // Helper function to filter out invalid repository paths
-function filterValidRepos(repoPaths) {
-  const fs = require('fs');
+function filterValidRepos(repoPaths: string[]): string[] {
   return repoPaths.filter(repoPath => {
     try {
       return fs.existsSync(repoPath);
@@ -22,10 +34,10 @@ function filterValidRepos(repoPaths) {
 }
 
 function App() {
-  const [tabs, setTabs] = useState([]);
-  const [activeTabId, setActiveTabId] = useState(null);
-  const [hasLoadedRecent, setHasLoadedRecent] = useState(false);
-  const [showCloneDialog, setShowCloneDialog] = useState(false);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
+  const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
 
   // Load recent repos and auto-open on startup
   useEffect(() => {
@@ -42,8 +54,8 @@ function App() {
 
       // Auto-open last opened repos
       if (validRecent.length > 0) {
-        const newTabs = [];
-        let activeTabIdToSet = null;
+        const newTabs: Tab[] = [];
+        let activeTabIdToSet: string | null = null;
 
         // Get saved active tab path
         const savedActiveTabPath = localStorage.getItem(ACTIVE_TAB_KEY);
@@ -52,8 +64,8 @@ function App() {
         const orderedRepos = [...validRecent].reverse();
 
         orderedRepos.forEach((repoPath, index) => {
-          const tabId = Date.now() + index;
-          const newTab = {
+          const tabId = String(Date.now() + index);
+          const newTab: Tab = {
             id: tabId,
             path: repoPath,
             name: repoPath.split(/[\\/]/).pop() || repoPath
@@ -82,7 +94,7 @@ function App() {
 
   // Listen for events from main process
   useEffect(() => {
-    const handleOpenRepo = (event, repoPath) => {
+    const handleOpenRepo = (event: any, repoPath: string) => {
       openRepository(repoPath);
     };
 
@@ -152,9 +164,8 @@ function App() {
     };
   }, [tabs, activeTabId]);
 
-  const openRepository = (repoPath) => {
+  const openRepository = (repoPath: string) => {
     // Check if path exists before opening
-    const fs = require('fs');
     try {
       if (!fs.existsSync(repoPath)) {
         alert(`Repository path does not exist:\n${repoPath}`);
@@ -174,8 +185,8 @@ function App() {
     }
 
     // Create new tab
-    const newTab = {
-      id: Date.now(),
+    const newTab: Tab = {
+      id: String(Date.now()),
       path: repoPath,
       name: repoPath.split(/[\\/]/).pop() || repoPath
     };
@@ -188,7 +199,7 @@ function App() {
     ipcRenderer.send('update-recent-repos', recent);
   };
 
-  const closeTab = (tabId) => {
+  const closeTab = (tabId: string) => {
     const newTabs = tabs.filter(tab => tab.id !== tabId);
     setTabs(newTabs);
 
@@ -204,15 +215,15 @@ function App() {
     }
   };
 
-  const handleTabReorder = (newTabs) => {
+  const handleTabReorder = (newTabs: Tab[]) => {
     setTabs(newTabs);
   };
 
-  const handleClone = async (repoUrl, parentFolder, repoName) => {
+  const handleClone = async (repoUrl: string, parentFolder: string, repoName: string): Promise<void> => {
     try {
-      const result = await ipcRenderer.invoke('clone-repository', repoUrl, parentFolder, repoName);
+      const result: CloneResult = await ipcRenderer.invoke('clone-repository', repoUrl, parentFolder, repoName);
 
-      if (result.success) {
+      if (result.success && result.path) {
         // Close dialog and open the cloned repository
         setShowCloneDialog(false);
         openRepository(result.path);
@@ -220,7 +231,7 @@ function App() {
         // Show error message
         alert(`Clone failed: ${result.error}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       alert(`Clone failed: ${error.message}`);
     }
   };
@@ -258,7 +269,6 @@ function App() {
       return;
 
     const checkTabValidity = () => {
-      const fs = require('fs');
       const invalidTabs = tabs.filter(tab => {
         try {
           return !fs.existsSync(tab.path);
@@ -300,8 +310,8 @@ function App() {
     <div className="app">
       <TabBar
         tabs={tabs}
-        activeTabId={activeTabId}
-        onTabSelect={setActiveTabId}
+        activeTabId={activeTabId || ''}
+        onTabSelect={(tabId) => setActiveTabId(tabId)}
         onTabClose={closeTab}
         onTabReorder={handleTabReorder}
       />

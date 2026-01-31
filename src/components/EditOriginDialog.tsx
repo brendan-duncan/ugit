@@ -1,20 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 
-function EditOriginDialog({ onClose, onEditOrigin, currentOriginUrl }) {
-  const [originUrl, setOriginUrl] = useState('');
+interface EditOriginDialogProps {
+  onClose: () => void;
+  onEditOrigin: (url: string) => void | Promise<void>;
+  currentOriginUrl?: string;
+}
+
+const EditOriginDialog: React.FC<EditOriginDialogProps> = ({ onClose, onEditOrigin, currentOriginUrl }) => {
+  const [originUrl, setOriginUrl] = useState<string>('');
 
   useEffect(() => {
     setOriginUrl(currentOriginUrl || '');
   }, [currentOriginUrl]);
 
-  const handleEdit = () => {
+  const handleEdit = (): void => {
     if (originUrl.trim()) {
       onEditOrigin(originUrl.trim());
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       handleEdit();
     }
@@ -34,7 +40,7 @@ function EditOriginDialog({ onClose, onEditOrigin, currentOriginUrl }) {
               id="origin-url"
               type="text"
               value={originUrl}
-              onChange={(e) => setOriginUrl(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setOriginUrl(e.target.value)}
               className="dialog-input"
               placeholder="https://github.com/user/repo.git"
               autoFocus
@@ -58,6 +64,6 @@ function EditOriginDialog({ onClose, onEditOrigin, currentOriginUrl }) {
       </div>
     </div>
   );
-}
+};
 
 export default EditOriginDialog;

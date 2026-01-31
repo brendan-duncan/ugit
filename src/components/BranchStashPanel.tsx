@@ -3,7 +3,7 @@ import BranchTree from './BranchTree';
 import RemoteList from './RemoteList';
 import StashList from './StashList';
 
-function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu, remotes, onSelectRemoteBranch, gitAdapter }) {
+function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu, remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction }) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
   const [stashesCollapsed, setStashesCollapsed] = useState(false);
@@ -40,6 +40,8 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           collapsed={remotesCollapsed}
           onToggleCollapse={() => setRemotesCollapsed(!remotesCollapsed)}
           gitAdapter={gitAdapter}
+          onRemoteBranchAction={onRemoteBranchAction}
+          currentBranch={currentBranch}
         />
       </div>
       {!remotesCollapsed && !stashesCollapsed && (

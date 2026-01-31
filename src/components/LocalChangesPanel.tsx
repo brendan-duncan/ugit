@@ -2,10 +2,9 @@ import React, { useState, useRef } from 'react';
 import FileList from './FileList';
 import DiffViewer from './DiffViewer';
 import StashDialog from './StashDialog';
+import { ipcRenderer } from 'electron';
+import path from 'path';
 import './LocalChangesPanel.css';
-
-const { ipcRenderer } = window.require('electron');
-const path = window.require('path');
 
 function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }) {
 

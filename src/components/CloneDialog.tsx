@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { ipcRenderer } from 'electron';
 import './CloneDialog.css';
 
 const PARENT_FOLDER_KEY = 'ugit-clone-parent-folder';
 
-function CloneDialog({ onClose, onClone }) {
-  const [repoUrl, setRepoUrl] = useState('');
-  const [parentFolder, setParentFolder] = useState('');
-  const [repoName, setRepoName] = useState('');
-  const [loading, setLoading] = useState(false);
+interface CloneDialogProps {
+  onClose: () => void;
+  onClone: (repoUrl: string, parentFolder: string, repoName: string) => Promise<void>;
+}
+
+const CloneDialog: React.FC<CloneDialogProps> = ({ onClose, onClone }) => {
+  const [repoUrl, setRepoUrl] = useState<string>('');
+  const [parentFolder, setParentFolder] = useState<string>('');
+  const [repoName, setRepoName] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
 // Load saved parent folder on mount
   useEffect(() => {
@@ -52,7 +58,7 @@ function CloneDialog({ onClose, onClone }) {
   // Update name field when URL changes
   useEffect(() => {
     // Extract repository name from URL
-    const extractRepoName = (url) => {
+    const extractRepoName = (url: string): string => {
       try {
         // Handle different URL formats
         let cleanUrl = url.trim();
@@ -90,7 +96,7 @@ function CloneDialog({ onClose, onClone }) {
 
   // Handle Escape key for cancel
   useEffect(() => {
-    const handleEscape = (e) => {
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
       }
@@ -101,7 +107,6 @@ function CloneDialog({ onClose, onClone }) {
   }, [onClose]);
 
   const handleBrowseFolder = async () => {
-    const { ipcRenderer } = window.require('electron');
     try {
       const result = await ipcRenderer.invoke('show-open-dialog', {
         properties: ['openDirectory'],

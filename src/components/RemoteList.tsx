@@ -12,7 +12,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
 
   const handleRemoteToggle = async (remoteName) => {
     const isCurrentlyExpanded = expandedRemotes[remoteName];
-    
+
     if (isCurrentlyExpanded) {
       // Collapse the remote
       setExpandedRemotes(prev => ({
@@ -36,7 +36,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
         try {
           console.log(`Loading branches for remote: ${remoteName}`);
           const branches = await gitAdapter.raw(['branch', '-r', '--format=%(refname:short)', '--list']);
-          
+
           // Filter branches for this remote and clean up names
           const remoteBranches = branches
             .split('\n')
@@ -48,7 +48,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
             ...prev,
             [remoteName]: remoteBranches
           }));
-          
+
           console.log(`Loaded ${remoteBranches.length} branches for remote: ${remoteName}`);
         } catch (error) {
           console.error(`Failed to load branches for remote ${remoteName}:`, error);
@@ -83,11 +83,11 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     e.stopPropagation();
 
     const fullName = `${remoteName}/${branchName}`;
-    
+
     // Check if current branch is tracking this remote branch
     // This is a simplified check - in a real implementation, you'd check git config for tracking branches
     const isTracking = currentBranch && fullName === `origin/${currentBranch}`;
-    
+
     const rect = e.currentTarget.getBoundingClientRect();
     setContextMenu({
       x: rect.left,
@@ -131,7 +131,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
           ) : (
             remotes.map((remote) => (
             <div key={remote.name} className="remote-item">
-              <div 
+              <div
                 className="remote-header"
                 onClick={() => handleRemoteToggle(remote.name)}
               >
@@ -142,7 +142,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                 <span className="remote-name">{remote.name}</span>
                 <span className="remote-url">{remote.url}</span>
               </div>
-              
+
               {expandedRemotes[remote.name] && (
                 <div className="remote-branches">
                   {loadingRemotes[remote.name] ? (
@@ -154,7 +154,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                                         selectedItem.type === 'remote-branch' &&
                                         selectedItem.remoteName === remote.name &&
                                         selectedItem.branchName === branch;
-                        
+
                         return (
                           <div
                             key={branch}
@@ -179,7 +179,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
           )))}
         </div>
       )}
-      
+
       {contextMenu && (
         <RemoteBranchContextMenu
           remoteName={contextMenu.remoteName}

@@ -3,8 +3,6 @@ import CommitList from './CommitList';
 import CommitInfo from './CommitInfo';
 import './BranchView.css';
 
-
-
 function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, currentBranch }) {
   const [selectedCommit, setSelectedCommit] = useState(null);
   const [commitFiles, setCommitFiles] = useState([]);
