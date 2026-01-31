@@ -15,6 +15,7 @@ import PushDialog from './PushDialog';
 import StashDialog from './StashDialog';
 import ResetToOriginDialog from './ResetToOriginDialog';
 import LocalChangesDialog from './LocalChangesDialog';
+import CleanWorkingDirectoryDialog from './CleanWorkingDirectoryDialog';
 import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
 import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import './RepositoryView.css';
@@ -1136,6 +1137,31 @@ function RepositoryView({ repoPath, isActiveTab }) {
     }
   };
 
+  const showCleanWorkingDirectory = async () => {
+    setShowCleanWorkingDirectoryDialog(true);
+  };
+
+  const handleCleanWorkingDirectory = async () => {
+    setShowCleanWorkingDirectoryDialog(false);
+
+    try {
+      const git = gitAdapter.current;
+
+      console.log('Cleaning working directory...');
+      await git.raw(['clean', '-fdx']);
+      console.log('Working directory cleaned successfully');
+
+      // Clear branch commits cache since cleaning may affect file status
+      clearBranchCache();
+
+      // Refresh all data after cleaning
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error cleaning working directory:', error);
+      setError(`Clean working directory failed: ${error.message}`);
+    }
+  };
+
   const handleCreateBranch = async (branchName, checkoutAfterCreate) => {
     try {
       const git = gitAdapter.current;
@@ -1809,6 +1835,12 @@ function RepositoryView({ repoPath, isActiveTab }) {
         <ResetToOriginDialog
           onClose={() => setShowResetDialog(false)}
           onReset={handleResetToOrigin}
+        />
+      )}
+      {showCleanWorkingDirectoryDialog && (
+        <CleanWorkingDirectoryDialog
+          onClose={() => setShowCleanWorkingDirectoryDialog(false)}
+          onClean={handleCleanWorkingDirectory}
         />
       )}
     </div>
