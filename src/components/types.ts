@@ -39,12 +39,6 @@ export interface BranchInfo {
   behind?: number;
 }
 
-export interface StashInfo {
-  hash: string;
-  message: string;
-  index?: number;
-}
-
 export interface RemoteInfo {
   name: string;
   url: string;

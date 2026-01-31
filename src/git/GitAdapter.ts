@@ -22,7 +22,17 @@ export interface AheadBehind {
 }
 
 export interface StashInfo {
+  stashRef: string;
+  index: number;
+  output: string;
+  files: string[];
+  fileDiffs: Map<string, string>;
+  totalFiles: number;
+
   hash: string;
+  author: string;
+  date: string;
+  merge: string;
   message: string;
 }
 
@@ -39,10 +49,27 @@ export interface CommandStateCallback {
   (isRunning: boolean, id: number, command: string, startTime: number): void;
 }
 
+export interface CommitFile {
+  status: string;
+  path: string;
+}
+
+export interface Commit {
+  hash: string;
+  author_name: string;
+  author_email: string;
+  date: string;
+  message: string;
+  body?: string;
+  onOrigin?: boolean;
+}
+
 export abstract class GitAdapter {
   public repoPath: string;
-  protected isOpen: boolean = false;
-  protected commandStateCallback: CommandStateCallback | null = null;
+  public currentBranch: string | null = null;
+  public commandStateCallback: CommandStateCallback | null = null;
+  public isOpen: boolean = false;
+
   protected _id: number = 0;
   protected _pendingCommands: Map<number, string> = new Map();
 
@@ -208,6 +235,12 @@ export abstract class GitAdapter {
   abstract commit(message: string): Promise<void>;
 
   /**
+   * Get a list of files changed in a commit
+   * @param commitHash string
+   */
+  abstract getCommitFiles(commitHash: string): Promise<Array<CommitFile>>;
+
+  /**
    * Get diff for a file
    * @param filePath - Path to file
    * @param isStaged - Whether to get staged diff
@@ -226,7 +259,7 @@ export abstract class GitAdapter {
    * @param stashIndex - The stash index (default: 0 for most recent)
    * @param repoPath - Path to the git repository (default: current directory)
    */
-  abstract getStashInfo(stashIndex: number): Promise<any>;
+  abstract getStashInfo(stashIndex: number): Promise<StashInfo>;
 
   /**
    * Get diff for a specific file in a stash
@@ -240,6 +273,19 @@ export abstract class GitAdapter {
    * @param filePaths - Array of file paths to discard
    */
   abstract discard(filePaths: string[]): Promise<void>;
+
+  /**
+   * Checkout a branch
+   * @param branchName - Name of the branch to checkout
+   */
+  abstract checkoutBranch(branchName: string): Promise<void>;
+
+  /**
+   * List the commit log for a branch
+   * @param branchName - Name of the branch
+   * @param maxCount - Maximum number of commits to retrieve
+   */
+  abstract log(branchName: string, maxCount: number): Promise<any[]>;
 
   /**
    * Create a patch file from changes

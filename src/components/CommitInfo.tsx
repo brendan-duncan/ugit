@@ -1,21 +1,8 @@
 import React, { useState } from 'react';
 import DiffViewer from './DiffViewer';
 import GitAdapter from '../git/GitAdapter';
+import { Commit, CommitFile } from '../git/GitAdapter';
 import './CommitInfo.css';
-
-interface CommitFile {
-  path: string;
-  status: string;
-}
-
-interface Commit {
-  hash: string;
-  author_name: string;
-  author_email: string;
-  date: string;
-  message: string;
-  body?: string;
-}
 
 interface CommitInfoProps {
   commit: Commit | null;
@@ -23,7 +10,7 @@ interface CommitInfoProps {
   gitAdapter: GitAdapter;
 }
 
-const CommitInfo: React.FC<CommitInfoProps> = ({ commit, files, gitAdapter }) => {
+function CommitInfo({ commit, files, gitAdapter }: CommitInfoProps) {
   const [expandedFiles, setExpandedFiles] = useState<{[key: string]: boolean}>({});
   const [fileDiffs, setFileDiffs] = useState<{[key: string]: string}>({});
 

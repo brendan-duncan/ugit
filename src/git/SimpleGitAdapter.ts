@@ -1,5 +1,12 @@
 import simpleGit, { SimpleGit } from 'simple-git';
-import GitAdapter, { CommandStateCallback, GitStatus, BranchInfo, StashListResponse } from './GitAdapter';
+import GitAdapter, {
+  Commit,
+  CommandStateCallback,
+  GitStatus,
+  BranchInfo,
+  StashInfo,
+  StashListResponse,
+  CommitFile } from './GitAdapter';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -8,7 +15,6 @@ import * as path from 'path';
  */
 export class SimpleGitAdapter extends GitAdapter {
   private git: SimpleGit | null = null;
-  private currentBranch: string | null = null;
 
   constructor(repoPath: string, commandStateCallback: CommandStateCallback | null = null) {
     super(repoPath, commandStateCallback);
@@ -19,9 +25,7 @@ export class SimpleGitAdapter extends GitAdapter {
     this.isOpen = true;
   }
 
-  async status(): Promise<GitStatus> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async status(): Promise<GitStatus> {  
     const startTime = performance.now();
     const id = this._startCommand('git status', startTime);
     let result: any = null;
@@ -39,8 +43,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async branchLocal(): Promise<BranchInfo> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand('git branch --list', startTime);
     let result: BranchInfo | null = null;
@@ -53,9 +55,7 @@ export class SimpleGitAdapter extends GitAdapter {
     return result || { all: [] };
   }
 
-  async createBranch(branchName: string, startPoint: string | null = null): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async createBranch(branchName: string, startPoint: string | null = null): Promise<void> {   
     const startTime = performance.now();
     let id: number;
     try {
@@ -76,8 +76,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async getAheadBehind(localBranch: string, remoteBranch: string): Promise<{ ahead: number; behind: number }> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     let id: number;
     try {
@@ -93,8 +91,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async getOriginUrl(): Promise<string> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     let id: number;
     try {
@@ -109,8 +105,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async setRemoteUrl(remoteName: string, url: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git remote set-url ${remoteName} ${url}`, startTime);
     try {
@@ -123,9 +117,7 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
-  async addRemote(remoteName: string, url: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async addRemote(remoteName: string, url: string): Promise<void> {   
     const startTime = performance.now();
     const id = this._startCommand(`git remote add ${remoteName} ${url}`, startTime);
     try {
@@ -138,9 +130,7 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
-  async removeRemote(remoteName: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async removeRemote(remoteName: string): Promise<void> {   
     const startTime = performance.now();
     const id = this._startCommand(`git remote remove ${remoteName}`, startTime);
     try {
@@ -154,8 +144,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async resetToOrigin(branch: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     let idFetch: number;
     let idReset: number;
@@ -178,8 +166,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async stashList(): Promise<StashListResponse> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand('git stash list', startTime);
     let result: any = null;
@@ -201,8 +187,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async fetch(remote: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git fetch ${remote}`, startTime);
     try {
@@ -214,8 +198,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async pull(remote: string, branch: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git pull ${remote} ${branch}`, startTime);
     try {
@@ -227,8 +209,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async push(remote: string, refspec: string, options: string[] = []): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     if (options.length > 0) {
       const id = this._startCommand(`git push ${remote} ${refspec} ${options.join(' ')}`, startTime);
@@ -250,8 +230,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async stashPush(message: string, filePaths: string[] | null = null): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     if (filePaths && filePaths.length > 0) {
       const id = this._startCommand(`git stash push -m "${message}" -- ${filePaths.length} files`, startTime);
@@ -273,8 +251,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async stashPop(): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand('git stash pop', startTime);
     try {
@@ -286,8 +262,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async stashApply(): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand('git stash apply', startTime);
     try {
@@ -299,8 +273,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async add(filePaths: string | string[]): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     // Support both single string and array of file paths for backward compatibility
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
@@ -315,8 +287,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async reset(filePaths: string | string[]): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     // Support both single string and array of file paths for backward compatibility
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
@@ -330,8 +300,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async commit(message: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git commit -m "${message}"`, startTime);
     try {
@@ -342,9 +310,7 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
-  async diff(filePath: string, isStaged: boolean): Promise<string> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async diff(filePath: string, isStaged: boolean): Promise<string> {  
     const startTime = performance.now();
     let result: string;
     if (isStaged) {
@@ -375,9 +341,7 @@ export class SimpleGitAdapter extends GitAdapter {
    * @param repoPath - Path to the git repository (default: current directory)
    * @returns Object containing stash information
    */
-  async getStashInfo(stashIndex: number): Promise<any> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async getStashInfo(stashIndex: number): Promise<StashInfo> {   
     const stashRef = `stash@{${stashIndex}}`;
     const startTime = performance.now();
     const id = this._startCommand(`git show ${stashRef}`, startTime);
@@ -399,8 +363,21 @@ export class SimpleGitAdapter extends GitAdapter {
         .filter((file: string) => file.length > 0);
 
       // Get diff for each file
-      const fileDiffs: { [key: string]: string } = {};
-      const info: any = {};
+      const fileDiffs: Map<string, string> = new Map();
+
+      const info: StashInfo = {
+        stashRef,
+        index: stashIndex,
+        output: showOutput,
+        files,
+        fileDiffs,
+        totalFiles: files.length,
+        hash: '',
+        author: '',
+        date: '',
+        merge: '',
+        message: ''
+      };
 
       showOutput.split('\n').forEach((line: string) => {
         if (line.startsWith('commit ')) {
@@ -423,25 +400,28 @@ export class SimpleGitAdapter extends GitAdapter {
 
       this._endCommand(id, startTime);
 
-      return {
-        stashRef,
-        stashIndex,
-        info,
-        showOutput,
-        files,
-        fileDiffs,
-        totalFiles: files.length
-      };
+      return info;
     } catch (error) {
       this._endCommand(id, startTime);
       console.error(`Error getting stash info for ${stashRef}:`, error);
-      return {};
+      const info: StashInfo = {
+        stashRef,
+        index: stashIndex,
+        output: '',
+        files: [],
+        fileDiffs: new Map<string, string>(),
+        totalFiles: 0,
+        hash: '',
+        author: '',
+        date: '',
+        merge: '',
+        message: ''
+      }
+      return info;
     }
   }
 
-  async getStashFileDiff(stashIndex: number, filePath: string): Promise<string> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async getStashFileDiff(stashIndex: number, filePath: string): Promise<string> {   
     try {
       const stashRef = `stash@{${stashIndex}}`;
       const startTime = performance.now();
@@ -460,8 +440,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async discard(filePaths: string[]): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git checkout -- ${filePaths.join(' ')}`, startTime);
 
@@ -499,9 +477,7 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
-  async checkoutBranch(branchName: string): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async checkoutBranch(branchName: string): Promise<void> {   
     const startTime = performance.now();
     const id = this._startCommand(`git checkout ${branchName}`, startTime);
     await this.git.checkout(branchName);
@@ -509,8 +485,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async log(branchName: string, maxCount: number = 100): Promise<any[]> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git log ${branchName} --max-count=${maxCount}`, startTime);
 
@@ -529,16 +503,15 @@ export class SimpleGitAdapter extends GitAdapter {
 
     // Check which commits exist on origin
     const commitsWithRemoteStatus = await Promise.all(
-      result.all.map(async (commit) => {
+      result.all.map(async (commit: Commit) => {
         try {
           // Check if commit exists on origin branch
-          if (!this.git) throw new Error('Git adapter not initialized');
           const unpushedCommits = await this.git.raw(['log', `origin/${branchName}..${commit.hash}`]);
           const onOrigin = unpushedCommits.trim().length === 0;
-          return { ...commit, onOrigin };
+          commit.onOrigin = onOrigin;
         } catch (error) {
           // If merge-base fails, commit doesn't exist on origin
-          return { ...commit, onOrigin: false };
+          commit.onOrigin = false;
         }
       })
     );
@@ -547,9 +520,7 @@ export class SimpleGitAdapter extends GitAdapter {
     return commitsWithRemoteStatus;
   }
 
-  async getCommitFiles(commitHash: string): Promise<Array<{ status: string; path: string }>> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
+  async getCommitFiles(commitHash: string): Promise<Array<CommitFile>> {
     const startTime = performance.now();
     const id = this._startCommand(`git diff-tree --no-commit-id --name-status -r ${commitHash}`, startTime);
 
@@ -581,8 +552,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async createPatch(filePaths: string[], outputPath: string, isStaged: boolean = false): Promise<void> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git createPatch`, startTime);
 
@@ -601,8 +570,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async show(commitHash: string, filePath: string): Promise<string> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git show --format= --unified=3 ${commitHash} -- ${filePath}`, startTime);
     try {
@@ -632,8 +599,6 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async raw(args: string[]): Promise<string> {
-    if (!this.git) throw new Error('Git adapter not initialized');
-    
     const startTime = performance.now();
     const id = this._startCommand(`git ${args.join(' ')}`, startTime);
     let result: string | null = null;

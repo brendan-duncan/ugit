@@ -1,10 +1,22 @@
 import React, { useState, useRef } from 'react';
 import CommitList from './CommitList';
 import CommitInfo from './CommitInfo';
+import { Commit } from '../git/GitAdapter';
+import GitAdapter from '../git/GitAdapter';
 import './BranchView.css';
 
-function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, currentBranch }) {
-  const [selectedCommit, setSelectedCommit] = useState(null);
+interface BranchViewProps {
+  branchName: string;
+  commits: Array<Commit>;
+  loading: boolean;
+  gitAdapter: GitAdapter;
+  onRefresh: () => void;
+  onContextMenu: (action: string, commit: Commit, currentBranch: string) => void;
+  currentBranch: string;
+}
+
+function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, currentBranch }: BranchViewProps) {
+  const [selectedCommit, setSelectedCommit] = useState<Commit | null>(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [topHeight, setTopHeight] = useState(60);
   const activeSplitter = useRef(null);
@@ -17,8 +29,9 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onCon
     activeSplitter.current = null;
   };
 
-  const handleMouseMove = (e) => {
-    if (activeSplitter.current === null) return;
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (activeSplitter.current === null)
+      return;
 
     const container = e.currentTarget;
     const rect = container.getBoundingClientRect();
@@ -29,11 +42,12 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onCon
     }
   };
 
-  const handleCommitSelect = async (commit) => {
+  const handleCommitSelect = async (commit: Commit | null) => {
     setSelectedCommit(commit);
     setCommitFiles([]);
 
-    if (!commit) return;
+    if (!commit)
+      return;
 
     try {
       const files = await gitAdapter.getCommitFiles(commit.hash);

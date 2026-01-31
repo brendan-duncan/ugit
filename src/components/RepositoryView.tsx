@@ -21,6 +21,7 @@ import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
 import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
+import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
 import { RunningCommand } from './types';
 import { ipcRenderer } from 'electron';
 import './RepositoryView.css';
@@ -34,10 +35,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
-  const [remotes, setRemotes] = useState([]);
+  const [remotes, setRemotes] = useState<string[]>([]);
   const [branchStatus, setBranchStatus] = useState({});
   const [originUrl, setOriginUrl] = useState('');
-  const [stashes, setStashes] = useState([]);
+  const [stashes, setStashes] = useState<StashInfo[]>([]);
   const [modifiedCount, setModifiedCount] = useState(0);
   const [unstagedFiles, setUnstagedFiles] = useState([]);
   const [stagedFiles, setStagedFiles] = useState([]);
@@ -75,13 +76,13 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
   const [commitForDialog, setCommitForDialog] = useState(null);
   const activeSplitter = useRef(null);
-  const gitAdapter = useRef(null);
+  const gitAdapter = useRef<GitAdapter | null>(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
 
   let runningCommands = null;
 
   // Helper function to update branch commits cache
-  const updateBranchCache = (branchName: string, commits: any) => {
+  const updateBranchCache = (branchName: string, commits: Commit[]) => {
     branchCommitsCache.current.set(branchName, commits);
 
     // Persist to cache manager (merge with existing)
@@ -1034,7 +1035,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       });
 
       console.log(`Loading commits for branch: ${branchName}`);
-      const commits = await git.log(branchName);
+      const maxCommits = 100;
+      const commits = await git.log(branchName, maxCommits);
 
       // Cache the commits for this branch
       updateBranchCache(branchName, commits);
@@ -1147,7 +1149,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
-  const handleCreateBranch = async (branchName, checkoutAfterCreate) => {
+  const handleCreateBranch = async (branchName: string, checkoutAfterCreate: boolean) => {
     try {
       const git = gitAdapter.current;
 
@@ -1457,7 +1459,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
-  const handleCommitContextMenu = async (action: string, commit: any, currentBranch: string) => {
+  const handleCommitContextMenu = async (action: string, commit: Commit, currentBranch: string) => {
     console.log('Commit context menu action:', action, 'on commit:', commit.hash);
 
     try {
