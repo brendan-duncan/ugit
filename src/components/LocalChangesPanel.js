@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import FileList from './FileList';
 import DiffViewer from './DiffViewer';
+import StashDialog from './StashDialog';
 import './LocalChangesPanel.css';
 
 const { ipcRenderer } = window.require('electron');
@@ -14,6 +15,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
   const [commitMessage, setCommitMessage] = useState('');
   const [commitDescription, setCommitDescription] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+  const [showStashDialog, setShowStashDialog] = useState(false);
+  const [pendingStashFiles, setPendingStashFiles] = useState([]);
   const activeSplitter = useRef(null);
 
   const handleMouseDown = (splitterType) => {
@@ -150,6 +153,46 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
     }
   };
 
+  const handleStash = async (message, stageNewFiles) => {
+    setShowStashDialog(false);
+
+    if (pendingStashFiles.length === 0) return;
+
+    try {
+      const git = gitAdapter;
+      
+      // If stageNewFiles is checked, stage new files first (optional for context menu stashing)
+      if (stageNewFiles) {
+        const statusPromises = pendingStashFiles.map(async (filePath) => {
+          try {
+            const status = await git.status([filePath]);
+            return { filePath, isNew: status[0]?.status === 'created' };
+          } catch {
+            return { filePath, isNew: false };
+          }
+        });
+        
+        const fileStatuses = await Promise.all(statusPromises);
+        const newFiles = fileStatuses.filter(f => f.isNew);
+        
+        if (newFiles.length > 0) {
+          console.log(`Staging ${newFiles.length} new files before stash...`);
+          await git.add(newFiles.map(f => f.filePath));
+        }
+      }
+
+      await git.stashPush(message || 'Stashed changes', pendingStashFiles);
+      console.log(`Stashed ${pendingStashFiles.length} files`);
+
+      // Clear pending files and refresh
+      setPendingStashFiles([]);
+      if (onRefresh) await onRefresh();
+    } catch (error) {
+      console.error('Error stashing:', error);
+      setPendingStashFiles([]);
+    }
+  };
+
   const handleContextMenu = async (action, items, clickedItem, contextRepoPath, listType) => {
     if (isBusy) {
       console.log('Operation in progress, please wait...');
@@ -209,12 +252,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
 
         case 'stash':
           if (allFilePaths.length > 0) {
-            const stashMessage = window.prompt('Enter stash message:', 'Stashed changes');
-            if (stashMessage) {
-              await git.stashPush(stashMessage, allFilePaths);
-              console.log(`Stashed ${allFilePaths.length} files`);
-              if (onRefresh) await onRefresh();
-            }
+            setPendingStashFiles(allFilePaths);
+            setShowStashDialog(true);
           }
           break;
 
@@ -360,6 +399,17 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
           </button>
         </div>
       </div>
+
+      {/* Stash Dialog */}
+      {showStashDialog && (
+        <StashDialog
+          onClose={() => {
+            setShowStashDialog(false);
+            setPendingStashFiles([]);
+          }}
+          onStash={handleStash}
+        />
+      )}
     </div>
   );
 }
