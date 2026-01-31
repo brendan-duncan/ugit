@@ -1,7 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './BranchTree.css';
 
-function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem, onContextMenu }) {
+interface TreeNodeProps {
+  node: any;
+  currentBranch: string;
+  branchStatus: Record<string, any>;
+  level?: number;
+  onBranchSwitch: (branchName: string) => void;
+  pullingBranch: string | null;
+  onBranchSelect: (branchName: string) => void;
+  selectedItem: any;
+  onContextMenu: (e: React.MouseEvent, branchName: string) => void;
+}
+
+function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
+      onBranchSelect, selectedItem, onContextMenu }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
   const isCurrent = node.fullPath === currentBranch;
@@ -15,7 +28,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
     }
   };
 
-  const handleClick = (e) => {
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (hasChildren) {
       handleToggle();
@@ -27,7 +40,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
     }
   };
 
-  const handleDoubleClick = (e) => {
+  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     // Only allow switching for leaf nodes (actual branches) and not the current branch
     if (!hasChildren && !isCurrent && onBranchSwitch) {
@@ -35,7 +48,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
     }
   };
 
-  const handleContextMenu = (e) => {
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     // Only show context menu for leaf nodes (actual branches), not folders
@@ -108,14 +121,28 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   );
 }
 
-function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem, collapsed, onToggleCollapse, onContextMenu }) {
-  const [contextMenu, setContextMenu] = useState(null);
-  const menuRef = useRef(null);
+interface BranchTreeProps {
+  branches: string[];
+  currentBranch: string;
+  branchStatus: Record<string, any>;
+  onBranchSwitch: (branchName: string) => void;
+  pullingBranch: string | null;
+  onBranchSelect: (branchName: string) => void;
+  selectedItem: string | null;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onContextMenu?: (action: string, branchName: string, currentBranch: string) => void;
+}
+
+function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem,
+      collapsed, onToggleCollapse, onContextMenu }: BranchTreeProps) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Close context menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setContextMenu(null);
       }
     };
@@ -128,7 +155,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
     }
   }, [contextMenu]);
 
-  const handleContextMenu = (e, branchName) => {
+  const handleContextMenu = (e: React.MouseEvent, branchName: string) => {
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -136,8 +163,8 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
     });
   };
 
-  const handleMenuAction = (action) => {
-    if (onContextMenu) {
+  const handleMenuAction = (action: string): void => {
+    if (onContextMenu && contextMenu) {
       onContextMenu(action, contextMenu.branchName, currentBranch);
     }
     setContextMenu(null);
@@ -147,7 +174,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
   }
 
   // Build tree structure from branch names
-  const buildTree = (branchNames) => {
+  const buildTree = (branchNames: string[]): any => {
     const root = { children: {} };
 
     branchNames.forEach(branchName => {
@@ -170,7 +197,6 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
   };
 
   const tree = buildTree(branches);
-  const activeBranch = currentBranch;
 
   return (
     <div className="branch-tree">

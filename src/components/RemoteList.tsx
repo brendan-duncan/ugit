@@ -100,9 +100,9 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     });
   };
 
-  const handleContextMenuAction = (action, ...args) => {
+  const handleContextMenuAction = (action: string) => {
     if (onRemoteBranchAction) {
-      onRemoteBranchAction(action, contextMenu?.remoteName, contextMenu?.branchName, contextMenu?.fullName, ...args);
+      onRemoteBranchAction(action, contextMenu?.remoteName ?? '', contextMenu?.branchName ?? '', contextMenu?.fullName ?? '');
     }
     setContextMenu(null);
   };

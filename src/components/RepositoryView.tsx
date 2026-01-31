@@ -30,7 +30,7 @@ interface RepositoryViewProps {
   isActiveTab: boolean;
 }
 
-const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }) => {
+function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
@@ -81,7 +81,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
   let runningCommands = null;
 
   // Helper function to update branch commits cache
-  const updateBranchCache = (branchName, commits) => {
+  const updateBranchCache = (branchName: string, commits: any) => {
     branchCommitsCache.current.set(branchName, commits);
 
     // Persist to cache manager (merge with existing)
@@ -94,7 +94,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
   };
 
   // Helper function to clear branch commits cache
-  const clearBranchCache = (branchName = null) => {
+  const clearBranchCache = (branchName: string | null = null) => {
     if (branchName) {
       branchCommitsCache.current.delete(branchName);
 
@@ -128,10 +128,6 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
   };
   const cacheInitialized = useRef(false);
   const currentBranchLoadId = useRef(0);
-
-  const _setSelectedItem = (item) => {
-    setSelectedItem(item);
-  };
 
   // Initialize git adapter and load repository data
   useEffect(() => {
@@ -230,7 +226,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
           // Always select local changes
           if (selectedItem == null) {
             setLastContentPanel('local-changes');
-            _setSelectedItem({ type: 'local-changes' });
+            setSelectedItem({ type: 'local-changes' });
           }
 
           setLoading(false);
@@ -359,7 +355,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
       // Always select local changes
       if (selectedItem == null) {
         setLastContentPanel('local-changes');
-        _setSelectedItem({ type: 'local-changes' });
+        setSelectedItem({ type: 'local-changes' });
       }
 
       // Save to cache (excluding lastContentPanel to avoid persistence)
@@ -722,39 +718,13 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
 
       await loadRepoData(true);
 
-      // Refresh branch status after push (parallel, update UI incrementally)
-      /*branches.forEach(async (branchName) => {
-        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-        if (ahead > 0 || behind > 0) {
-          setBranchStatus(prev => ({
-            ...prev,
-            [branchName]: { ahead, behind }
-          }));
-        } else if (ahead < 0 || behind < 0) {
-          // Branch doesn't have a remote tracking branch
-          // Remove status for this branch
-          setBranchStatus(prev => {
-            const newStatus = { ...prev };
-            delete newStatus[branchName];
-            return newStatus;
-          });
-        } else {
-          // Remove status if branch is now in sync
-          setBranchStatus(prev => {
-            const newStatus = { ...prev };
-            delete newStatus[branchName];
-            return newStatus;
-          });
-        }
-      });*/
-
     } catch (error) {
       console.error('Error during push:', error);
       setError(`Push failed: ${error.message}`);
     }
   };
 
-  const handleBranchSwitch = async (branchName) => {
+  const handleBranchSwitch = async (branchName: string) => {
     // Check if there are local changes
     if (hasLocalChanges) {
       setPendingBranchSwitch(branchName);
@@ -766,7 +736,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     await performBranchSwitch(branchName);
   };
 
-  const performBranchSwitch = async (branchName) => {
+  const performBranchSwitch = async (branchName: string) => {
     try {
       const git = gitAdapter.current;
 
@@ -782,7 +752,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     }
   };
 
-  const handleLocalChangesDialog = async (option) => {
+  const handleLocalChangesDialog = async (option: string) => {
     setShowLocalChangesDialog(false);
 
     if (!pendingBranchSwitch) {
@@ -934,7 +904,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     }
   };
 
-  const handleRenameBranchDialog = async (newName) => {
+  const handleRenameBranchDialog = async (newName: string) => {
     setShowRenameBranchDialog(false);
 
     if (!branchToRename) {
@@ -952,7 +922,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
 
       // Update selected item if it was the renamed branch
       if (selectedItem?.type === 'branch' && selectedItem.branchName === oldName) {
-        _setSelectedItem({
+        setSelectedItem({
           ...selectedItem,
           branchName: newName
         });
@@ -979,7 +949,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     }
   };
 
-  const handleMergeBranchDialog = async ({ sourceBranch, targetBranch, mergeOption, flag }) => {
+  const handleMergeBranchDialog = async ({ sourceBranch, targetBranch, mergeOption, flag }: { sourceBranch: string; targetBranch: string; mergeOption: string; flag?: string }) => {
     setShowMergeBranchDialog(false);
 
     if (!sourceBranch || !targetBranch) {
@@ -1022,12 +992,12 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     }
   };
 
-  const handleItemSelect = (item) => {
+  const handleItemSelect = (item: any) => {
     // If switching away from a branch, cancel any pending branch loads
     if (item.type !== 'branch') {
       currentBranchLoadId.current += 1;
     }
-    _setSelectedItem(item);
+    setSelectedItem(item);
 
     // Update content panel type when selecting content panel items (no persistence)
     if (item.type === 'local-changes' || item.type === 'branch' || item.type === 'stash') {
@@ -1035,11 +1005,11 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     }
   };
 
-  const handleBranchSelect = async (branchName) => {
+  const handleBranchSelect = async (branchName: string) => {
     // Check cache first
     if (branchCommitsCache.current.has(branchName)) {
       console.log(`Loading commits for ${branchName} from cache`);
-      _setSelectedItem({
+      setSelectedItem({
         type: 'branch',
         branchName,
         commits: branchCommitsCache.current.get(branchName),
@@ -1056,7 +1026,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
       const git = gitAdapter.current;
 
       // Set loading state immediately
-      _setSelectedItem({
+      setSelectedItem({
         type: 'branch',
         branchName,
         commits: [],
@@ -1071,7 +1041,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
 
       // Only update state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
-        _setSelectedItem({
+        setSelectedItem({
           type: 'branch',
           branchName,
           commits,
@@ -1084,7 +1054,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
       // Only update error state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
         setError(`Failed to load commits: ${error.message}`);
-        _setSelectedItem({
+        setSelectedItem({
           type: 'branch',
           branchName,
           commits: [],
@@ -1098,7 +1068,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     setShowStashDialog(true);
   };
 
-  const handleStash = async (message, stageNewFiles) => {
+  const handleStash = async (message: string, stageNewFiles: boolean) => {
     setShowStashDialog(false);
 
     try {
@@ -1154,10 +1124,6 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
       console.error('Error resetting to origin:', error);
       setError(`Reset to origin failed: ${error.message}`);
     }
-  };
-
-  const showCleanWorkingDirectory = async () => {
-    setShowCleanWorkingDirectoryDialog(true);
   };
 
   const handleCleanWorkingDirectory = async () => {
@@ -1261,7 +1227,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     }
   };
 
-  const handleBranchContextMenu = (action, branchName, activeBranch) => {
+  const handleBranchContextMenu = (action: string, branchName: string, currentBranch: string) => {
     console.log('Branch context menu action:', action, 'on branch:', branchName);
 
     switch (action) {
@@ -1277,11 +1243,11 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
         break;
       case 'rebase-active-onto-branch':
         // TODO: Implement rebase active branch onto branch
-        alert(`Rebase ${activeBranch} onto branch: ${branchName}`);
+        alert(`Rebase ${currentBranch} onto branch: ${branchName}`);
         break;
       case 'new-branch':
         // TODO: Implement new branch dialog
-        alert(`New branch from: ${activeBranch}`);
+        alert(`New branch from: ${currentBranch} to ${branchName}`);
         break;
       case 'new-tag':
         // TODO: Implement new tag dialog
@@ -1308,7 +1274,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
     }
   };
 
-  const handleStashContextMenu = (action, stash, stashIndex) => {
+  const handleStashContextMenu = (action: string, stash: any, stashIndex: number): void => {
     console.log('Stash context menu action:', action, 'on stash:', stash);
 
     switch (action) {
@@ -1445,10 +1411,10 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
 
   const handleRemoteBranchSelect = (remoteBranchInfo) => {
     console.log('Remote branch selected:', remoteBranchInfo);
-    _setSelectedItem(remoteBranchInfo);
+    setSelectedItem(remoteBranchInfo);
 };
 
-  const handleRemoteBranchContextMenu = (action, remoteName, branchName, fullName, ...args) => {
+  const handleRemoteBranchContextMenu = (action: string, remoteName: string, branchName: string, fullName: string): void => {
     console.log('Remote branch context menu action:', action, 'on branch:', fullName);
 
     switch (action) {
@@ -1491,7 +1457,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repoPath, isActiveTab }
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
-  const handleCommitContextMenu = async (action, commit, currentBranch) => {
+  const handleCommitContextMenu = async (action: string, commit: any, currentBranch: string) => {
     console.log('Commit context menu action:', action, 'on commit:', commit.hash);
 
     try {
