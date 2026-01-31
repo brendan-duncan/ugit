@@ -141,8 +141,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
       // Use setTimeout to ensure file status is updated first
       setTimeout(async () => {
         // Call a special refresh that only updates branch status
-        const refreshEvent = new CustomEvent('refresh-branch-status', { 
-          detail: {} 
+        const refreshEvent = new CustomEvent('refresh-branch-status', {
+          detail: {}
         });
         window.dispatchEvent(refreshEvent);
       }, 100);
@@ -160,7 +160,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
 
     try {
       const git = gitAdapter;
-      
+
       // If stageNewFiles is checked, stage new files first (optional for context menu stashing)
       if (stageNewFiles) {
         const statusPromises = pendingStashFiles.map(async (filePath) => {
@@ -171,10 +171,10 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
             return { filePath, isNew: false };
           }
         });
-        
+
         const fileStatuses = await Promise.all(statusPromises);
         const newFiles = fileStatuses.filter(f => f.isNew);
-        
+
         if (newFiles.length > 0) {
           console.log(`Staging ${newFiles.length} new files before stash...`);
           await git.add(newFiles.map(f => f.filePath));
