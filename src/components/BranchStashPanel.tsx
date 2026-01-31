@@ -2,8 +2,30 @@ import React, { useState } from 'react';
 import BranchTree from './BranchTree';
 import RemoteList from './RemoteList';
 import StashList from './StashList';
+import { GitAdapter } from '../git/GitAdapter';
 
-function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu, remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction }) {
+interface BranchStashPanelProps {
+  branches: Array<any>;
+  currentBranch: string;
+  branchStatus: Record<string, any>;
+  onBranchSwitch: (branchName: string) => void;
+  pullingBranch: string | null;
+  onBranchSelect: (branchName: string) => void;
+  stashes: Array<any>;
+  onSelectStash: (stash: any) => void;
+  selectedItem: string | null;
+  onMouseDown: (panelIndex: number) => void;
+  onBranchContextMenu: (action: string, branchName: string, currentBranch: string) => void;
+  onStashContextMenu: (action: string, stash: any, stashIndex: number) => void;
+  remotes: Array<any>;
+  onSelectRemoteBranch: (remoteBranchName: string) => void;
+  gitAdapter: GitAdapter;
+  onRemoteBranchAction: (action: string, remoteName: string, branchName: string, fullName: string) => void;
+}
+
+function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
+      onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
+      remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction }: BranchStashPanelProps) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
   const [stashesCollapsed, setStashesCollapsed] = useState(false);

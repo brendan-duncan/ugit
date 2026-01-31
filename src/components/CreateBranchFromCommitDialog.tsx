@@ -36,7 +36,7 @@ function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, com
 
   const handleCreate = async () => {
     if (isCreating || !branchName.trim() || branchExists) return;
-    
+
     setIsCreating(true);
     try {
       await onCreateBranch(branchName.trim(), checkoutAfterCreate);
@@ -109,7 +109,7 @@ function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, com
           <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isCreating}>
             Cancel
           </button>
-          <button 
+          <button
             className={`dialog-button dialog-button-primary ${!branchName.trim() || branchExists || isCreating ? 'disabled' : ''}`}
             onClick={handleCreate}
             disabled={!branchName.trim() || branchExists || isCreating}

@@ -2,9 +2,16 @@ import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './ApplyStashDialog.css';
 
-function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
+interface ApplyStashDialogProps {
+  onClose: () => void;
+  onApply: (options: { stashIndex: number; deleteAfterApplying: boolean }) => void;
+  stashMessage: string;
+  stashIndex: number;
+}
+
+function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }: ApplyStashDialogProps) {
   const STORAGE_KEY = 'apply-stash-delete-after';
-  
+
   // Load saved option from localStorage on mount
   const getSavedOption = () => {
     try {
@@ -13,11 +20,11 @@ function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
       return true; // Default to true
     }
   };
-  
+
   const [deleteAfterApplying, setDeleteAfterApplying] = useState(getSavedOption());
-  
+
   // Save to localStorage whenever option changes
-  const handleDeleteAfterChange = (checked) => {
+  const handleDeleteAfterChange = (checked: boolean): void => {
     setDeleteAfterApplying(checked);
     try {
       localStorage.setItem(STORAGE_KEY, checked.toString());
@@ -26,7 +33,7 @@ function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
     }
   };
 
-  const handleApply = () => {
+  const handleApply = (): void => {
     onApply({
       stashIndex,
       deleteAfterApplying
@@ -54,7 +61,7 @@ function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
               style={{ backgroundColor: '#2d2d2d', color: '#cccccc' }}
             />
           </div>
-          
+
           <div className="dialog-field apply-stash-delete-after-field">
             <label className="dialog-checkbox-label">
               <input
@@ -68,9 +75,9 @@ function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }) {
           </div>
 
           <div className="dialog-field">
-            <div style={{ 
-              fontSize: '0.85rem', 
-              color: '#888888', 
+            <div style={{
+              fontSize: '0.85rem',
+              color: '#888888',
               fontStyle: 'italic',
               marginLeft: '4px'
             }}>

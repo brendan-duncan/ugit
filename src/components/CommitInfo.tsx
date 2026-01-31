@@ -59,19 +59,19 @@ const CommitInfo: React.FC<CommitInfoProps> = ({ commit, files, gitAdapter }) =>
 
   const toggleFileExpansion = async (filePath: string, index: number): Promise<void> => {
     const key = `${filePath}-${index}`;
-    
+
     if (expandedFiles[key]) {
       // Collapse
       setExpandedFiles(prev => ({ ...prev, [key]: false }));
     } else {
       // Expand and load diff if not already loaded
       setExpandedFiles(prev => ({ ...prev, [key]: true }));
-      
+
       if (!fileDiffs[key]) {
         try {
           // Load diff for this specific file from commit
           const diffResult = await gitAdapter.show(commit.hash, filePath);
-          
+
           setFileDiffs(prev => ({
             ...prev,
             [key]: diffResult
@@ -123,10 +123,10 @@ const CommitInfo: React.FC<CommitInfoProps> = ({ commit, files, gitAdapter }) =>
                 const key = `${file.path}-${index}`;
                 const isExpanded = expandedFiles[key];
                 const diff = fileDiffs[key];
-                
+
                 return (
                   <div key={index} className="commit-file-tree-item">
-                    <div 
+                    <div
                       className={`commit-file-item ${getStatusClass(file.status)} ${isExpanded ? 'expanded' : ''}`}
                       onClick={() => toggleFileExpansion(file.path, index)}
                     >
@@ -140,7 +140,7 @@ const CommitInfo: React.FC<CommitInfoProps> = ({ commit, files, gitAdapter }) =>
                       <div className="commit-file-diff-container">
                         {diff !== undefined ? (
                           <div className="commit-file-diff">
-                            <DiffViewer 
+                            <DiffViewer
                               file={{ path: file.path, diff, status: file.status }}
                               gitAdapter={gitAdapter}
                               isStaged={false}

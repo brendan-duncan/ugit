@@ -24,7 +24,7 @@ function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMes
 
   const handleCreate = async () => {
     if (isCreating || !tagName.trim() || tagExists) return;
-    
+
     setIsCreating(true);
     try {
       await onCreateTag(tagName.trim(), tagMessage.trim());
@@ -97,7 +97,7 @@ function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMes
           <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isCreating}>
             Cancel
           </button>
-          <button 
+          <button
             className={`dialog-button dialog-button-primary ${!tagName.trim() || tagExists || isCreating ? 'disabled' : ''}`}
             onClick={handleCreate}
             disabled={!tagName.trim() || tagExists || isCreating}
