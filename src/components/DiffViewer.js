@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import './DiffViewer.css';
 import 'diff2html/bundles/css/diff2html.min.css';
+import CodeMirror from '@uiw/react-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { json } from '@codemirror/lang-json';
+import { python } from '@codemirror/lang-python';
+import { xml } from '@codemirror/lang-xml';
+import { css } from '@codemirror/lang-css';
+import { html } from '@codemirror/lang-html';
+import { cpp } from "@codemirror/lang-cpp";
+import { csharp } from "@replit/codemirror-lang-csharp";
+import { oneDark } from '@codemirror/theme-one-dark';
 const fs = require('fs');
 
 const Diff2Html = window.require('diff2html');
@@ -10,6 +20,48 @@ function isImageFile(filePath) {
   if (!filePath) return false;
   const imageExtensions = /\.(png|jpg|jpeg|gif|bmp|svg|ico|webp|tiff|tif)$/i;
   return imageExtensions.test(filePath);
+}
+
+// Helper function to get CodeMirror language extension based on file extension
+function getCodeMirrorLanguage(filePath) {
+  if (!filePath) return [];
+  
+  const extension = filePath.split('.').pop().toLowerCase();
+  
+  switch (extension) {
+    case 'js':
+    case 'jsx':
+    case 'ts':
+    case 'tsx':
+    case 'mjs':
+      return [javascript({ jsx: true, typescript: true })];
+    case 'json':
+      return [json()];
+    case 'py':
+      return [python()];
+    case 'xml':
+    case 'xhtml':
+      return [xml()];
+    case 'css':
+      return [css()];
+    case 'html':
+    case 'htm':
+      return [html({ matchClosingTags: true })];
+    case 'c':
+    case 'cpp':
+    case 'h':
+    case 'hpp':
+    case 'cc':
+    case 'cxx':
+    case 'c++':
+    case 'hh':
+    case 'hxx':
+      return [cpp()];
+    case 'cs':
+      return [csharp()];
+    default:
+      return [];
+  }
 }
 
 function DiffViewer({ file, gitAdapter, isStaged }) {
@@ -131,7 +183,14 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
         ) : fileType === 'text' ? (
           <div className="diff-file-content">
             <div className="diff-file-content-display">
-              <pre className="diff-file-content-text">{fileContent}</pre>
+              <CodeMirror
+                value={fileContent}
+                height="100%"
+                theme={oneDark}
+                extensions={getCodeMirrorLanguage(file.path)}
+                editable={false}
+                readOnly={true}
+              />
             </div>
           </div>
         ) : fileType === 'diff' && diffHtml ? (
@@ -146,7 +205,14 @@ function DiffViewer({ file, gitAdapter, isStaged }) {
               <span className="diff-status-badge">{file.status}</span>
             </div>
             <div className="diff-file-content-display">
-              <pre className="diff-file-content-text">{fileContent}</pre>
+              <CodeMirror
+                value={fileContent}
+                height="100%"
+                theme={oneDark}
+                extensions={getCodeMirrorLanguage(file.path)}
+                editable={false}
+                readOnly={true}
+              />
             </div>
           </div>
         ) : (

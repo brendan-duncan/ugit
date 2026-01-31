@@ -37,19 +37,7 @@
   padding: 16px;
 }
 
-.diff-text {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #cccccc;
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
 
-.diff-text::selection {
-  background-color: #264f78;
-}
 
 .diff-empty {
   color: #888888;
@@ -71,6 +59,45 @@
   font-size: 13px;
   line-height: 1.4;
   position: relative;
+}
+
+/* CodeMirror integration styles */
+.diff-file-content-display {
+  height: 100%;
+  overflow: hidden;
+}
+
+.diff-file-content-display .cm-editor {
+  height: 100%;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.diff-file-content-display .cm-scroller {
+  overflow: auto;
+}
+
+.diff-file-content-display .cm-focused {
+  outline: none;
+}
+
+.diff-file-content-display .cm-content {
+  padding: 16px;
+  background: #1e1e1e;
+  color: #cccccc;
+}
+
+/* Ensure CodeMirror doesn't overflow in flex layout */
+.diff-file-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.diff-file-content-display {
+  flex: 1;
+  min-height: 0;
 }
 
 /* Override diff2html colors for dark theme */
