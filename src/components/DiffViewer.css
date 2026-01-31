@@ -64,7 +64,7 @@
 /* CodeMirror integration styles */
 .diff-file-content-display {
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .diff-file-content-display .cm-editor {

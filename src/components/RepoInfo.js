@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import './RepoInfo.css';
 import { DropdownMenu, DropdownItem, DropdownSeparator } from './DropdownMenu';
+import EditOriginDialog from './EditOriginDialog';
 const { exec } = require('child_process');
 const { shell } = window.require('electron');
 
-function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory }) {
+function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
   // Extract repository directory name from the full path
@@ -20,7 +22,7 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
   const handleOpenInConsole = () => {
     const platform = process.platform;
     const repoPath = gitAdapter?.repoPath;
-    
+
     if (platform === 'win32') {
       //shell.openExternal(`start cmd /k "cd /d ${repoPath}`);
       exec(`start cmd /k "cd /d ${repoPath}"`);
@@ -37,8 +39,33 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
   };
 
   const handleEditOrigin = () => {
-    // TODO: Implement edit origin dialog
-    alert('Edit origin - not implemented yet');
+    setShowEditOriginDialog(true);
+  };
+
+  const handleEditOriginDialog = async (newUrl) => {
+    setShowEditOriginDialog(false);
+
+    try {
+      const git = gitAdapter;
+
+      if (originUrl) {
+        // Update existing origin
+        await git.setRemoteUrl('origin', newUrl);
+        console.log(`Updated origin URL from ${originUrl} to ${newUrl}`);
+      } else {
+        // Add new origin if none exists
+        await git.addRemote('origin', newUrl);
+        console.log(`Added new origin URL: ${newUrl}`);
+      }
+
+      // Notify parent component to refresh origin URL
+      if (onOriginChanged) {
+        await onOriginChanged();
+      }
+    } catch (error) {
+      console.error('Error editing origin:', error);
+      alert(`Error editing origin: ${error.message}`);
+    }
   };
 
   const handleDeleteOrigin = () => {
@@ -120,7 +147,7 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
           </div>
         )}
       <div className="local-changes-section">
-        <div 
+        <div
           className={`local-changes-item ${isSelected ? 'selected' : ''}`}
           onClick={() => onSelectItem({ type: 'local-changes' })}
         >
@@ -130,6 +157,15 @@ function RepoInfo({ gitAdapter, currentBranch, originUrl, modifiedCount, selecte
           {usingCache && <span className="cache-indicator"></span>}
         </div>
       </div>
+
+      {/* Edit Origin Dialog */}
+      {showEditOriginDialog && (
+        <EditOriginDialog
+          onClose={() => setShowEditOriginDialog(false)}
+          onEditOrigin={handleEditOriginDialog}
+          currentOriginUrl={originUrl}
+        />
+      )}
     </div>
   );
 }

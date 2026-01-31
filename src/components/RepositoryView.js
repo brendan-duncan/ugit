@@ -866,6 +866,18 @@ function RepositoryView({ repoPath, isActiveTab }) {
     }
   };
 
+  const handleOriginChanged = async () => {
+    try {
+      const git = gitAdapter.current;
+      const url = await git.getOriginUrl();
+      setOriginUrl(url);
+      console.log('Origin URL refreshed:', url);
+    } catch (error) {
+      console.error('Error refreshing origin URL:', error);
+      setOriginUrl('');
+    }
+  };
+
   const handleDeleteBranchDialog = async ({ deleteRemote }) => {
     setShowDeleteBranchDialog(false);
 
@@ -1641,6 +1653,7 @@ function RepositoryView({ repoPath, isActiveTab }) {
                 usingCache={usingCache}
                 onResetToOrigin={() => setShowResetDialog(true)}
                 onCleanWorkingDirectory={() => setShowCleanWorkingDirectoryDialog(true)}
+                onOriginChanged={handleOriginChanged}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel

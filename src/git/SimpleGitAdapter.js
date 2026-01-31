@@ -539,6 +539,45 @@ class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
     return result;
   }
+
+  async setRemoteUrl(remoteName, url) {
+    const startTime = performance.now();
+    const id = this._startCommand(`git remote set-url ${remoteName} ${url}`, startTime);
+    try {
+      await this.git.raw(['remote', 'set-url', remoteName, url]);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error setting remote URL for ${remoteName}:`, error);
+      throw error;
+    }
+  }
+
+  async addRemote(remoteName, url) {
+    const startTime = performance.now();
+    const id = this._startCommand(`git remote add ${remoteName} ${url}`, startTime);
+    try {
+      await this.git.raw(['remote', 'add', remoteName, url]);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error adding remote ${remoteName}:`, error);
+      throw error;
+    }
+  }
+
+  async removeRemote(remoteName) {
+    const startTime = performance.now();
+    const id = this._startCommand(`git remote remove ${remoteName}`, startTime);
+    try {
+      await this.git.raw(['remote', 'remove', remoteName]);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error removing remote ${remoteName}:`, error);
+      throw error;
+    }
+  }
 }
 
 module.exports = SimpleGitAdapter;

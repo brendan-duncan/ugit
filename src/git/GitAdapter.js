@@ -95,6 +95,35 @@ class GitAdapter {
   }
 
   /**
+   * Set remote URL
+   * @param {string} remoteName - Name of the remote (e.g., 'origin')
+   * @param {string} url - New URL for the remote
+   * @returns {Promise<void>}
+   */
+  async setRemoteUrl(remoteName, url) {
+    throw new Error('setRemoteUrl() must be implemented');
+  }
+
+  /**
+   * Add a new remote
+   * @param {string} remoteName - Name of the remote to add (e.g., 'origin')
+   * @param {string} url - URL for the remote
+   * @returns {Promise<void>}
+   */
+  async addRemote(remoteName, url) {
+    throw new Error('addRemote() must be implemented');
+  }
+
+  /**
+   * Remove a remote
+   * @param {string} remoteName - Name of the remote to remove (e.g., 'origin')
+   * @returns {Promise<void>}
+   */
+  async removeRemote(remoteName) {
+    throw new Error('removeRemote() must be implemented');
+  }
+
+  /**
    * Hard reset local branch to match origin
    * @param {string} branch - Branch name to reset
    * @returns {Promise<void>}
