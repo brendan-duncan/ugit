@@ -15,10 +15,130 @@ interface RemoteListProps {
   currentBranch?: string;
 }
 
+interface TreeNode {
+  name: string;
+  isLeaf: boolean;
+  children?: Record<string, TreeNode>;
+  fullName?: string;
+}
+
+// Helper function to build tree structure from branch names
+const buildBranchTree = (branches: Array<string>): Record<string, TreeNode> => {
+  const tree: Record<string, TreeNode> = {};
+  
+  branches.forEach(branch => {
+    const parts = branch.split('/');
+    let currentLevel = tree;
+    
+    parts.forEach((part, index) => {
+      if (!currentLevel[part]) {
+        currentLevel[part] = {
+          name: part,
+          isLeaf: index === parts.length - 1,
+          children: {}
+        };
+      }
+      
+      if (index < parts.length - 1) {
+        if (!currentLevel[part].children) {
+          currentLevel[part].children = {};
+        }
+        currentLevel = currentLevel[part].children!;
+      } else {
+        // This is the leaf node (actual branch)
+        currentLevel[part].isLeaf = true;
+        currentLevel[part].fullName = branch;
+      }
+    });
+  });
+  
+  return tree;
+};
+
+// Recursive component to render tree nodes
+const BranchTreeNode: React.FC<{
+  node: TreeNode;
+  level: number;
+  remoteName: string;
+  path: string;
+  selectedItem: SelectedItem | null;
+  onSelectRemoteBranch: (remoteName: string, branchName: string) => void;
+  onContextMenu: (e: React.MouseEvent<HTMLDivElement>, remoteName: string, branchName: string) => void;
+  expandedFolders: Record<string, boolean>;
+  onFolderToggle: (remoteName: string, folderPath: string) => void;
+}> = ({ node, level, remoteName, path, selectedItem, onSelectRemoteBranch, onContextMenu, expandedFolders, onFolderToggle }) => {
+  const fullPath = path ? `${path}/${node.name}` : node.name;
+  const folderKey = `${remoteName}/${fullPath}`;
+  const isExpanded = expandedFolders[folderKey];
+  
+  const isSelected = selectedItem &&
+                    selectedItem.type === 'remote-branch' &&
+                    selectedItem.remoteName === remoteName &&
+                    selectedItem.branchName === node.fullName;
+  
+  return (
+    <div>
+      <div
+        className={`remote-branch-item ${isSelected ? 'selected' : ''}`}
+        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        onClick={() => {
+          if (node.isLeaf && node.fullName) {
+            onSelectRemoteBranch(remoteName, node.fullName);
+          } else {
+            onFolderToggle(remoteName, fullPath);
+          }
+        }}
+        onContextMenu={node.isLeaf && node.fullName ? (e) => onContextMenu(e, remoteName, node.fullName) : undefined}
+      >
+        <span className="remote-branch-icon">
+          {node.isLeaf ? '🌿' : (isExpanded ? '📂' : '📁')}
+        </span>
+        <span className={`remote-branch-name ${node.isLeaf ? '' : 'folder-name'}`}>
+          {node.name}
+        </span>
+        {!node.isLeaf && (
+          <span className="folder-toggle">
+            {isExpanded ? '▼' : '▶'}
+          </span>
+        )}
+      </div>
+      
+      {!node.isLeaf && isExpanded && node.children && (
+        <div>
+          {Object.values(node.children)
+            .sort((a, b) => {
+              // Sort folders first, then leaves, then alphabetically
+              if (a.isLeaf !== b.isLeaf) {
+                return a.isLeaf ? 1 : -1;
+              }
+              return a.name.localeCompare(b.name);
+            })
+            .map((childNode, index) => (
+              <BranchTreeNode
+                key={`${fullPath}/${childNode.name}`}
+                node={childNode}
+                level={level + 1}
+                remoteName={remoteName}
+                path={fullPath}
+                selectedItem={selectedItem}
+                onSelectRemoteBranch={onSelectRemoteBranch}
+                onContextMenu={onContextMenu}
+                expandedFolders={expandedFolders}
+                onFolderToggle={onFolderToggle}
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch }: RemoteListProps) {
   const [expandedRemotes, setExpandedRemotes] = useState<Record<string, boolean>>({});
   const [remoteBranchesCache, setRemoteBranchesCache] = useState<Record<string, Array<string>>>({});
+  const [remoteBranchesTreeCache, setRemoteBranchesTreeCache] = useState<Record<string, Record<string, TreeNode>>>({});
   const [loadingRemotes, setLoadingRemotes] = useState<Record<string, boolean>>({});
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [contextMenu, setContextMenu] = useState(null);
 
   const contextMenuRef = { current: null };
@@ -61,6 +181,13 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
             ...prev,
             [remoteName]: remoteBranches
           }));
+          
+          // Build tree structure for hierarchical display
+          const tree = buildBranchTree(remoteBranches);
+          setRemoteBranchesTreeCache(prev => ({
+            ...prev,
+            [remoteName]: tree
+          }));
 
           console.log(`Loaded ${remoteBranches.length} branches for remote: ${remoteName}`);
         } catch (error) {
@@ -89,6 +216,14 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
         fullName: `${remoteName}/${branchName}`
       });
     }
+  };
+
+  const handleFolderToggle = (remoteName: string, folderPath: string) => {
+    const key = `${remoteName}/${folderPath}`;
+    setExpandedFolders(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
   const handleRemoteBranchContextMenu = (e: React.MouseEvent<HTMLDivElement>, remoteName: string, branchName: string) => {
@@ -160,26 +295,30 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                 <div className="remote-branches">
                   {loadingRemotes[remote.name] ? (
                     <div className="loading-branches">Loading branches...</div>
-                  ) : remoteBranchesCache[remote.name] ? (
-                    remoteBranchesCache[remote.name].length > 0 ? (
-                      remoteBranchesCache[remote.name].map((branch) => {
-                        const isSelected = selectedItem &&
-                                        selectedItem.type === 'remote-branch' &&
-                                        selectedItem.remoteName === remote.name &&
-                                        selectedItem.branchName === branch;
-
-                        return (
-                          <div
-                            key={branch}
-                            className={`remote-branch-item ${isSelected ? 'selected' : ''}`}
-                            onClick={() => handleRemoteBranchSelect(remote.name, branch)}
-                            onContextMenu={(e) => handleRemoteBranchContextMenu(e, remote.name, branch)}
-                          >
-                            <span className="remote-branch-icon">🌿</span>
-                            <span className="remote-branch-name">{branch}</span>
-                          </div>
-                        );
-                      })
+                  ) : remoteBranchesTreeCache[remote.name] ? (
+                    Object.keys(remoteBranchesTreeCache[remote.name]).length > 0 ? (
+                      Object.values(remoteBranchesTreeCache[remote.name])
+                        .sort((a, b) => {
+                          // Sort folders first, then leaves, then alphabetically
+                          if (a.isLeaf !== b.isLeaf) {
+                            return a.isLeaf ? 1 : -1;
+                          }
+                          return a.name.localeCompare(b.name);
+                        })
+                        .map((node) => (
+                          <BranchTreeNode
+                            key={node.name}
+                            node={node}
+                            level={0}
+                            remoteName={remote.name}
+                            path=""
+                            selectedItem={selectedItem}
+                            onSelectRemoteBranch={handleRemoteBranchSelect}
+                            onContextMenu={handleRemoteBranchContextMenu}
+                            expandedFolders={expandedFolders}
+                            onFolderToggle={handleFolderToggle}
+                          />
+                        ))
                     ) : (
                       <div className="no-branches">No branches found</div>
                     )

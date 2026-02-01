@@ -173,3 +173,14 @@
   padding: 8px 12px;
   font-size: 12px;
 }
+
+.folder-name {
+  color: #ffd700;
+  font-weight: bold;
+}
+
+.folder-toggle {
+  color: #888888;
+  font-size: 10px;
+  margin-left: auto;
+}
