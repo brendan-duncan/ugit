@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
+import { GitAdapter } from '../git/GitAdapter';
 import RemoteBranchContextMenu from './RemoteBranchContextMenu';
 import './RemoteList.css';
 
-function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch }) {
+interface RemoteListProps {
+  remotes: Array<{ name: string; url: string }>;
+  onSelectRemoteBranch?: (branch: { type: 'remote-branch'; remoteName: string; branchName: string; fullName: string }) => void;
+  selectedItem?: { type: 'remote-branch'; remoteName: string; branchName: string; fullName: string };
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  gitAdapter: GitAdapter;
+  onRemoteBranchAction?: (action: string, remoteName: string, branchName: string, fullName: string) => void;
+  currentBranch?: string;
+}
+
+function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch }: RemoteListProps) {
   const [expandedRemotes, setExpandedRemotes] = useState({});
   const [remoteBranchesCache, setRemoteBranchesCache] = useState({});
   const [loadingRemotes, setLoadingRemotes] = useState({});
@@ -10,7 +22,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
 
   const contextMenuRef = { current: null };
 
-  const handleRemoteToggle = async (remoteName) => {
+  const handleRemoteToggle = async (remoteName: string) => {
     const isCurrentlyExpanded = expandedRemotes[remoteName];
 
     if (isCurrentlyExpanded) {
@@ -67,7 +79,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     }
   };
 
-  const handleRemoteBranchSelect = (remoteName, branchName) => {
+  const handleRemoteBranchSelect = (remoteName: string, branchName: string) => {
     if (onSelectRemoteBranch) {
       onSelectRemoteBranch({
         type: 'remote-branch',
@@ -78,7 +90,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     }
   };
 
-  const handleRemoteBranchContextMenu = (e, remoteName, branchName) => {
+  const handleRemoteBranchContextMenu = (e: React.MouseEvent<HTMLDivElement>, remoteName: string, branchName: string) => {
     e.preventDefault();
     e.stopPropagation();
 

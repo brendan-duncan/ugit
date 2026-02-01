@@ -2,8 +2,15 @@ import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './RenameStashDialog.css';
 
-function RenameStashDialog({ onClose, onRename, currentStashName, stashIndex }) {
-  const [newName, setNewName] = useState(currentStashName);
+interface RenameStashDialogProps {
+  onClose: () => void;
+  onRename: (newName: string) => void;
+  currentStashName: string;
+  stashIndex: number;
+}
+
+function RenameStashDialog({ onClose, onRename, currentStashName, stashIndex }: RenameStashDialogProps) {
+  const [newName, setNewName] = useState<string>(currentStashName);
 
   // Update new name when current stash name changes
   useEffect(() => {
@@ -31,11 +38,11 @@ function RenameStashDialog({ onClose, onRename, currentStashName, stashIndex }) 
             <input
               type="text"
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
               className="dialog-input"
               placeholder="Enter new stash name"
               autoFocus
-              onKeyDown={(e) => {
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                 if (e.key === 'Enter' && !isRenameDisabled) {
                   handleRename();
                 } else if (e.key === 'Escape') {

@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './RenameBranchDialog.css';
 
-function RenameBranchDialog({ onClose, onRename, currentBranchName }) {
-  const [newName, setNewName] = useState(currentBranchName);
+interface RenameBranchDialogProps {
+  onClose: () => void;
+  onRename: (newName: string) => void;
+  currentBranchName: string;
+}
+
+function RenameBranchDialog({ onClose, onRename, currentBranchName }: RenameBranchDialogProps) {
+  const [newName, setNewName] = useState<string>(currentBranchName);
 
   // Update new name when current branch name changes
   useEffect(() => {
@@ -31,11 +37,11 @@ function RenameBranchDialog({ onClose, onRename, currentBranchName }) {
             <input
               type="text"
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewName(e.target.value)}
               className="dialog-input"
               placeholder="Enter new branch name"
               autoFocus
-              onKeyDown={(e) => {
+              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                 if (e.key === 'Enter' && !isRenameDisabled) {
                   handleRename();
                 } else if (e.key === 'Escape') {

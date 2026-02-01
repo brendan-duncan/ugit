@@ -39,7 +39,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [branchStatus, setBranchStatus] = useState({});
   const [originUrl, setOriginUrl] = useState('');
   const [stashes, setStashes] = useState<StashInfo[]>([]);
-  const [modifiedCount, setModifiedCount] = useState(0);
+  const [modifiedCount, setModifiedCount] = useState<number>(0);
   const [unstagedFiles, setUnstagedFiles] = useState([]);
   const [stagedFiles, setStagedFiles] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -47,9 +47,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [usingCache, setUsingCache] = useState(false);
-  const [branchesHeight, setBranchesHeight] = useState(50);
-  const [leftWidth, setLeftWidth] = useState(30);
+  const [usingCache, setUsingCache] = useState<boolean>(false);
+  const [branchesHeight, setBranchesHeight] = useState<number>(50);
+  const [leftWidth, setLeftWidth] = useState<number>(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(null);
   const [showStashDialog, setShowStashDialog] = useState(false);
