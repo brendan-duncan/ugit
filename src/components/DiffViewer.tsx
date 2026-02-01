@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileDiff } from './types';
+import { GitAdapter } from '../git/GitAdapter';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -68,7 +69,7 @@ function getCodeMirrorLanguage(filePath: string): any[] {
 
 interface DiffViewerProps {
   file: FileDiff;
-  gitAdapter: any;
+  gitAdapter: GitAdapter;
   isStaged: boolean;
 }
 

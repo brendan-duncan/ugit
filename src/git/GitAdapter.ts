@@ -81,7 +81,13 @@ export abstract class GitAdapter {
   protected _startCommand(command: string, startTime: number): number {
     this._pendingCommands.set(this._id, command);
     if (this.commandStateCallback) {
-      this.commandStateCallback(true, this._id, command, startTime);
+      // Defer callback to avoid state updates during render
+      var _id = this._id;
+      var _command = command;
+      var _startTime = startTime;
+      setTimeout(() => {
+        this.commandStateCallback(true, _id, _command, _startTime);
+      }, 0);
     }
     return this._id++;
   }
@@ -94,7 +100,13 @@ export abstract class GitAdapter {
       this._pendingCommands.delete(id);
     }
     if (this.commandStateCallback) {
-      this.commandStateCallback(false, id, command || '', deltaTime);
+      // Defer callback to avoid state updates during render
+      var _id = id;
+      var _command = command;
+      var _deltaTime = deltaTime;
+      setTimeout(() => {
+        this.commandStateCallback(false, _id, _command || '', _deltaTime);
+      }, 0);
     }
   }
 
