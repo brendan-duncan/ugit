@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import DiffViewer from './DiffViewer';
-import { StashInfo } from '../git/GitAdapter';
+import { StashInfo, GitAdapter } from '../git/GitAdapter';
 import './StashViewer.css';
 
+interface StashViewerProps {
+  stash: StashInfo | null;
+  stashIndex: number;
+  gitAdapter: GitAdapter;
+}
 
-function StashViewer({ stash, stashIndex, gitAdapter }) {
+function StashViewer({ stash, stashIndex, gitAdapter }: StashViewerProps): React.ReactElement {
   const [stashInfo, setStashInfo] = useState<StashInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [expandedFiles, setExpandedFiles] = useState(new Set());
   const [loadedDiffs, setLoadedDiffs] = useState(new Set());
 
@@ -145,8 +150,8 @@ function StashViewer({ stash, stashIndex, gitAdapter }) {
                   <div className="stash-file-diff">
                     <DiffViewer
                       file={{
-                        //path: fileName,
-                        //status: 'MODIFIED',
+                        path: fileName,
+                        status: 'modified',
                         diff: stashInfo.fileDiffs[fileName]
                       }}
                       gitAdapter={gitAdapter}

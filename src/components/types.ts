@@ -16,6 +16,12 @@ export interface RunningCommand {
   time: number;
 }
 
+export interface FileDiff {
+  path: string;
+  status: string;
+  diff: string;
+}
+
 export interface LocalFileStatus {
   file: string;
   status: 'staged' | 'unstaged';

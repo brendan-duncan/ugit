@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FileDiff } from './types';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -24,7 +25,8 @@ function isImageFile(filePath: string): boolean {
 
 // Helper function to get CodeMirror language extension based on file extension
 function getCodeMirrorLanguage(filePath: string): any[] {
-  if (!filePath) return [];
+  if (!filePath)
+    return [];
   
   const extension = filePath.split('.').pop().toLowerCase();
   
@@ -65,7 +67,7 @@ function getCodeMirrorLanguage(filePath: string): any[] {
 }
 
 interface DiffViewerProps {
-  file: any;
+  file: FileDiff;
   gitAdapter: any;
   isStaged: boolean;
 }
@@ -159,12 +161,6 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
 
   return (
     <div className="diff-viewer">
-      {file.path && (
-        <div className="diff-header">
-          <span className="diff-filename">{file.path}</span>
-          <span className="diff-status-badge">{file.status}</span>
-        </div>
-      )}
       <div className="diff-content">
         {loading ? (
           <div className="diff-loading">Loading...</div>
@@ -204,10 +200,6 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
           />
         ) : fileContent ? (
           <div className="diff-file-content">
-            <div className="diff-header">
-              <span className="diff-filename">{file.path}</span>
-              <span className="diff-status-badge">{file.status}</span>
-            </div>
             <div className="diff-file-content-display">
               <CodeMirror
                 value={fileContent}
