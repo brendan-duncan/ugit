@@ -961,14 +961,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   };
 
   const handleItemSelect = (item: any) => {
-    // If switching away from a branch, cancel any pending branch loads
-    if (item.type !== 'branch') {
+    // If switching away from a branch or remote branch, cancel any pending loads
+    if (item.type !== 'branch' && item.type !== 'remote-branch') {
       currentBranchLoadId.current += 1;
     }
     setSelectedItem(item);
 
     // Update content panel type when selecting content panel items (no persistence)
-    if (item.type === 'local-changes' || item.type === 'branch' || item.type === 'stash') {
+    if (item.type === 'local-changes' || item.type === 'branch' || item.type === 'stash' || item.type === 'remote-branch') {
       setLastContentPanel(item.type);
     }
   };
@@ -1032,6 +1032,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
     }
   };
+
+
 
   const handleStashClick = () => {
     setShowStashDialog(true);
@@ -1378,10 +1380,84 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
 };
 
-  const handleRemoteBranchSelect = (remoteBranchInfo) => {
+  const handleRemoteBranchSelect = (remoteBranchInfo: any) => {
     console.log('Remote branch selected:', remoteBranchInfo);
-    setSelectedItem(remoteBranchInfo);
-};
+    
+    if (remoteBranchInfo.type === 'remote-branch' && remoteBranchInfo.fullName) {
+      // Load commits for the remote branch
+      loadRemoteBranchCommits(remoteBranchInfo.remoteName, remoteBranchInfo.branchName, remoteBranchInfo.fullName);
+    } else {
+      setSelectedItem(remoteBranchInfo);
+    }
+  };
+
+  const loadRemoteBranchCommits = async (remoteName: string, branchName: string, fullName: string) => {
+    // Check cache first
+    if (branchCommitsCache.current.has(fullName)) {
+      console.log(`Loading commits for ${fullName} from cache`);
+      setSelectedItem({
+        type: 'remote-branch',
+        remoteName,
+        branchName,
+        fullName,
+        commits: branchCommitsCache.current.get(fullName),
+        loading: false
+      });
+      return;
+    }
+
+    // Increment load ID to cancel any pending requests
+    currentBranchLoadId.current += 1;
+    const thisLoadId = currentBranchLoadId.current;
+
+    try {
+      const git = gitAdapter.current;
+
+      // Set loading state immediately
+      setSelectedItem({
+        type: 'remote-branch',
+        remoteName,
+        branchName,
+        fullName,
+        commits: [],
+        loading: true
+      });
+
+      console.log(`Loading commits for remote branch: ${fullName}`);
+      const maxCommits = 100;
+      const commits = await git.log(fullName, maxCommits);
+
+      // Cache commits for this remote branch
+      updateBranchCache(fullName, commits);
+
+      // Only update state if this request is still current
+      if (thisLoadId === currentBranchLoadId.current) {
+        setSelectedItem({
+          type: 'remote-branch',
+          remoteName,
+          branchName,
+          fullName,
+          commits,
+          loading: false
+        });
+      }
+    } catch (error) {
+      console.error('Error loading remote branch commits:', error);
+
+      // Only update error state if this request is still current
+      if (thisLoadId === currentBranchLoadId.current) {
+        setError(`Failed to load commits: ${error.message}`);
+        setSelectedItem({
+          type: 'remote-branch',
+          remoteName,
+          branchName,
+          fullName,
+          commits: [],
+          loading: false
+        });
+      }
+    }
+  };
 
   const handleRemoteBranchContextMenu = (action: string, remoteName: string, branchName: string, fullName: string): void => {
     console.log('Remote branch context menu action:', action, 'on branch:', fullName);

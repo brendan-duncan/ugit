@@ -47,7 +47,18 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           currentBranch={currentBranch}
         />
       )}
-      {item.type !== 'local-changes' && item.type !== 'stash' && item.type !== 'branch' && (
+      {item.type === 'remote-branch' && (
+        <BranchView
+          branchName={selectedItem.fullName || `${selectedItem.remoteName}/${selectedItem.branchName}`}
+          commits={item.commits || []}
+          loading={item.loading || false}
+          gitAdapter={gitAdapter}
+          onRefresh={onRefresh}
+          onContextMenu={onContextMenu}
+          currentBranch={currentBranch}
+        />
+      )}
+      {item.type !== 'local-changes' && item.type !== 'stash' && item.type !== 'branch' && item.type !== 'remote-branch' && (
         <div className="content-viewer-placeholder">
           <p>Content for "{item.type}" will be displayed here</p>
         </div>
