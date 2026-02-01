@@ -5,14 +5,15 @@ import StashDialog from './StashDialog';
 import PullCommitDialog from './PullCommitDialog';
 import StashConflictDialog from './StashConflictDialog';
 import { GitAdapter } from '../git/GitAdapter';
+import { FileInfo } from './types';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
 
 
 interface LocalChangesPanelProps {
-  unstagedFiles: Array<{ path: string; status: string }>;
-  stagedFiles: Array<{ path: string; status: string }>;
+  unstagedFiles: Array<FileInfo>;
+  stagedFiles: Array<FileInfo>;
   gitAdapter: GitAdapter;
   onRefresh: () => Promise<void>;
   currentBranch?: string;

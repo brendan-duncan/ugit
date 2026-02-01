@@ -16,15 +16,16 @@ export interface RunningCommand {
   time: number;
 }
 
+export interface FileInfo {
+  path: string;
+  status: string;
+}
+
+
 export interface FileDiff {
   path: string;
   status: string;
   diff: string;
-}
-
-export interface LocalFileStatus {
-  file: string;
-  status: 'staged' | 'unstaged';
 }
 
 export interface BranchStatus {
@@ -34,10 +35,6 @@ export interface BranchStatus {
   };
 }
 
-export interface FileStatus {
-  path: string;
-  status: 'modified' | 'created' | 'deleted' | 'renamed' | 'conflict';
-}
 
 export interface CommitInfo {
   hash: string;

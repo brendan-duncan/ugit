@@ -2,9 +2,22 @@ import React from 'react';
 import LocalChangesPanel from './LocalChangesPanel';
 import StashViewer from './StashViewer';
 import BranchView from './BranchView';
+import { GitAdapter, Commit } from '../git/GitAdapter';
+import { FileInfo } from './types';
 import './ContentViewer.css';
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus }) {
+interface ContentViewerProps {
+  selectedItem: any; // Could be more specifically typed based on your app's types
+  unstagedFiles: Array<FileInfo>;
+  stagedFiles: Array<FileInfo>;
+  gitAdapter: GitAdapter;
+  onRefresh: () => Promise<void>;
+  onContextMenu: (action: string, commit: Commit, currentBranch: string) => Promise<void>;
+  currentBranch: string;
+  branchStatus: { [branchName: string]: { ahead: number; behind: number } };
+}
+
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">

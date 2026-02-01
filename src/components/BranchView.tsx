@@ -10,8 +10,8 @@ interface BranchViewProps {
   commits: Array<Commit>;
   loading: boolean;
   gitAdapter: GitAdapter;
-  onRefresh: () => void;
-  onContextMenu: (action: string, commit: Commit, currentBranch: string) => void;
+  onRefresh: () => Promise<void>;
+  onContextMenu: (action: string, commit: Commit, currentBranch: string) => Promise<void>;
   currentBranch: string;
 }
 

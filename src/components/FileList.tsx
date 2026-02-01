@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { SelectedItem } from './types';
+import { FileInfo } from './types';
+import { Commit } from '../git/GitAdapter';
 import './FileList.css';
 
 // Build tree structure from flat file list
@@ -39,19 +40,19 @@ function getStatusIcon(status: string): string {
 
 interface FileListProps {
   title: string;
-  files: Array<any>;
-  onDrop?: (data: any, sourceList: string, targetList: string) => void;
+  files: Array<FileInfo>;
+  onDrop: (data: any, sourceList: string, targetList: string) => void;
   listType: 'staged' | 'unstaged';
-  onSelectFile?: (file: any, listType: string) => void;
-  selectedFile?: any;
+  onSelectFile: (file: any, listType: string) => void;
+  selectedFile: any;
   repoPath: string;
-  onContextMenu?: any;
+  onContextMenu: (action: string, items: any[], clickedItem: string, contextRepoPath: string, listType: string) => Promise<void>;
 }
 
 function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu }: FileListProps) {
   const [dragOver, setDragOver] = useState<boolean>(false);
   const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
-  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [selectedItems, setSelectedItems] = useState(new Set<string>());
   const [contextMenu, setContextMenu] = useState(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const lastMouseButton = useRef<number>(0);

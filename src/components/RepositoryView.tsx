@@ -22,7 +22,7 @@ import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
 import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
-import { RunningCommand, RemoteInfo } from './types';
+import { RunningCommand, RemoteInfo, FileInfo } from './types';
 import { ipcRenderer } from 'electron';
 import './RepositoryView.css';
 
@@ -40,8 +40,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [originUrl, setOriginUrl] = useState('');
   const [stashes, setStashes] = useState<StashInfo[]>([]);
   const [modifiedCount, setModifiedCount] = useState<number>(0);
-  const [unstagedFiles, setUnstagedFiles] = useState([]);
-  const [stagedFiles, setStagedFiles] = useState([]);
+  const [unstagedFiles, setUnstagedFiles] = useState<FileInfo[]>([]);
+  const [stagedFiles, setStagedFiles] = useState<FileInfo[]>([]);
   const [selectedItem, setSelectedItem] = useState(null);
   const [lastContentPanel, setLastContentPanel] = useState(''); // Will be set based on current branch
   const [loading, setLoading] = useState(false);
