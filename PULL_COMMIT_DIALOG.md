@@ -33,10 +33,12 @@ The dialog includes informative text explaining the situation and recommending t
 
 Key changes:
 - Added `showPullCommitDialog` state for dialog visibility
+- Added `showStashConflictDialog` state for conflict handling
 - Added `currentBranch` and `branchStatus` props for status checking
 - Enhanced `handleCommit` to check ahead/behind status
-- Added `performCommit` function with optional pull functionality
+- Added `performCommit` function with robust stashing and pull functionality
 - Added `handlePullAndCommit` and `handleCommitOnly` handlers
+- Implemented comprehensive conflict handling for stash apply operations
 
 ### Enhanced ContentViewer & RepositoryView
 
@@ -114,5 +116,31 @@ The implementation integrates seamlessly with existing:
 - Dialog rendering patterns
 - Error handling patterns
 - State management patterns
+
+### StashConflictDialog
+
+**File**: `src/components/StashConflictDialog.tsx`
+
+A new dialog component for handling stash conflicts with informative message and user acknowledgement. Provides clear explanation of conflicts and guidance for manual resolution.
+
+## Enhanced Stashing Logic
+
+The `performCommit` function now implements robust stashing workflow:
+
+### Before Pull:
+1. **Stash Local Changes**: Creates automatic stash with timestamp
+2. **Pull Remote Changes**: Fetches latest changes from origin/currentBranch
+3. **Apply Stash**: Attempts to merge stashed changes with remote changes
+4. **Clean Up**: Removes stash on successful apply
+
+### Conflict Handling:
+- **Successful Apply**: Stash is popped and removed
+- **Conflict Detected**: Shows StashConflictDialog and aborts commit
+- **Pull Failure**: Attempts to restore original stashed changes
+
+### Error Recovery:
+- **Pull Failures**: Automatic stash restoration to preserve user's work
+- **Apply Conflicts**: Clear error message with next steps for user
+- **Graceful Degradation**: System remains stable even on failures
 
 No breaking changes were introduced - the functionality is additive and respects all existing workflows.

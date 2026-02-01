@@ -3,6 +3,7 @@ import FileList from './FileList';
 import DiffViewer from './DiffViewer';
 import StashDialog from './StashDialog';
 import PullCommitDialog from './PullCommitDialog';
+import StashConflictDialog from './StashConflictDialog';
 import { GitAdapter } from '../git/GitAdapter';
 import { ipcRenderer } from 'electron';
 import path from 'path';
@@ -27,6 +28,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [showStashDialog, setShowStashDialog] = useState<boolean>(false);
   const [showPullCommitDialog, setShowPullCommitDialog] = useState<boolean>(false);
+  const [showStashConflictDialog, setShowStashConflictDialog] = useState<boolean>(false);
   const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
   const activeSplitter = useRef<string | null>(null);
 
@@ -150,11 +152,55 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
 
       // Pull first if requested
       if (doPullFirst && currentBranch) {
-        console.log(`Pulling latest changes from origin/${currentBranch}...`);
-        await git.pull('origin', currentBranch);
-        console.log('Pull completed successfully');
+        // Stash local changes before pulling
+        console.log('Stashing local changes before pull...');
+        const stashMessage = `Auto-stash before pull at ${new Date().toISOString()}`;
+        await git.stashPush(stashMessage);
+        console.log('Stashed local changes successfully');
+
+        try {
+          console.log(`Pulling latest changes from origin/${currentBranch}...`);
+          await git.pull('origin', currentBranch);
+          console.log('Pull completed successfully');
+          
+          // Try to apply the stash
+          try {
+            console.log('Applying stashed changes...');
+            await git.stashApply();
+            console.log('Stash applied successfully');
+            
+            // If apply succeeded, pop the stash to remove it
+            try {
+              await git.stashPop();
+              console.log('Stash removed successfully after successful apply');
+            } catch (popError) {
+              console.warn('Failed to remove stash after successful apply:', popError);
+              // Continue with commit since stash was applied
+            }
+          } catch (stashError) {
+            console.error('Conflicts detected when applying stash:', stashError);
+            
+            // Show conflict dialog
+            setShowStashConflictDialog(true);
+            return;
+          }
+        } catch (pullError) {
+          console.error('Pull failed, attempting to restore stash:', pullError);
+          
+          // Pull failed, try to restore stash
+          try {
+            await git.stashPop();
+            console.log('Restored stashed changes after failed pull');
+          } catch (restoreError) {
+            console.error('Failed to restore stash after failed pull:', restoreError);
+            // Just log the error, don't prevent the user from trying again
+          }
+          
+          setIsBusy(false);
+          throw pullError;
+        }
         
-        // Refresh file status after pull to capture any new changes
+        // Refresh file status after pull (and possible stash apply)
         if (onRefresh) {
           await onRefresh();
         }
@@ -471,6 +517,13 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
           onClose={() => setShowPullCommitDialog(false)}
           onPullAndCommit={handlePullAndCommit}
           onCommitOnly={handleCommitOnly}
+        />
+      )}
+
+      {/* Stash Conflict Dialog */}
+      {showStashConflictDialog && (
+        <StashConflictDialog
+          onClose={() => setShowStashConflictDialog(false)}
         />
       )}
     </div>
