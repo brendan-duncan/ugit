@@ -123,6 +123,69 @@ The implementation integrates seamlessly with existing:
 
 A new dialog component for handling stash conflicts with informative message and user acknowledgement. Provides clear explanation of conflicts and guidance for manual resolution.
 
+## Remote Management Features
+
+### Remote Action Menu Button
+
+**Added**: "..." button to each remote in the remote list
+- Positioned in the remote header next to the URL
+- Opens context menu on click with various actions
+
+### Remote Action Menu Options
+
+**File**: `src/components/RemoteList.tsx` (enhanced)
+
+1. **Edit Remote**: Opens EditRemoteDialog to change remote URL
+2. **Delete Remote**: Opens DeleteRemoteDialog for confirmation
+3. **Separator**: Visual separator between destructive and utility actions
+4. **Open Remote in Browser**: Opens remote URL in default browser
+5. **Copy Remote Address**: Copies remote URL to clipboard
+
+### EditRemoteDialog Component
+
+**File**: `src/components/EditRemoteDialog.tsx` (new)
+
+Features:
+- Pre-fills with current remote name and URL
+- Remote name is read-only (cannot be changed to maintain stability)
+- URL field is editable and focused
+- Validation for URL format
+- Loading states and error handling
+
+### DeleteRemoteDialog Component
+
+**File**: `src/components/DeleteRemoteDialog.tsx` (new)
+
+Features:
+- Displays remote name and URL for confirmation
+- Warning that action cannot be undone
+- Focus on safety with clear confirmation language
+
+### Enhanced GitAdapter Methods
+
+**Added**: `editRemote(remoteName: string, newUrl: string)` method
+**Existing**: `removeRemote(remoteName: string)` method utilized
+
+### CSS Enhancements
+
+**File**: `src/components/RemoteList.css` (enhanced)
+
+New styles added:
+- `.remote-action-button`: Context menu button styling
+- `.remote-action-menu`: Floating dropdown menu container
+- `.remote-action-menu-item`: Individual menu item styling
+- `.remote-action-menu-item-separator`: Visual separator
+
+### User Experience Improvements
+
+- **Visual Feedback**: Hover states and transitions
+- **Keyboard Support**: Enter key support in dialogs
+- **Error Handling**: Comprehensive validation and user feedback
+- **State Management**: Proper dialog visibility management
+- **Clipboard Integration**: Native clipboard API usage
+
+No breaking changes were introduced - the functionality is additive and respects all existing workflows.
+
 ## Enhanced Stashing Logic
 
 The `performCommit` function now implements robust stashing workflow:

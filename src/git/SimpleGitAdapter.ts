@@ -147,6 +147,19 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async editRemote(remoteName: string, newUrl: string): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git remote set-url ${remoteName} ${newUrl}`, startTime);
+    try {
+      await this.git.raw(['remote', 'set-url', remoteName, newUrl]);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error editing remote ${remoteName}:`, error);
+      throw error;
+    }
+  }
+
   async resetToOrigin(branch: string): Promise<void> {
     const startTime = performance.now();
     let idFetch: number;

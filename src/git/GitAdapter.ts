@@ -180,6 +180,13 @@ export abstract class GitAdapter {
   abstract removeRemote(remoteName: string): Promise<void>;
 
   /**
+   * Edit a remote URL
+   * @param remoteName - Name of the remote to edit (e.g., 'origin')
+   * @param newUrl - New URL for the remote
+   */
+  abstract editRemote(remoteName: string, newUrl: string): Promise<void>;
+
+  /**
    * Hard reset local branch to match origin
    * @param branch - Branch name to reset
    */

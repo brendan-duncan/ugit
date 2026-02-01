@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { GitAdapter } from '../git/GitAdapter';
 import RemoteBranchContextMenu from './RemoteBranchContextMenu';
 import AddRemoteDialog from './AddRemoteDialog';
+import EditRemoteDialog from './EditRemoteDialog';
+import DeleteRemoteDialog from './DeleteRemoteDialog';
 import { SelectedItem, RemoteInfo } from './types';
 import './RemoteList.css';
 
@@ -143,6 +145,9 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [contextMenu, setContextMenu] = useState(null);
   const [showAddRemoteDialog, setShowAddRemoteDialog] = useState(false);
+  const [showEditRemoteDialog, setShowEditRemoteDialog] = useState(false);
+  const [showDeleteRemoteDialog, setShowDeleteRemoteDialog] = useState(false);
+  const [remoteActionMenu, setRemoteActionMenu] = useState<{ x: number; y: number; remote: RemoteInfo } | null>(null);
 
   const contextMenuRef = { current: null };
 
@@ -273,14 +278,86 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     }
   };
 
-  // Close context menu when clicking outside
+  const handleRemoteActionMenu = (e: React.MouseEvent<HTMLButtonElement>, remote: RemoteInfo) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    setRemoteActionMenu({
+      x: rect.left,
+      y: rect.bottom + 4,
+      remote
+    });
+  };
+
+  const handleEditRemote = async (name: string, url: string) => {
+    try {
+      console.log(`Editing remote: ${name} with URL: ${url}`);
+      await gitAdapter.editRemote(name, url);
+      console.log(`Successfully edited remote: ${name}`);
+      
+      if (onRemoteAdded) {
+        onRemoteAdded();
+      }
+    } catch (error) {
+      console.error(`Failed to edit remote ${name}:`, error);
+      throw error;
+    }
+  };
+
+  const handleDeleteRemote = async (name: string) => {
+    try {
+      console.log(`Deleting remote: ${name}`);
+      await gitAdapter.removeRemote(name);
+      console.log(`Successfully deleted remote: ${name}`);
+      
+      if (onRemoteAdded) {
+        onRemoteAdded();
+      }
+    } catch (error) {
+      console.error(`Failed to delete remote ${name}:`, error);
+      throw error;
+    }
+  };
+
+  const handleRemoteAction = (action: string) => {
+    const remote = remoteActionMenu?.remote;
+    if (!remote) return;
+
+    setRemoteActionMenu(null);
+
+    switch (action) {
+      case 'edit':
+        setShowEditRemoteDialog(true);
+        break;
+      case 'delete':
+        setShowDeleteRemoteDialog(true);
+        break;
+      case 'open':
+        if (remote.url) {
+          window.open(remote.url, '_blank');
+        }
+        break;
+      case 'copy':
+        if (remote.url) {
+          navigator.clipboard.writeText(remote.url);
+        }
+        break;
+    }
+  };
+
+  // Close context menus when clicking outside
   React.useEffect(() => {
-    const handleClick = () => setContextMenu(null);
-    if (contextMenu) {
+    const handleClick = () => {
+      setContextMenu(null);
+      setRemoteActionMenu(null);
+    };
+    
+    if (contextMenu || remoteActionMenu) {
       document.addEventListener('click', handleClick);
       return () => document.removeEventListener('click', handleClick);
     }
-  }, [contextMenu]);
+  }, [contextMenu, remoteActionMenu]);
 
   return (
     <div className="remote-list">
@@ -312,6 +389,13 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                 <span className="remote-icon">🌐</span>
                 <span className="remote-name">{remote.name}</span>
                 <span className="remote-url" title={remote.url}>{remote.url}</span>
+                <button
+                  className="remote-action-button"
+                  onClick={(e) => handleRemoteActionMenu(e, remote)}
+                  title="Remote Actions"
+                >
+                  <span>...</span>
+                </button>
               </div>
 
               {expandedRemotes[remote.name] && (
@@ -379,6 +463,57 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
           onClose={() => setShowAddRemoteDialog(false)}
           onAddRemote={handleAddRemote}
         />
+      )}
+
+      {showEditRemoteDialog && (
+        <EditRemoteDialog
+          onClose={() => setShowEditRemoteDialog(false)}
+          onEditRemote={handleEditRemote}
+          currentName={remoteActionMenu?.remote?.name}
+          currentUrl={remoteActionMenu?.remote?.url}
+        />
+      )}
+
+      {showDeleteRemoteDialog && (
+        <DeleteRemoteDialog
+          onClose={() => setShowDeleteRemoteDialog(false)}
+          onDeleteRemote={handleDeleteRemote}
+          remoteName={remoteActionMenu?.remote?.name}
+          remoteUrl={remoteActionMenu?.remote?.url}
+        />
+      )}
+
+      {remoteActionMenu && (
+        <div 
+          className="remote-action-menu"
+          style={{ left: `${remoteActionMenu.x}px`, top: `${remoteActionMenu.y}px` }}
+        >
+          <div 
+            className="remote-action-menu-item"
+            onClick={() => handleRemoteAction('edit')}
+          >
+            Edit Remote
+          </div>
+          <div 
+            className="remote-action-menu-item"
+            onClick={() => handleRemoteAction('delete')}
+          >
+            Delete Remote
+          </div>
+          <div className="remote-action-menu-item-separator"></div>
+          <div 
+            className="remote-action-menu-item"
+            onClick={() => handleRemoteAction('open')}
+          >
+            Open Remote in Browser
+          </div>
+          <div 
+            className="remote-action-menu-item"
+            onClick={() => handleRemoteAction('copy')}
+          >
+            Copy Remote Address
+          </div>
+        </div>
       )}
     </div>
   );
