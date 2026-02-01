@@ -525,18 +525,22 @@ export class SimpleGitAdapter extends GitAdapter {
       date: commit.date,
       message: commit.message,
       body: commit.body,
-      onOrigin: false // Will determine this later
+      onOrigin: branchName.startsWith('origin/')
     }));
 
     Promise.all(commits .map(async (commit) => {
       try {
         // Check if commit exists on origin branch
-        const unpushedCommits = await this.git.raw(['log', `origin/${branchName}..${commit.hash}`]);
-        const onOrigin = unpushedCommits.trim().length === 0;
-        commit.onOrigin = onOrigin;
+        // For remote branches, we need to check against the actual remote branch name
+        // If we're loading a remote branch like "origin/feature/login", we should compare against that branch
+        const isRemoteBranch = branchName.startsWith('origin/');
+        if (!isRemoteBranch) {
+          const refToCheck = isRemoteBranch ? branchName : `origin/${branchName}`;
+          const unpushedCommits = await this.git.raw(['log', `${refToCheck}..${commit.hash}`]);
+          const onOrigin = unpushedCommits.trim().length === 0;
+          commit.onOrigin = onOrigin;
+        }
       } catch (error) {
-        // If merge-base fails, commit doesn't exist on origin
-        commit.onOrigin = false;
       }
     }));
 

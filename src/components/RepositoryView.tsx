@@ -248,6 +248,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
       const git = gitAdapter.current;
 
+      clearBranchCache(); // Clear entire branch cache on full reload
+
       // Get current branch and modified files
       const status = await git.status();
       setCurrentBranch(status.current);
