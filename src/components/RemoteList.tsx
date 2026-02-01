@@ -153,7 +153,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                 </span>
                 <span className="remote-icon">🌐</span>
                 <span className="remote-name">{remote.name}</span>
-                <span className="remote-url">{remote.url}</span>
+                <span className="remote-url" title={remote.url}>{remote.url}</span>
               </div>
 
               {expandedRemotes[remote.name] && (
