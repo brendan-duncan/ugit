@@ -160,6 +160,20 @@
   background-color: #3eb9a0;
 }
 
+.dialog-button-secondary {
+  background-color: #ffa500;
+  color: #1e1e1e;
+  border: 1px solid #ffa500;
+}
+
+.dialog-button-secondary:hover {
+  background-color: #ffb733;
+}
+
+.dialog-button-secondary:active {
+  background-color: #e69400;
+}
+
 .dialog-error {
   background-color: #ff6b6b;
   color: white;

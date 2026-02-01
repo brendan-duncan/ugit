@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import FileList from './FileList';
 import DiffViewer from './DiffViewer';
 import StashDialog from './StashDialog';
+import PullCommitDialog from './PullCommitDialog';
 import { GitAdapter } from '../git/GitAdapter';
 import { ipcRenderer } from 'electron';
 import path from 'path';
@@ -13,9 +14,11 @@ interface LocalChangesPanelProps {
   stagedFiles: Array<{ path: string; status: string }>;
   gitAdapter: GitAdapter;
   onRefresh: () => Promise<void>;
+  currentBranch?: string;
+  branchStatus?: Record<string, any>;
 }
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }: LocalChangesPanelProps) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus }: LocalChangesPanelProps) {
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -23,6 +26,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
   const [commitDescription, setCommitDescription] = useState<string>('');
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [showStashDialog, setShowStashDialog] = useState<boolean>(false);
+  const [showPullCommitDialog, setShowPullCommitDialog] = useState<boolean>(false);
   const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
   const activeSplitter = useRef<string | null>(null);
 
@@ -123,9 +127,38 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
       return;
     }
 
+    // Check if current branch is behind remote
+    let needsPull = false;
+    if (currentBranch && branchStatus && branchStatus[currentBranch]) {
+      const status = branchStatus[currentBranch];
+      needsPull = status.behind && status.behind > 0;
+    }
+
+    if (needsPull) {
+      setShowPullCommitDialog(true);
+      return;
+    }
+
+    // If no pull needed, proceed with commit directly
+    await performCommit();
+  };
+
+  const performCommit = async (doPullFirst = false) => {
     try {
       setIsBusy(true);
       const git = gitAdapter;
+
+      // Pull first if requested
+      if (doPullFirst && currentBranch) {
+        console.log(`Pulling latest changes from origin/${currentBranch}...`);
+        await git.pull('origin', currentBranch);
+        console.log('Pull completed successfully');
+        
+        // Refresh file status after pull to capture any new changes
+        if (onRefresh) {
+          await onRefresh();
+        }
+      }
 
       // Construct commit message with optional description
       const fullMessage = commitDescription.trim()
@@ -139,7 +172,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
       setCommitMessage('');
       setCommitDescription('');
 
-      // Refresh the file lists
+      // Refresh of the file lists
       if (onRefresh) {
         await onRefresh();
       }
@@ -158,6 +191,16 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
     } finally {
       setIsBusy(false);
     }
+  };
+
+  const handlePullAndCommit = async () => {
+    setShowPullCommitDialog(false);
+    await performCommit(true);
+  };
+
+  const handleCommitOnly = async () => {
+    setShowPullCommitDialog(false);
+    await performCommit(false);
   };
 
   const handleStash = async (message: string, stageNewFiles: boolean) => {
@@ -419,6 +462,15 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
             setPendingStashFiles([]);
           }}
           onStash={handleStash}
+        />
+      )}
+
+      {/* Pull Commit Dialog */}
+      {showPullCommitDialog && (
+        <PullCommitDialog
+          onClose={() => setShowPullCommitDialog(false)}
+          onPullAndCommit={handlePullAndCommit}
+          onCommitOnly={handleCommitOnly}
         />
       )}
     </div>

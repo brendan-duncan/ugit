@@ -1715,6 +1715,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 onRefresh={refreshFileStatus}
                 onContextMenu={handleCommitContextMenu}
                 currentBranch={currentBranch}
+                branchStatus={branchStatus}
               />
             </div>
           </>

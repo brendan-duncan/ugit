@@ -4,7 +4,7 @@ import StashViewer from './StashViewer';
 import BranchView from './BranchView';
 import './ContentViewer.css';
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch }) {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus }) {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -27,6 +27,8 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           stagedFiles={stagedFiles}
           gitAdapter={gitAdapter}
           onRefresh={onRefresh}
+          currentBranch={currentBranch}
+          branchStatus={branchStatus}
         />
       )}
       {item.type === 'stash' && selectedItem.stash && (
