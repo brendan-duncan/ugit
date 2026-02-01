@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GitAdapter } from '../git/GitAdapter';
 import RemoteBranchContextMenu from './RemoteBranchContextMenu';
+import AddRemoteDialog from './AddRemoteDialog';
 import { SelectedItem, RemoteInfo } from './types';
 import './RemoteList.css';
 
@@ -13,6 +14,7 @@ interface RemoteListProps {
   gitAdapter: GitAdapter;
   onRemoteBranchAction?: (action: string, remoteName: string, branchName: string, fullName: string) => void;
   currentBranch?: string;
+  onRemoteAdded?: () => void;
 }
 
 interface TreeNode {
@@ -133,13 +135,14 @@ const BranchTreeNode: React.FC<{
   );
 };
 
-function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch }: RemoteListProps) {
+function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch, onRemoteAdded }: RemoteListProps) {
   const [expandedRemotes, setExpandedRemotes] = useState<Record<string, boolean>>({});
   const [remoteBranchesCache, setRemoteBranchesCache] = useState<Record<string, Array<string>>>({});
   const [remoteBranchesTreeCache, setRemoteBranchesTreeCache] = useState<Record<string, Record<string, TreeNode>>>({});
   const [loadingRemotes, setLoadingRemotes] = useState<Record<string, boolean>>({});
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [contextMenu, setContextMenu] = useState(null);
+  const [showAddRemoteDialog, setShowAddRemoteDialog] = useState(false);
 
   const contextMenuRef = { current: null };
 
@@ -255,6 +258,21 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     setContextMenu(null);
   };
 
+  const handleAddRemote = async (name: string, url: string) => {
+    try {
+      console.log(`Adding remote: ${name} with URL: ${url}`);
+      await gitAdapter.addRemote(name, url);
+      console.log(`Successfully added remote: ${name}`);
+      
+      if (onRemoteAdded) {
+        onRemoteAdded();
+      }
+    } catch (error) {
+      console.error(`Failed to add remote ${name}:`, error);
+      throw error;
+    }
+  };
+
   // Close context menu when clicking outside
   React.useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -268,9 +286,14 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
     <div className="remote-list">
       <div className="panel-header">
         <h3>Remotes</h3>
-        <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
-          {collapsed ? '▶' : '▼'}
-        </button>
+        <div className="panel-header-buttons">
+          <button className="add-button" onClick={() => setShowAddRemoteDialog(true)} title="Add Remote">
+            <span>+</span>
+          </button>
+          <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
+            {collapsed ? '▶' : '▼'}
+          </button>
+        </div>
       </div>
       {!collapsed && (
         <div className="remote-list-content">
@@ -348,6 +371,13 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
           onCopyName={() => handleContextMenuAction('copy-name')}
           onClose={() => setContextMenu(null)}
           position={{ x: contextMenu.x, y: contextMenu.y }}
+        />
+      )}
+
+      {showAddRemoteDialog && (
+        <AddRemoteDialog
+          onClose={() => setShowAddRemoteDialog(false)}
+          onAddRemote={handleAddRemote}
         />
       )}
     </div>

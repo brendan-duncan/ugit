@@ -59,6 +59,29 @@
   margin-bottom: 8px;
 }
 
+.dialog-input {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 3px;
+  color: #cccccc;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.dialog-input:focus {
+  border-color: #4ec9b0;
+}
+
+.dialog-input:disabled {
+  background-color: #2d2d2d;
+  color: #888888;
+  cursor: not-allowed;
+}
+
 .dialog-select {
   width: 100%;
   padding: 8px 12px;
@@ -135,4 +158,30 @@
 
 .dialog-button-primary:active {
   background-color: #3eb9a0;
+}
+
+.dialog-error {
+  background-color: #ff6b6b;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 3px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+.dialog-info {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #3d3d3d;
+}
+
+.dialog-info p {
+  color: #888888;
+  font-size: 0.85rem;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.dialog-info p:last-child {
+  margin-bottom: 0;
 }

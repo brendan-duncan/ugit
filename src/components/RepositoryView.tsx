@@ -1459,6 +1459,11 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
+  const handleRemoteAdded = () => {
+    // Refresh repository data to show the new remote
+    loadRepoData(true);
+  };
+
   const handleRemoteBranchContextMenu = (action: string, remoteName: string, branchName: string, fullName: string): void => {
     console.log('Remote branch context menu action:', action, 'on branch:', fullName);
 
@@ -1690,6 +1695,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                   remotes={remotes}
                   onSelectRemoteBranch={handleRemoteBranchSelect}
                   onRemoteBranchAction={handleRemoteBranchContextMenu}
+                  onRemoteAdded={handleRemoteAdded}
                   gitAdapter={gitAdapter.current}
                 />
               </div>

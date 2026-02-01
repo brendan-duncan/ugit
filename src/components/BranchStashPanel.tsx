@@ -22,11 +22,12 @@ interface BranchStashPanelProps {
   onSelectRemoteBranch: (remoteBranch: SelectedItem) => void;
   gitAdapter: GitAdapter;
   onRemoteBranchAction: (action: string, remoteName: string, branchName: string, fullName: string) => void;
+  onRemoteAdded?: () => void;
 }
 
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
       onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
-      remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction }: BranchStashPanelProps) {
+      remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded }: BranchStashPanelProps) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
   const [stashesCollapsed, setStashesCollapsed] = useState(false);
@@ -65,6 +66,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           gitAdapter={gitAdapter}
           onRemoteBranchAction={onRemoteBranchAction}
           currentBranch={currentBranch}
+          onRemoteAdded={onRemoteAdded}
         />
       </div>
       {!remotesCollapsed && !stashesCollapsed && (
