@@ -2,7 +2,14 @@ import React from 'react';
 import './Dialog.css';
 import './DeleteStashDialog.css';
 
-function DeleteStashDialog({ onClose, onDelete, stashMessage, stashIndex }) {
+interface DeleteStashDialogProps {
+  onClose: () => void;
+  onDelete: (stashIndex: number) => void | Promise<void>;
+  stashMessage: string;
+  stashIndex: number;
+}
+
+function DeleteStashDialog({ onClose, onDelete, stashMessage, stashIndex }: DeleteStashDialogProps): React.ReactElement {
   const handleDelete = () => {
     onDelete(stashIndex);
   };

@@ -45,7 +45,7 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
     setContextMenu(null);
   };
 
-  if (!commits || commits.length === 0) {
+  if (commits.length === 0) {
     return (
       <div className="commit-list">
         <h4>Commits</h4>

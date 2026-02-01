@@ -2,23 +2,31 @@ import React, { useState, useRef } from 'react';
 import FileList from './FileList';
 import DiffViewer from './DiffViewer';
 import StashDialog from './StashDialog';
+import { GitAdapter } from '../git/GitAdapter';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }) {
 
-  const [fileListsHeight, setFileListsHeight] = useState(50);
-  const [leftWidth, setLeftWidth] = useState(50);
+interface LocalChangesPanelProps {
+  unstagedFiles: Array<{ path: string; status: string }>;
+  stagedFiles: Array<{ path: string; status: string }>;
+  gitAdapter: GitAdapter;
+  onRefresh: () => Promise<void>;
+}
+
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }: LocalChangesPanelProps) {
+  const [fileListsHeight, setFileListsHeight] = useState<number>(50);
+  const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [commitMessage, setCommitMessage] = useState('');
-  const [commitDescription, setCommitDescription] = useState('');
-  const [isBusy, setIsBusy] = useState(false);
-  const [showStashDialog, setShowStashDialog] = useState(false);
-  const [pendingStashFiles, setPendingStashFiles] = useState([]);
-  const activeSplitter = useRef(null);
+  const [commitMessage, setCommitMessage] = useState<string>('');
+  const [commitDescription, setCommitDescription] = useState<string>('');
+  const [isBusy, setIsBusy] = useState<boolean>(false);
+  const [showStashDialog, setShowStashDialog] = useState<boolean>(false);
+  const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
+  const activeSplitter = useRef<string | null>(null);
 
-  const handleMouseDown = (splitterType) => {
+  const handleMouseDown = (splitterType: string) => {
     activeSplitter.current = splitterType;
   };
 
@@ -26,11 +34,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
     activeSplitter.current = null;
   };
 
-  const handleMouseMove = (e) => {
-    if (activeSplitter.current === null) return;
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (activeSplitter.current === null)
+      return;
 
     const container = e.currentTarget;
-    const rect = container.getBoundingClientRect();
 
     if (activeSplitter.current === 'vertical') {
       // Vertical splitter within file lists - between unstaged and staged
@@ -49,7 +57,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
       }
   };
 
-  const handleFileDrop = async (item, sourceList, targetList) => {
+  const handleFileDrop = async (item: any, sourceList: string, targetList: string) => {
     if (isBusy) {
       console.log('Operation in progress, please wait...');
       return;
@@ -106,8 +114,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
     }
   };
 
-  const handleSelectFile = (file, listType) => {
-    setSelectedFile({ file, listType });
+  const handleSelectFile = (file: string, status: string) => {
+    setSelectedFile({ file, status });
   };
 
   const handleCommit = async () => {
@@ -152,10 +160,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
     }
   };
 
-  const handleStash = async (message, stageNewFiles) => {
+  const handleStash = async (message: string, stageNewFiles: boolean) => {
     setShowStashDialog(false);
 
-    if (pendingStashFiles.length === 0) return;
+    if (pendingStashFiles.length === 0)
+      return;
 
     try {
       const git = gitAdapter;
@@ -164,7 +173,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
       if (stageNewFiles) {
         const statusPromises = pendingStashFiles.map(async (filePath) => {
           try {
-            const status = await git.status([filePath]);
+            const status = await git.status(filePath);
             return { filePath, isNew: status[0]?.status === 'created' };
           } catch {
             return { filePath, isNew: false };
@@ -192,7 +201,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
     }
   };
 
-  const handleContextMenu = async (action, items, clickedItem, contextRepoPath, listType) => {
+  const handleContextMenu = async (action: string, items: any[], clickedItem: string, contextRepoPath: string, listType: string) => {
     if (isBusy) {
       console.log('Operation in progress, please wait...');
       return;
@@ -224,7 +233,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
           if (allFilePaths.length > 0) {
             await git.add(allFilePaths);
             console.log(`Staged ${allFilePaths.length} files`);
-            if (onRefresh) await onRefresh();
+            if (onRefresh)
+              await onRefresh();
           }
           break;
 
@@ -232,7 +242,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
           if (allFilePaths.length > 0) {
             await git.reset(allFilePaths);
             console.log(`Unstaged ${allFilePaths.length} files`);
-            if (onRefresh) await onRefresh();
+            if (onRefresh)
+              await onRefresh();
           }
           break;
 
@@ -244,7 +255,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh }
             if (confirmed) {
               await git.discard(allFilePaths);
               console.log(`Discarded changes for ${allFilePaths.length} files`);
-              if (onRefresh) await onRefresh();
+              if (onRefresh)
+                await onRefresh();
             }
           }
           break;

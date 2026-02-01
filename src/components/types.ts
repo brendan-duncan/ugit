@@ -5,10 +5,20 @@ export interface SelectedItem {
   [key: string]: any;
 }
 
+export interface RemoteInfo {
+  name: string;
+  url: string;
+}
+
 export interface RunningCommand {
   id: number;
   command: string;
   time: number;
+}
+
+export interface LocalFileStatus {
+  file: string;
+  status: 'staged' | 'unstaged';
 }
 
 export interface BranchStatus {
@@ -39,10 +49,7 @@ export interface BranchInfo {
   behind?: number;
 }
 
-export interface RemoteInfo {
-  name: string;
-  url: string;
-}
+
 
 export interface DialogProps {
   onClose: () => void;

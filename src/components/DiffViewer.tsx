@@ -64,12 +64,18 @@ function getCodeMirrorLanguage(filePath: string): any[] {
   }
 }
 
-function DiffViewer({ file, gitAdapter, isStaged }: { file: any; gitAdapter: any; isStaged: boolean }) {
-  const [diff, setDiff] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [diffHtml, setDiffHtml] = useState('');
-  const [fileContent, setFileContent] = useState('');
-  const [fileType, setFileType] = useState(''); // 'text' or 'image'
+interface DiffViewerProps {
+  file: any;
+  gitAdapter: any;
+  isStaged: boolean;
+}
+
+function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.ReactElement {
+  const [diff, setDiff] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [diffHtml, setDiffHtml] = useState<string>('');
+  const [fileContent, setFileContent] = useState<string>('');
+  const [fileType, setFileType] = useState<string>(''); // 'text' or 'image'
 
   useEffect(() => {
     const loadContent = async () => {
@@ -91,7 +97,7 @@ function DiffViewer({ file, gitAdapter, isStaged }: { file: any; gitAdapter: any
           return;
         }
 
-        let diffResult;
+        let diffResult: string;
 
         // If diff is already provided in the file object (for stashes), use it
         if (file.diff) {

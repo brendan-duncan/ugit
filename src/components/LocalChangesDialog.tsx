@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './LocalChangesDialog.css';
 
-function LocalChangesDialog({ onClose, onProceed, targetBranch }) {
+interface LocalChangesDialogProps {
+  onClose: () => void;
+  onProceed: (option: string) => void;
+  targetBranch: string;
+}
+
+function LocalChangesDialog({ onClose, onProceed, targetBranch }: LocalChangesDialogProps) {
   const STORAGE_KEY = 'local-changes-dialog-option';
 
   // Load saved option from localStorage on mount
@@ -17,7 +23,7 @@ function LocalChangesDialog({ onClose, onProceed, targetBranch }) {
   const [selectedOption, setSelectedOption] = useState(getSavedOption());
 
   // Save to localStorage whenever option changes
-  const handleOptionChange = (option) => {
+  const handleOptionChange = (option: string) => {
     setSelectedOption(option);
     try {
       localStorage.setItem(STORAGE_KEY, option);

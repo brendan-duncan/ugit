@@ -2,15 +2,22 @@ import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './CreateBranchFromCommitDialog.css';
 
-function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, commitMessage }) {
-  const [branchName, setBranchName] = useState('');
-  const [checkoutAfterCreate, setCheckoutAfterCreate] = useState(true);
-  const [branchExists, setBranchExists] = useState(false);
-  const [existingBranchName, setExistingBranchName] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+interface CreateBranchFromCommitDialogProps {
+  onClose: () => void;
+  onCreateBranch: (branchName: string, checkoutAfterCreate: boolean) => void | Promise<void>;
+  commitHash: string;
+  commitMessage: string;
+}
+
+function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, commitMessage }: CreateBranchFromCommitDialogProps): React.ReactElement {
+  const [branchName, setBranchName] = useState<string>('');
+  const [checkoutAfterCreate, setCheckoutAfterCreate] = useState<boolean>(true);
+  const [branchExists, setBranchExists] = useState<boolean>(false);
+  const [existingBranchName, setExistingBranchName] = useState<string>('');
+  const [isCreating, setIsCreating] = useState<boolean>(false);
 
   // Check if branch name already exists
-  const checkBranchExists = async (name) => {
+  const checkBranchExists = async (name: string) => {
     if (!name.trim()) {
       setBranchExists(false);
       setExistingBranchName('');
@@ -47,7 +54,7 @@ function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, com
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
       onClose();
     } else if (e.key === 'Enter' && !e.shiftKey) {

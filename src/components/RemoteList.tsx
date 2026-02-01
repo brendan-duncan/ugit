@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { GitAdapter } from '../git/GitAdapter';
 import RemoteBranchContextMenu from './RemoteBranchContextMenu';
+import { SelectedItem, RemoteInfo } from './types';
 import './RemoteList.css';
 
 interface RemoteListProps {
-  remotes: Array<{ name: string; url: string }>;
-  onSelectRemoteBranch?: (branch: { type: 'remote-branch'; remoteName: string; branchName: string; fullName: string }) => void;
-  selectedItem?: { type: 'remote-branch'; remoteName: string; branchName: string; fullName: string };
+  remotes: Array<RemoteInfo>;
+  onSelectRemoteBranch?: (branch: SelectedItem) => void;
+  selectedItem: SelectedItem | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
   gitAdapter: GitAdapter;
@@ -15,9 +16,9 @@ interface RemoteListProps {
 }
 
 function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch }: RemoteListProps) {
-  const [expandedRemotes, setExpandedRemotes] = useState({});
-  const [remoteBranchesCache, setRemoteBranchesCache] = useState({});
-  const [loadingRemotes, setLoadingRemotes] = useState({});
+  const [expandedRemotes, setExpandedRemotes] = useState<Record<string, boolean>>({});
+  const [remoteBranchesCache, setRemoteBranchesCache] = useState<Record<string, Array<string>>>({});
+  const [loadingRemotes, setLoadingRemotes] = useState<Record<string, boolean>>({});
   const [contextMenu, setContextMenu] = useState(null);
 
   const contextMenuRef = { current: null };

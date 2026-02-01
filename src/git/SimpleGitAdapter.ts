@@ -25,12 +25,16 @@ export class SimpleGitAdapter extends GitAdapter {
     this.isOpen = true;
   }
 
-  async status(): Promise<GitStatus> {  
+  async status(path?: string): Promise<GitStatus> {  
     const startTime = performance.now();
     const id = this._startCommand('git status', startTime);
     let result: any = null;
     try {
-      result = await this.git.status();
+      if (path) {
+        result = await this.git!.raw(['status', '--', path]);
+      } else {
+        result = await this.git.status();
+      }
     } catch (error) {
       console.error('Error getting status:', error);
     }
@@ -484,7 +488,7 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
-  async log(branchName: string, maxCount: number = 100): Promise<any[]> {
+  async log(branchName: string, maxCount: number = 100): Promise<Commit[]> {
     const startTime = performance.now();
     const id = this._startCommand(`git log ${branchName} --max-count=${maxCount}`, startTime);
 
@@ -501,23 +505,31 @@ export class SimpleGitAdapter extends GitAdapter {
       }
     });
 
-    // Check which commits exist on origin
-    const commitsWithRemoteStatus = await Promise.all(
-      result.all.map(async (commit: Commit) => {
-        try {
-          // Check if commit exists on origin branch
-          const unpushedCommits = await this.git.raw(['log', `origin/${branchName}..${commit.hash}`]);
-          const onOrigin = unpushedCommits.trim().length === 0;
-          commit.onOrigin = onOrigin;
-        } catch (error) {
-          // If merge-base fails, commit doesn't exist on origin
-          commit.onOrigin = false;
-        }
-      })
-    );
+    const commits = result.all.map((commit: any) => ({
+      hash: commit.hash,
+      author_name: commit.author_name,
+      author_email: commit.author_email,
+      date: commit.date,
+      message: commit.message,
+      body: commit.body,
+      onOrigin: false // Will determine this later
+    }));
+
+    Promise.all(commits .map(async (commit) => {
+      try {
+        // Check if commit exists on origin branch
+        const unpushedCommits = await this.git.raw(['log', `origin/${branchName}..${commit.hash}`]);
+        const onOrigin = unpushedCommits.trim().length === 0;
+        commit.onOrigin = onOrigin;
+      } catch (error) {
+        // If merge-base fails, commit doesn't exist on origin
+        commit.onOrigin = false;
+      }
+    }));
 
     this._endCommand(id, startTime);
-    return commitsWithRemoteStatus;
+
+    return commits;
   }
 
   async getCommitFiles(commitHash: string): Promise<Array<CommitFile>> {

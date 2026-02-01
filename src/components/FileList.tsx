@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { SelectedItem } from './types';
 import './FileList.css';
 
 // Build tree structure from flat file list
-function buildTree(files) {
+function buildTree(files: Array<{ path: string }>) {
   const root = { children: {}, files: [] };
 
   files.forEach(file => {
@@ -25,34 +26,45 @@ function buildTree(files) {
   return root;
 }
 
-function FileList({
-  title,
-  files,
-  onDrop,
-  listType,
-  onSelectFile,
-  selectedFile,
-  repoPath,
-  onContextMenu
-}) {
-  const [dragOver, setDragOver] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState({});
+function getStatusIcon(status: string): string {
+  switch (status) {
+    case 'modified': return 'M';
+    case 'created': return 'A';
+    case 'deleted': return 'D';
+    case 'renamed': return 'R';
+    case 'conflict': return 'C';
+    default: return '?';
+  }
+}
+
+interface FileListProps {
+  title: string;
+  files: Array<any>;
+  onDrop?: (data: any, sourceList: string, targetList: string) => void;
+  listType: 'staged' | 'unstaged';
+  onSelectFile?: (file: any, listType: string) => void;
+  selectedFile?: any;
+  repoPath: string;
+  onContextMenu?: any;
+}
+
+function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu }: FileListProps) {
+  const [dragOver, setDragOver] = useState<boolean>(false);
+  const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [contextMenu, setContextMenu] = useState(null);
-  const contextMenuRef = useRef(null);
-  const lastMouseButton = useRef(0);
-  const isDraggingEnabled = useRef(false);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const lastMouseButton = useRef<number>(0);
+  const isDraggingEnabled = useRef<boolean>(false);
   const lastSelectedItem = useRef(null);
-
-
 
   // Build tree structure from files
   const tree = useMemo(() => buildTree(files), [files]);
 
   // Close context menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
         setContextMenu(null);
       }
     };
@@ -65,7 +77,7 @@ function FileList({
 
   // Handle keyboard events for hotkeys
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Delete key for discard
       if (e.key === 'Delete' && selectedItems.size > 0) {
         // Get selected items with their details
@@ -96,7 +108,7 @@ function FileList({
     }
   }, [selectedItems, files, onContextMenu, repoPath, listType]);
 
-  const toggleFolder = (path) => {
+  const toggleFolder = (path: string) => {
     setExpandedFolders(prev => ({
       ...prev,
       [path]: !prev[path]
@@ -136,11 +148,12 @@ function FileList({
   }, [tree, expandedFolders]);
 
   // Get items between two paths (inclusive)
-  const getItemsBetween = (startPath, endPath) => {
+  const getItemsBetween = (startPath: string, endPath: string) => {
     const startIndex = getAllItemsInOrder.indexOf(startPath);
     const endIndex = getAllItemsInOrder.indexOf(endPath);
 
-    if (startIndex === -1 || endIndex === -1) return [];
+    if (startIndex === -1 || endIndex === -1)
+      return [];
 
     const minIndex = Math.min(startIndex, endIndex);
     const maxIndex = Math.max(startIndex, endIndex);
@@ -149,7 +162,7 @@ function FileList({
   };
 
   // Handle item selection (files or folders)
-  const handleItemClick = (e, itemPath, isFolder) => {
+  const handleItemClick = (e: React.MouseEvent, itemPath: string, isFolder: boolean) => {
     e.stopPropagation();
 
     if (e.shiftKey && lastSelectedItem.current) {
@@ -195,7 +208,7 @@ function FileList({
   };
 
   // Handle context menu
-  const handleContextMenuOpen = (e, itemPath, isFolder) => {
+  const handleContextMenuOpen = (e: React.MouseEvent, itemPath: string, isFolder: boolean) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -226,7 +239,7 @@ function FileList({
     });
   };
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     lastMouseButton.current = e.button;
 
     // Only enable dragging for left-click
@@ -239,12 +252,12 @@ function FileList({
     }
   };
 
-  const handleMouseUp = (e) => {
+  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
     isDraggingEnabled.current = false;
     e.currentTarget.setAttribute('draggable', 'false');
   };
 
-  const handleFileDragStart = (e, file) => {
+  const handleFileDragStart = (e: React.DragEvent<HTMLDivElement>, file) => {
     // Block drag if not enabled
     if (!isDraggingEnabled.current) {
       e.preventDefault();
@@ -280,7 +293,7 @@ function FileList({
     }
   };
 
-  const handleFolderDragStart = (e, folderPath) => {
+  const handleFolderDragStart = (e: React.DragEvent<HTMLDivElement>, folderPath: string) => {
     // Block drag if not enabled
     if (!isDraggingEnabled.current) {
       e.preventDefault();
@@ -323,30 +336,30 @@ function FileList({
     }
   };
 
-  const handleDragEnd = (e) => {
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
     // Remove dragging class when drag ends
     e.currentTarget.classList.remove('dragging');
   };
 
-  const handleItemDragOver = (e) => {
+  const handleItemDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     // Allow drops over individual items - the panel will handle the actual drop
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     // Don't stopPropagation - let it bubble to the panel handler
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOver(true);
   };
 
-  const handleDragLeave = (e) => {
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
 
@@ -382,7 +395,7 @@ function FileList({
     }
   };
 
-  const renderTree = (node, path = '', depth = 0) => {
+  const renderTree = (node: any, path = '', depth = 0) => {
     const items = [];
 
     // Render folders
@@ -425,7 +438,7 @@ function FileList({
     });
 
     // Render files in current folder
-    node.files.sort((a, b) => a.path.localeCompare(b.path)).forEach((file, index) => {
+    node.files.sort((a: any, b: any) => a.path.localeCompare(b.path)).forEach((file: any, index: number) => {
       const isFileSelected = selectedItems.has(file.path);
       const fileName = file.path.split('/').pop();
 
@@ -452,7 +465,7 @@ function FileList({
     return items;
   };
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = (action: string) => {
     if (onContextMenu && contextMenu) {
       onContextMenu(action, contextMenu.items, contextMenu.clickedItem, repoPath, listType);
     }
@@ -525,17 +538,6 @@ function FileList({
       )}
     </div>
   );
-}
-
-function getStatusIcon(status) {
-  switch (status) {
-    case 'modified': return 'M';
-    case 'created': return 'A';
-    case 'deleted': return 'D';
-    case 'renamed': return 'R';
-    case 'conflict': return 'C';
-    default: return '?';
-  }
 }
 
 export default FileList;

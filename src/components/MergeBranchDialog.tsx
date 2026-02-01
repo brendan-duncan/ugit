@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { GitAdapter } from '../git/GitAdapter';
 import './Dialog.css';
 
-function MergeBranchDialog({ onClose, onMerge, sourceBranch, targetBranch, gitAdapter }) {
-  const [selectedOption, setSelectedOption] = useState('default');
+interface MergeBranchDialogProps {
+  onClose: () => void;
+  onMerge: (options: { sourceBranch: string; targetBranch: string; mergeOption: string; flag: string | null }) => void;
+  sourceBranch: string;
+  targetBranch: string;
+  gitAdapter: GitAdapter;
+}
+
+function MergeBranchDialog({ onClose, onMerge, sourceBranch, targetBranch, gitAdapter }: MergeBranchDialogProps) {
+  const [selectedOption, setSelectedOption] = useState<string>('default');
   const [conflictCheck, setConflictCheck] = useState({ loading: true, result: null });
   const STORAGE_KEY = 'merge-branch-dialog-option';
 
@@ -29,7 +38,7 @@ function MergeBranchDialog({ onClose, onMerge, sourceBranch, targetBranch, gitAd
   }, []);
 
   // Save to localStorage whenever option changes
-  const handleOptionChange = (option) => {
+  const handleOptionChange = (option: string) => {
     setSelectedOption(option);
     try {
       localStorage.setItem(STORAGE_KEY, option);
@@ -94,9 +103,12 @@ function MergeBranchDialog({ onClose, onMerge, sourceBranch, targetBranch, gitAd
   };
 
   const getConflictStatusClass = () => {
-    if (conflictCheck.loading) return 'conflict-check-loading';
-    if (!conflictCheck.result) return 'conflict-check-unknown';
-    if (conflictCheck.result.hasConflicts === null) return 'conflict-check-unknown';
+    if (conflictCheck.loading)
+      return 'conflict-check-loading';
+    if (!conflictCheck.result)
+      return 'conflict-check-unknown';
+    if (conflictCheck.result.hasConflicts === null)
+      return 'conflict-check-unknown';
     return conflictCheck.result.hasConflicts ? 'conflict-check-warning' : 'conflict-check-success';
   };
 

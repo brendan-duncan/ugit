@@ -60,8 +60,8 @@ export interface Commit {
   author_email: string;
   date: string;
   message: string;
-  body?: string;
-  onOrigin?: boolean;
+  body: string;
+  onOrigin: boolean;
 }
 
 export abstract class GitAdapter {
@@ -87,16 +87,15 @@ export abstract class GitAdapter {
   }
 
   protected _endCommand(id: number, startTime: number): void {
+    const deltaTime = performance.now() - startTime;
     const command = this._pendingCommands.get(id);
     if (command) {
+      this._logCommand(command, deltaTime);
       this._pendingCommands.delete(id);
     }
-
     if (this.commandStateCallback) {
-      this.commandStateCallback(false, id, command || '', performance.now() - startTime);
+      this.commandStateCallback(false, id, command || '', deltaTime);
     }
-
-    this._logCommand(command || '', performance.now() - startTime);
   }
 
   /**
@@ -111,17 +110,18 @@ export abstract class GitAdapter {
   /**
    * Log a git command with timing information
    * @param command - The git command being executed
-   * @param startTime - Start time from performance.now()
+   * @param deltaTime - Time taken in milliseconds
    */
-  protected _logCommand(command: string, startTime: number): void {
-    const duration = (performance.now() - startTime).toFixed(2);
-    console.log(`[git] ${command} (${duration}ms)`);
+  protected _logCommand(command: string, deltaTime: number): void {
+    const duration = (deltaTime * 0.001).toFixed(2);
+    console.log(`[git] ${command} (${duration}s)`);
   }
 
   /**
    * Get repository status including current branch and file changes
+   * @param path - Optional file path to limit status to that file
    */
-  abstract status(): Promise<GitStatus>;
+  abstract status(path?: string): Promise<GitStatus>;
 
   /**
    * Get list of local branches

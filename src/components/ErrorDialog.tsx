@@ -6,7 +6,7 @@ interface ErrorDialogProps {
   onClose: () => void;
 }
 
-const ErrorDialog: React.FC<ErrorDialogProps> = ({ error, onClose }) => {
+function ErrorDialog({ error, onClose }: ErrorDialogProps) {
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
@@ -24,6 +24,6 @@ const ErrorDialog: React.FC<ErrorDialogProps> = ({ error, onClose }) => {
       </div>
     </div>
   );
-};
+}
 
 export default ErrorDialog;

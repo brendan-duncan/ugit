@@ -22,7 +22,7 @@ import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
 import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
-import { RunningCommand } from './types';
+import { RunningCommand, RemoteInfo } from './types';
 import { ipcRenderer } from 'electron';
 import './RepositoryView.css';
 
@@ -35,7 +35,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
-  const [remotes, setRemotes] = useState<string[]>([]);
+  const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
   const [branchStatus, setBranchStatus] = useState({});
   const [originUrl, setOriginUrl] = useState('');
   const [stashes, setStashes] = useState<StashInfo[]>([]);
@@ -127,6 +127,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
     return {};
   };
+
   const cacheInitialized = useRef(false);
   const currentBranchLoadId = useRef(0);
 
@@ -318,7 +319,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             return match ? { name: match[1], url: match[2] } : null;
           })
           .filter(Boolean);
-        
+
         setRemotes(remotesList);
         console.log(`Loaded ${remotesList.length} remotes`);
       } catch (error) {
@@ -410,6 +411,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         // Silently refresh file status in the background
         await refreshFileStatus();
       }, 5000); // The interval time should be a setting...
+
+      refreshFileStatus();
     }
 
     // Clean up interval on unmount
@@ -546,8 +549,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     activeSplitter.current = null;
   };
 
-  const handleMouseMove = (e) => {
-    if (activeSplitter.current === null) return;
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (activeSplitter.current === null)
+      return;
 
     const container = e.currentTarget;
     const rect = container.getBoundingClientRect();
@@ -653,43 +657,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       clearBranchCache();
 
       await loadRepoData(true);
-
-      // Refresh all data after pull
-      /*const status = await git.status();
-      setCurrentBranch(status.current);
-
-      // Refresh file status
-      await refreshFileStatus();
-
-      // Refresh stashes
-      const stashList = await git.stashList();
-      setStashes(stashList.all);
-
-      // Refresh branch status (parallel, update UI incrementally)
-      branches.forEach(async (branchName) => {
-        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-        if (ahead > 0 || behind > 0) {
-          setBranchStatus(prev => ({
-            ...prev,
-            [branchName]: { ahead, behind }
-          }));
-        } else if (ahead < 0 || behind < 0) {
-          // Branch doesn't have a remote tracking branch
-          // Remove status for this branch
-          setBranchStatus(prev => {
-            const newStatus = { ...prev };
-            delete newStatus[branchName];
-            return newStatus;
-          });
-        } else {
-          // Remove status if branch is now in sync
-          setBranchStatus(prev => {
-            const newStatus = { ...prev };
-            delete newStatus[branchName];
-            return newStatus;
-          });
-        }
-      });*/
 
     } catch (error) {
       console.error('Error during pull:', error);

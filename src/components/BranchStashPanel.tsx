@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import BranchTree from './BranchTree';
 import RemoteList from './RemoteList';
 import StashList from './StashList';
-import { SelectedItem } from './types';
+import { SelectedItem, RemoteInfo } from './types';
 import { GitAdapter, StashInfo } from '../git/GitAdapter';
 
 interface BranchStashPanelProps {
@@ -18,8 +18,8 @@ interface BranchStashPanelProps {
   onMouseDown: (panelIndex: number) => void;
   onBranchContextMenu: (action: string, branchName: string, currentBranch: string) => void;
   onStashContextMenu: (action: string, stash: StashInfo, stashIndex: number) => void;
-  remotes: Array<string>;
-  onSelectRemoteBranch: (remoteBranchName: string) => void;
+  remotes: Array<RemoteInfo>;
+  onSelectRemoteBranch: (remoteBranch: SelectedItem) => void;
   gitAdapter: GitAdapter;
   onRemoteBranchAction: (action: string, remoteName: string, branchName: string, fullName: string) => void;
 }

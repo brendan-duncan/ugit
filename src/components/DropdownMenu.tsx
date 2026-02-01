@@ -6,13 +6,7 @@ interface DropdownMenuProps {
   children: ReactNode;
 }
 
-interface DropdownItemProps {
-  children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-}
-
-const DropdownMenu: React.FC<DropdownMenuProps> = ({ trigger, children }) => {
+function DropdownMenu({ trigger, children }: DropdownMenuProps): React.ReactElement {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -50,9 +44,15 @@ const DropdownMenu: React.FC<DropdownMenuProps> = ({ trigger, children }) => {
       )}
     </div>
   );
-};
+}
 
-const DropdownItem: React.FC<DropdownItemProps> = ({ children, onClick, disabled = false }) => {
+interface DropdownItemProps {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}
+
+function DropdownItem({ children, onClick, disabled = false }: DropdownItemProps): React.ReactElement {
   return (
     <div 
       className={`dropdown-item ${disabled ? 'disabled' : ''}`}
@@ -63,7 +63,7 @@ const DropdownItem: React.FC<DropdownItemProps> = ({ children, onClick, disabled
   );
 };
 
-const DropdownSeparator: React.FC = () => {
+function DropdownSeparator(): React.ReactElement {
   return <div className="dropdown-separator"></div>;
 };
 

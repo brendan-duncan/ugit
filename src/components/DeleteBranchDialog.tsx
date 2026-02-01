@@ -7,9 +7,9 @@ interface DeleteBranchDialogProps {
   branchName: string;
 }
 
-const DeleteBranchDialog: React.FC<DeleteBranchDialogProps> = ({ onClose, onConfirm, branchName }) => {
+function DeleteBranchDialog({ onClose, onConfirm, branchName }: DeleteBranchDialogProps): React.ReactElement {
   const STORAGE_KEY = 'delete-branch-dialog-option';
-  
+
   // Load saved option from localStorage on mount
   const getSavedOption = (): boolean => {
     try {
@@ -18,9 +18,9 @@ const DeleteBranchDialog: React.FC<DeleteBranchDialogProps> = ({ onClose, onConf
       return false;
     }
   };
-  
+
   const [deleteRemote, setDeleteRemote] = useState<boolean>(getSavedOption());
-  
+
   // Save to localStorage whenever option changes
   const handleDeleteRemoteChange = (checked: boolean): void => {
     setDeleteRemote(checked);
@@ -45,7 +45,7 @@ const DeleteBranchDialog: React.FC<DeleteBranchDialogProps> = ({ onClose, onConf
         <div className="dialog-body">
           <p>Are you sure you want to delete the branch <strong>{branchName}</strong>?</p>
           <p>This action cannot be undone.</p>
-          
+
           <div className="dialog-field">
             <label className="dialog-checkbox-label">
               <input

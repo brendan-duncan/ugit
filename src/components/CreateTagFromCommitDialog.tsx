@@ -2,13 +2,20 @@ import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './CreateTagFromCommitDialog.css';
 
-function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMessage }) {
-  const [tagName, setTagName] = useState('');
-  const [tagMessage, setTagMessage] = useState('');
-  const [tagExists, setTagExists] = useState(false);
-  const [existingTagName, setExistingTagName] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+interface CreateTagFromCommitDialogProps {
+  onClose: () => void;
+  onCreateTag: (tagName: string, tagMessage: string) => void | Promise<void>;
+  commitHash: string;
+  commitMessage: string;
+}
 
+function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMessage }: CreateTagFromCommitDialogProps): React.ReactElement {
+  const [tagName, setTagName] = useState<string>('');
+  const [tagMessage, setTagMessage] = useState<string>('');
+  const [tagExists, setTagExists] = useState<boolean>(false);
+  const [existingTagName, setExistingTagName] = useState<string>('');
+  const [isCreating, setIsCreating] = useState<boolean>(false);
+  
   // Validate tag name when it changes
   useEffect(() => {
     if (tagName.trim()) {
@@ -35,7 +42,7 @@ function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMes
     }
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
       onClose();
     } else if (e.key === 'Enter' && !e.shiftKey) {

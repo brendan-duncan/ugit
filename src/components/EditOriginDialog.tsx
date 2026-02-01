@@ -7,7 +7,7 @@ interface EditOriginDialogProps {
   currentOriginUrl?: string;
 }
 
-const EditOriginDialog: React.FC<EditOriginDialogProps> = ({ onClose, onEditOrigin, currentOriginUrl }) => {
+function EditOriginDialog({ onClose, onEditOrigin, currentOriginUrl }: EditOriginDialogProps) {
   const [originUrl, setOriginUrl] = useState<string>('');
 
   useEffect(() => {
