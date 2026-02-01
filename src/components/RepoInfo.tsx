@@ -25,7 +25,6 @@ interface RepoInfoProps {
 }
 
 const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged }) => {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
@@ -51,8 +50,8 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
-  const handleCopyLocalPath = async () => {
-    await clipboard.writeText(gitAdapter?.repoPath || '');
+  const handleCopyLocalPath = () => {
+    clipboard.writeText(gitAdapter?.repoPath || '');
   };
 
   const handleEditOrigin = () => {
@@ -102,8 +101,8 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
-  const handleCopyRemoteAddress = async () => {
-    await clipboard.writeText(originUrl || '');
+  const handleCopyRemoteAddress = () => {
+    clipboard.writeText(originUrl || '');
   };
 
   return (
@@ -119,22 +118,6 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           </DropdownItem>
           <DropdownItem onClick={handleCopyLocalPath}>
             📋 Copy Local Path
-          </DropdownItem>
-          <DropdownSeparator />
-          <DropdownItem onClick={handleEditOrigin}>
-            ✏️ Edit Origin...
-          </DropdownItem>
-          <DropdownItem onClick={handleDeleteOrigin}>
-            🗑️ Delete Origin...
-          </DropdownItem>
-          <DropdownItem onClick={handleAddNewRemote}>
-            ➕ Add New Remote
-          </DropdownItem>
-          <DropdownItem onClick={handleOpenRemoteInBrowser}>
-            🌐 Open Remote in Browser
-          </DropdownItem>
-          <DropdownItem onClick={handleCopyRemoteAddress}>
-            📋 Copy Remote Address
           </DropdownItem>
           <DropdownSeparator />
           <DropdownItem onClick={onCleanWorkingDirectory}>
