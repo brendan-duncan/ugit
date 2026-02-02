@@ -7,7 +7,7 @@ import { AppSettings } from '../components/types';
  */
 export function useSettings() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [loadingSettings, setLoadingSettings] = useState<boolean>(true);
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
   // Load settings on mount

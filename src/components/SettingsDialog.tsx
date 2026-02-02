@@ -23,7 +23,8 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   }, [settings]);
 
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings)
+      return;
 
     setIsSaving(true);
     try {

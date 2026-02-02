@@ -23,8 +23,8 @@ import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
 import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo } from './types';
-import { useSettings } from '../hooks/useSettings';
 import { ipcRenderer } from 'electron';
+import { useSettings } from '../hooks/useSettings';
 import './RepositoryView.css';
 
 interface RepositoryViewProps {
@@ -33,6 +33,7 @@ interface RepositoryViewProps {
 }
 
 function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
+  const { settings, getSetting } = useSettings();
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
@@ -76,18 +77,11 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [showCreateBranchFromCommitDialog, setShowCreateBranchFromCommitDialog] = useState(false);
   const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
   const [commitForDialog, setCommitForDialog] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState<number>(5); // in seconds
+
   const activeSplitter = useRef(null);
   const gitAdapter = useRef<GitAdapter | null>(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
-  //const { settings, loadingSettings } = useSettings();
-
-  /*if (loadingSettings) {
-    return <div>Loading settings...</div>;
-  }
-
-  if (!settings) {
-    return <div>Failed to load settings</div>;
-  }*/
 
   let runningCommands = null;
 
@@ -411,29 +405,35 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   // Periodic background check for local changes
   useEffect(() => {
-    // Don't start checking until initial load is complete
-    if (loading)
+    // Don't start checking until initial load is complete or settings are not loaded
+    if (loading || !settings)
       return;
 
     let refreshFileStatusId = null;
     // Only run if this tab is active
     if (isActiveTab) {
-      // Check for changes every 5 seconds
+      // Get refresh time from settings, default to 5 seconds if not available
+      const refreshTime = getSetting('localFileRefreshTime') || 5;
+
+      console.log(`Setting up file status refresh interval: ${refreshTime} seconds`);
+
       refreshFileStatusId = setInterval(async () => {
-        // Silently refresh file status in the background
         await refreshFileStatus();
-      }, (/*settings?.localFileRefreshTime ||*/ 5) * 1000);
+        const refreshTime = getSetting('localFileRefreshTime') || 5;
+        setRefreshInterval(refreshTime);
+      }, refreshTime * 1000);
 
       refreshFileStatus();
     }
 
-    // Clean up interval on unmount
+    // Clean up interval on unmount or when dependencies change
     return () => {
       if (refreshFileStatusId !== null) {
         clearInterval(refreshFileStatusId);
+        console.log('Cleared file status refresh interval');
       }
     };
-  }, [loading, isActiveTab/*, settings?.localFileRefreshTime*/]); // Re-run if loading state, active tab, or refresh time changes
+  }, [loading, isActiveTab, settings, refreshInterval]); // Re-run if loading state, active tab, or settings change
 
   const refreshFileStatus = async () => {
     // Ensure git adapter is available before attempting to use it
@@ -1189,14 +1189,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
     try {
       const git = gitAdapter.current;
-      
+
       // Create tag with optional message
       if (tagMessage) {
         await git.raw(['tag', '-a', tagName, '-m', tagMessage, commitForDialog.hash]);
       } else {
         await git.raw(['tag', tagName, commitForDialog.hash]);
       }
-      
+
       console.log(`Created tag '${tagName}' on commit ${commitForDialog.hash.substring(0, 7)}`);
 
       // Refresh all data to show new tag
@@ -1394,7 +1394,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleRemoteBranchSelect = (remoteBranchInfo: any) => {
     console.log('Remote branch selected:', remoteBranchInfo);
-    
+
     if (remoteBranchInfo.type === 'remote-branch' && remoteBranchInfo.fullName) {
       // Load commits for the remote branch
       loadRemoteBranchCommits(remoteBranchInfo.remoteName, remoteBranchInfo.branchName, remoteBranchInfo.fullName);
