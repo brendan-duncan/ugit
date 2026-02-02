@@ -1,6 +1,6 @@
 # UGit
 
-I want a decent and free Git GUI and dislike the available options, so I thought I'd see how far I could get making one.
+I wanted a decent and free Git GUI and dislike the available options, so I thought I'd see how far I could get making one.
 
 <a href="ugit.png">
 <img src="ugit.png" style="width:800px">
