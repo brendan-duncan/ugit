@@ -1,9 +1,10 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron';
+import cacheManager from './utils/cacheManager';
+import { initializeSettings } from './utils/settings';
+import GitFactory from './git/GitFactory';
 import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';
-import cacheManager from './utils/cacheManager';
-import GitFactory from './git/GitFactory';
 
 let mainWindow: Electron.BrowserWindow | null = null;
 let recentRepos: string[] = [];
@@ -50,7 +51,8 @@ function loadWindowState(): WindowState {
 
 // Save window state to file
 function saveWindowState(): void {
-  if (!mainWindow) return;
+  if (!mainWindow)
+    return;
 
   try {
     const bounds = mainWindow.getBounds();
@@ -151,6 +153,16 @@ function createMenu(): void {
         },
         { type: 'separator' },
         {
+          label: 'Preferences...',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('show-settings-dialog');
+            }
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'Exit',
           accelerator: 'CmdOrCtrl+Q',
           click: () => {
@@ -212,6 +224,9 @@ app.whenReady().then(() => {
   // Initialize cache manager with user data path
   cacheManager.setCacheDir(app.getPath('userData'));
 
+  // Initialize settings manager
+  initializeSettings(cacheManager);
+
   // Set window state file path
   windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 
@@ -251,6 +266,34 @@ ipcMain.handle('get-git-backend', () => {
 // Provide user data path to renderer process for cache initialization
 ipcMain.handle('get-user-data-path', () => {
   return app.getPath('userData');
+});
+
+// Settings IPC handlers
+ipcMain.handle('get-settings', () => {
+  const { getSettingsManager } = require('./utils/settings');
+  const settingsManager = getSettingsManager();
+  return settingsManager.getSettings();
+});
+
+ipcMain.handle('update-setting', async (event: any, key: string, value: any) => {
+  const { getSettingsManager } = require('./utils/settings');
+  const settingsManager = getSettingsManager();
+  settingsManager.updateSetting(key as any, value);
+  return { success: true };
+});
+
+ipcMain.handle('update-settings', async (event: any, updates: any) => {
+  const { getSettingsManager } = require('./utils/settings');
+  const settingsManager = getSettingsManager();
+  settingsManager.updateSettings(updates);
+  return { success: true };
+});
+
+ipcMain.handle('reset-settings', async () => {
+  const { getSettingsManager } = require('./utils/settings');
+  const settingsManager = getSettingsManager();
+  settingsManager.resetToDefaults();
+  return { success: true };
 });
 
 // Show item in file explorer

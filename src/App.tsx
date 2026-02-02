@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
+import { SettingsDialog } from './components/SettingsDialog';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
 import { ipcRenderer } from 'electron';
 import fs from 'fs';
@@ -33,11 +34,12 @@ function filterValidRepos(repoPaths: string[]): string[] {
   });
 }
 
-function App() {
+function App(): React.ReactElement {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // Load recent repos and auto-open on startup
   useEffect(() => {
@@ -102,8 +104,13 @@ function App() {
       setShowCloneDialog(true);
     };
 
+    const handleShowSettingsDialog = () => {
+      setShowSettings(true);
+    };
+
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
+    ipcRenderer.on('show-settings-dialog', handleShowSettingsDialog);
 
     const handleFetch = () => {
       if (activeTabId !== null && tabs.length > 0) {
@@ -334,6 +341,9 @@ function App() {
           </>
         )}
       </div>
+      {showSettings && (
+        <SettingsDialog onClose={() => setShowSettings(false)} />
+      )}
       {showCloneDialog && (
         <CloneDialog
           onClose={() => setShowCloneDialog(false)}

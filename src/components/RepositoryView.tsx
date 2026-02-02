@@ -23,6 +23,7 @@ import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
 import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo } from './types';
+import { useSettings } from '../hooks/useSettings';
 import { ipcRenderer } from 'electron';
 import './RepositoryView.css';
 
@@ -78,6 +79,15 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const activeSplitter = useRef(null);
   const gitAdapter = useRef<GitAdapter | null>(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
+  //const { settings, loadingSettings } = useSettings();
+
+  /*if (loadingSettings) {
+    return <div>Loading settings...</div>;
+  }
+
+  if (!settings) {
+    return <div>Failed to load settings</div>;
+  }*/
 
   let runningCommands = null;
 
@@ -412,7 +422,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       refreshFileStatusId = setInterval(async () => {
         // Silently refresh file status in the background
         await refreshFileStatus();
-      }, 5000); // The interval time should be a setting...
+      }, (/*settings?.localFileRefreshTime ||*/ 5) * 1000);
 
       refreshFileStatus();
     }
@@ -423,7 +433,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         clearInterval(refreshFileStatusId);
       }
     };
-  }, [loading, isActiveTab]); // Re-run if loading state or active tab changes
+  }, [loading, isActiveTab/*, settings?.localFileRefreshTime*/]); // Re-run if loading state, active tab, or refresh time changes
 
   const refreshFileStatus = async () => {
     // Ensure git adapter is available before attempting to use it
