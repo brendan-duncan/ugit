@@ -33,7 +33,6 @@ interface RepositoryViewProps {
 }
 
 function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
-  const { settings, getSetting } = useSettings();
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
@@ -77,11 +76,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [showCreateBranchFromCommitDialog, setShowCreateBranchFromCommitDialog] = useState(false);
   const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
   const [commitForDialog, setCommitForDialog] = useState(null);
-  const [refreshInterval, setRefreshInterval] = useState<number>(5); // in seconds
-
   const activeSplitter = useRef(null);
   const gitAdapter = useRef<GitAdapter | null>(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
+  const { settings, getSetting, updateSetting } = useSettings();
 
   let runningCommands = null;
 
@@ -198,7 +196,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
     }
 
-    console.log("Loading repository data for ", repoPath, "... (isRefresh:", isRefresh, ")");
+    //console.log("Loading repository data for ", repoPath, "... (isRefresh:", isRefresh, ")");
     const cacheLoadTime = performance.now();
 
     if (isRefresh) {
@@ -414,13 +412,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     if (isActiveTab) {
       // Get refresh time from settings, default to 5 seconds if not available
       const refreshTime = getSetting('localFileRefreshTime') || 5;
-
-      console.log(`Setting up file status refresh interval: ${refreshTime} seconds`);
+      //console.log(`Setting up file status refresh interval: ${refreshTime} seconds`);
 
       refreshFileStatusId = setInterval(async () => {
         await refreshFileStatus();
-        const refreshTime = getSetting('localFileRefreshTime') || 5;
-        setRefreshInterval(refreshTime);
       }, refreshTime * 1000);
 
       refreshFileStatus();
@@ -430,10 +425,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     return () => {
       if (refreshFileStatusId !== null) {
         clearInterval(refreshFileStatusId);
-        console.log('Cleared file status refresh interval');
+        //console.log('Cleared file status refresh interval');
       }
     };
-  }, [loading, isActiveTab, settings, refreshInterval]); // Re-run if loading state, active tab, or settings change
+  }, [loading, isActiveTab, settings]); // Re-run if loading state, active tab, or settings change
 
   const refreshFileStatus = async () => {
     // Ensure git adapter is available before attempting to use it

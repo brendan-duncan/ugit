@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useSettings } from '../hooks/useSettings';
-import { AppSettings } from './types';
 import './Dialog.css';
 import './SettingsDialog.css';
 

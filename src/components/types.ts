@@ -1,10 +1,5 @@
 // Common types for React components
 
-export interface AppSettings {
-  localFileRefreshTime: number;
-  blockCommitBranches: string[];
-}
-
 export interface SelectedItem {
   type: string;
   [key: string]: any;

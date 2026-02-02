@@ -87,7 +87,7 @@ export class SettingsManager {
     if (!this.settings) {
       this.loadSettings();
     }
-    
+
     if (this.settings) {
       this.settings[key] = value;
       this.saveSettings();
@@ -102,7 +102,7 @@ export class SettingsManager {
     if (!this.settings) {
       this.loadSettings();
     }
-    
+
     if (this.settings) {
       this.settings = { ...this.settings, ...updates };
       this.saveSettings();

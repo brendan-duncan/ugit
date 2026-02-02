@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import { AppSettings } from '../components/types';
+import { AppSettings } from './settings';
 
 /**
  * Utility functions for working with settings in non-React contexts
@@ -14,7 +14,7 @@ export class SettingsUtils {
    */
   static async getSettings(): Promise<AppSettings> {
     const now = Date.now();
-    
+
     // Return cached settings if still valid
     if (this.cachedSettings && now < this.cacheExpiry) {
       return this.cachedSettings;
@@ -42,14 +42,14 @@ export class SettingsUtils {
    */
   static async shouldBlockCommit(branchName: string): Promise<boolean> {
     const settings = await this.getSettings();
-    
+
     // Check each blocked branch pattern
     for (const pattern of settings.blockCommitBranches) {
       if (this.matchesPattern(branchName, pattern)) {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -82,13 +82,13 @@ export class SettingsUtils {
       const prefix = pattern.slice(0, -1);
       return branchName.startsWith(prefix);
     }
-    
+
     // Simple glob-like pattern matching
     if (pattern.includes('*')) {
       const regex = new RegExp(pattern.replace(/\*/g, '.*'));
       return regex.test(branchName);
     }
-    
+
     // Exact match
     return branchName === pattern;
   }

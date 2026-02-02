@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ipcRenderer } from 'electron';
-import { AppSettings } from '../components/types';
+import { AppSettings } from '../utils/settings';
 
 /**
  * React hook for accessing and updating application settings

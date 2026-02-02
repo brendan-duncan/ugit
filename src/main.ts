@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron';
 import cacheManager from './utils/cacheManager';
 import { initializeSettings } from './utils/settings';
 import GitFactory from './git/GitFactory';
+import { getSettingsManager } from './utils/settings';
 import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';
@@ -270,27 +271,23 @@ ipcMain.handle('get-user-data-path', () => {
 
 // Settings IPC handlers
 ipcMain.handle('get-settings', () => {
-  const { getSettingsManager } = require('./utils/settings');
   const settingsManager = getSettingsManager();
   return settingsManager.getSettings();
 });
 
 ipcMain.handle('update-setting', async (event: any, key: string, value: any) => {
-  const { getSettingsManager } = require('./utils/settings');
   const settingsManager = getSettingsManager();
   settingsManager.updateSetting(key as any, value);
   return { success: true };
 });
 
 ipcMain.handle('update-settings', async (event: any, updates: any) => {
-  const { getSettingsManager } = require('./utils/settings');
   const settingsManager = getSettingsManager();
   settingsManager.updateSettings(updates);
   return { success: true };
 });
 
 ipcMain.handle('reset-settings', async () => {
-  const { getSettingsManager } = require('./utils/settings');
   const settingsManager = getSettingsManager();
   settingsManager.resetToDefaults();
   return { success: true };
@@ -328,8 +325,6 @@ ipcMain.handle('show-open-dialog', async (event: any, options: any) => {
 
 // Clone repository
 ipcMain.handle('clone-repository', async (event: any, repoUrl: string, parentFolder: string, repoName: string) => {
-
-
   try {
     const targetPath = path.join(parentFolder, repoName);
 
