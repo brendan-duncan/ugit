@@ -85,26 +85,6 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
-  const handleDeleteOrigin = () => {
-    // TODO: Implement delete origin dialog
-    alert('Delete origin - not implemented yet');
-  };
-
-  const handleAddNewRemote = () => {
-    // TODO: Implement add remote dialog
-    alert('Add new remote - not implemented yet');
-  };
-
-  const handleOpenRemoteInBrowser = () => {
-    if (originUrl) {
-      shell.openExternal(originUrl);
-    }
-  };
-
-  const handleCopyRemoteAddress = () => {
-    clipboard.writeText(originUrl || '');
-  };
-
   return (
     <div className="repo-info">
       <div className="repo-header">
