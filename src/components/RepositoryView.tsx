@@ -415,10 +415,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       //console.log(`Setting up file status refresh interval: ${refreshTime} seconds`);
 
       refreshFileStatusId = setInterval(async () => {
-        await refreshFileStatus();
+        await refreshFileStatus(true);
       }, refreshTime * 1000);
 
-      refreshFileStatus();
+      refreshFileStatus(true);
     }
 
     // Clean up interval on unmount or when dependencies change
@@ -430,7 +430,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     };
   }, [loading, isActiveTab, settings]); // Re-run if loading state, active tab, or settings change
 
-  const refreshFileStatus = async () => {
+  const refreshFileStatus = async (noLock: boolean) => {
     // Ensure git adapter is available before attempting to use it
     if (!gitAdapter.current || runningCommands?.length > 0) {
       return;
@@ -440,7 +440,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       const git = gitAdapter.current;
 
       // Get current branch and modified files
-      const status = await git.status();
+      const status = await git.status(undefined, noLock);
       setCurrentBranch(status.current);
 
       // Parse files using status.files array for accurate staging info
@@ -771,14 +771,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             }
 
             // Refresh Local Changes panel after stash reapplication
-            await refreshFileStatus();
+            await refreshFileStatus(false);
           } catch (stashError) {
             console.warn('Could not reapply stash automatically:', stashError.message);
             setError(`Branch switched but stash could not be reapplied: ${stashError.message}`);
             console.info('The stash has been preserved and can be applied manually.');
 
             // Still refresh file status even if stash failed
-            await refreshFileStatus();
+            await refreshFileStatus(false);
           }
 
           // Refresh all data after stash operations
@@ -1073,7 +1073,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       clearBranchCache();
 
       // Refresh file status and stashes
-      await refreshFileStatus();
+      await refreshFileStatus(false);
       const stashList = await git.stashList();
       setStashes(stashList.all);
 
@@ -1306,7 +1306,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
 
       // Refresh the file statuses to show applied changes
-      await refreshFileStatus();
+      await refreshFileStatus(false);
 
       // Refresh repository data to show updated stash list
       await loadRepoData(true);
@@ -1719,7 +1719,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 unstagedFiles={unstagedFiles}
                 stagedFiles={stagedFiles}
                 gitAdapter={gitAdapter.current}
-                onRefresh={refreshFileStatus}
+                onRefresh={() => refreshFileStatus(false)}
                 onContextMenu={handleCommitContextMenu}
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}

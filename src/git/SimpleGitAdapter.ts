@@ -25,15 +25,25 @@ export class SimpleGitAdapter extends GitAdapter {
     this.isOpen = true;
   }
 
-  async status(path?: string): Promise<GitStatus> {  
+  async status(path?: string, noLock?: boolean): Promise<GitStatus> {  
     const startTime = performance.now();
     const id = this._startCommand('git status', startTime);
     let result: any = null;
     try {
       if (path) {
-        result = await this.git!.raw(['status', '--', path]);
+        if (noLock) {
+          const git2 = simpleGit({ baseDir: this.repoPath }).env({'GIT_OPTIONAL_LOCKS': '0'});
+          result = await git2.raw(['status', '--', path]);
+        } else {
+          result = await this.git!.raw(['status', '--', path]);
+        }
       } else {
-        result = await this.git.status();
+        if (noLock) {
+          const git2 = simpleGit({ baseDir: this.repoPath }).env({'GIT_OPTIONAL_LOCKS': '0'});
+          result = await git2.status();
+        } else {
+          result = await this.git.status();
+        }
       }
     } catch (error) {
       console.error('Error getting status:', error);
