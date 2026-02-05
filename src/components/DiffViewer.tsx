@@ -14,6 +14,8 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import * as Diff2Html from 'diff2html';
 import * as Diff2HtmlTypes from 'diff2html/lib/types';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import './DiffViewer.css';
 import 'diff2html/bundles/css/diff2html.min.css';
 
@@ -126,19 +128,174 @@ interface DiffViewerProps {
   file: FileDiff;
   gitAdapter: GitAdapter;
   isStaged: boolean;
+  onRefresh?: () => Promise<void>;
 }
 
-function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.ReactElement {
+function DiffViewer({ file, gitAdapter, isStaged, onRefresh }: DiffViewerProps): React.ReactElement {
   const [diff, setDiff] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [diffHtml, setDiffHtml] = useState<string>('');
   const [fileContent, setFileContent] = useState<string>('');
   const [fileType, setFileType] = useState<string>(''); // 'text' or 'image'
+  const [diffHunks, setDiffHunks] = useState<DiffHunk[]>([]);
+  const [hoveredChunkIndex, setHoveredChunkIndex] = useState<number | null>(null);
+  const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number } | null>(null);
+
+  // Add event listeners for chunk hover
+  useEffect(() => {
+    const handleChunkHover = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      // Check if hovering over the overlay buttons
+      const overlayButtons = target.closest('.chunk-overlay-buttons') as HTMLElement;
+      if (overlayButtons) {
+        // Don't change anything - keep current hover state
+        return;
+      }
+
+      const chunkWrapper = target.closest('.diff-chunk-wrapper') as HTMLElement;
+      if (chunkWrapper) {
+        const chunkIndex = parseInt(chunkWrapper.getAttribute('data-chunk-index') || '-1', 10);
+        if (chunkIndex >= 0) {
+          setHoveredChunkIndex(chunkIndex);
+
+          // Calculate button position relative to the container
+          const container = document.querySelector('.diff2html-container')?.parentElement;
+          if (container) {
+            const containerRect = container.getBoundingClientRect();
+            const chunkRect = chunkWrapper.getBoundingClientRect();
+            setButtonPosition({
+              top: chunkRect.top - containerRect.top + 8,
+              left: chunkRect.right - containerRect.left - 200
+            });
+          }
+        }
+      } else {
+        setHoveredChunkIndex(null);
+        setButtonPosition(null);
+      }
+    };
+
+    const handleMouseLeave = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const container = target.closest('.diff2html-container');
+      const overlayButtons = target.closest('.chunk-overlay-buttons');
+
+      // Only hide if not over container or buttons
+      if (!container && !overlayButtons) {
+        setHoveredChunkIndex(null);
+        setButtonPosition(null);
+      }
+    };
+
+    const container = document.querySelector('.diff2html-container');
+    if (container) {
+      container.addEventListener('mouseover', handleChunkHover);
+      container.addEventListener('mousemove', handleChunkHover);
+      document.addEventListener('mouseover', handleMouseLeave);
+      return () => {
+        container.removeEventListener('mouseover', handleChunkHover);
+        container.removeEventListener('mousemove', handleChunkHover);
+        document.removeEventListener('mouseover', handleMouseLeave);
+      };
+    }
+  }, [diffHtml]);
+
+  const handleDiscardChunk = async (chunkIndex: number) => {
+    if (chunkIndex < 0 || chunkIndex >= diffHunks.length)
+      return;
+
+    const chunk = diffHunks[chunkIndex];
+    const confirmed = window.confirm(
+      `Are you sure you want to discard this chunk? This cannot be undone.`
+    );
+
+    if (!confirmed)
+      return;
+
+    try {
+      // Create a temporary file with the chunk's diff
+      const tempDir = os.tmpdir();
+      const tempFile = path.join(tempDir, `chunk-${Date.now()}.patch`);
+      fs.writeFileSync(tempFile, chunk.fullDiff, 'utf8');
+
+      // Apply reverse patch
+      await gitAdapter.raw(['apply', '--reverse', '--unidiff-zero', tempFile]);
+
+      // Clean up temp file
+      fs.unlinkSync(tempFile);
+
+      console.log(`Discarded chunk ${chunkIndex + 1}`);
+
+      // Refresh the diff
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error: any) {
+      console.error('Error discarding chunk:', error);
+      alert(`Failed to discard chunk: ${error.message}`);
+    }
+  };
+
+  const handleStashChunk = async (chunkIndex: number) => {
+    if (chunkIndex < 0 || chunkIndex >= diffHunks.length)
+      return;
+
+    const chunk = diffHunks[chunkIndex];
+
+    try {
+      // Create a directory for chunk stashes if it doesn't exist
+      const stashDir = path.join(gitAdapter.repoPath, '.ugit', 'chunk-stashes');
+      if (!fs.existsSync(stashDir)) {
+        fs.mkdirSync(stashDir, { recursive: true });
+
+        // Add .ugit to .gitignore if not already present
+        const gitignorePath = path.join(gitAdapter.repoPath, '.gitignore');
+        let gitignoreContent = '';
+        if (fs.existsSync(gitignorePath)) {
+          gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+        }
+        if (!gitignoreContent.includes('.ugit')) {
+          gitignoreContent += (gitignoreContent && !gitignoreContent.endsWith('\n') ? '\n' : '') + '.ugit/\n';
+          fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
+          console.log('Added .ugit/ to .gitignore');
+        }
+      }
+
+      // Create a patch file with timestamp and file info
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileName = path.basename(file.path);
+      const patchFile = path.join(stashDir, `${timestamp}_${fileName}_chunk${chunkIndex + 1}.patch`);
+
+      fs.writeFileSync(patchFile, chunk.fullDiff, 'utf8');
+      console.log(`Stashed chunk to: ${patchFile}`);
+
+      // Now discard the chunk by applying reverse patch
+      const tempFile = path.join(os.tmpdir(), `chunk-discard-${Date.now()}.patch`);
+      fs.writeFileSync(tempFile, chunk.fullDiff, 'utf8');
+
+      await gitAdapter.raw(['apply', '--reverse', '--unidiff-zero', tempFile]);
+
+      // Clean up temp file
+      fs.unlinkSync(tempFile);
+
+      alert(`Chunk stashed to: ${patchFile.replace(gitAdapter.repoPath, '.')}`);
+
+      // Refresh the diff
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error: any) {
+      console.error('Error stashing chunk:', error);
+      alert(`Failed to stash chunk: ${error.message}`);
+    }
+  };
 
   useEffect(() => {
     const loadContent = async () => {
-      if (!file || !gitAdapter)
+      if (!file || !gitAdapter) {
         return;
+      }
 
       try {
         setLoading(true);
@@ -182,6 +339,7 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
           setDiffHtml('');
         } else {
           const hunks = splitDiffIntoHunks(diffResult);
+          setDiffHunks(hunks);
 
           let html = '<div class="diff2html-diff">';
           hunks.forEach((hunk, index) => {
@@ -197,7 +355,7 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
               // Hide the file header for subsequent hunks to avoid repetition
               hunkHtml = hunkHtml.replace('<div class="d2h-file-header">', `<div class="d2h-file-header" style="display: none;">`);
             }
-            html += hunkHtml;
+            html += `<div class="diff-chunk-wrapper" data-chunk-index="${index}">${hunkHtml}</div>`;
           });
           html += '</div>';
 
@@ -233,8 +391,8 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
         ) : fileType === 'image' ? (
           <div className="diff-image-container">
             <div className="diff-image-display">
-              <img 
-                src={`file://${gitAdapter.repoPath}/${file.path}`} 
+              <img
+                src={`file://${gitAdapter.repoPath}/${file.path}`}
                 alt={file.path}
                 className="diff-image"
                 onError={(e) => {
@@ -260,10 +418,38 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
             </div>
           </div>
         ) : fileType === 'diff' && diffHtml ? (
-          <div
-            className="diff2html-container"
-            dangerouslySetInnerHTML={{ __html: diffHtml }}
-          />
+          <div style={{ position: 'relative' }}>
+            <div
+              className="diff2html-container"
+              dangerouslySetInnerHTML={{ __html: diffHtml }}
+            />
+            {hoveredChunkIndex !== null && buttonPosition && (
+              <div
+                className="chunk-overlay-buttons"
+                style={{
+                  position: 'absolute',
+                  top: `${buttonPosition.top}px`,
+                  left: `${buttonPosition.left}px`,
+                  zIndex: 100
+                }}
+              >
+                <button
+                  className="chunk-action-button chunk-stash-button"
+                  onClick={() => handleStashChunk(hoveredChunkIndex)}
+                  title="Stash this chunk"
+                >
+                  Stash
+                </button>
+                <button
+                  className="chunk-action-button chunk-discard-button"
+                  onClick={() => handleDiscardChunk(hoveredChunkIndex)}
+                  title="Discard this chunk"
+                >
+                  Discard
+                </button>
+              </div>
+            )}
+          </div>
         ) : fileContent ? (
           <div className="diff-file-content">
             <div className="diff-file-content-display">

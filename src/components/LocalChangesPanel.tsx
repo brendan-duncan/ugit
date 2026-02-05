@@ -464,6 +464,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                 file={selectedFile.file}
                 gitAdapter={gitAdapter}
                 isStaged={selectedFile.listType === 'staged'}
+                onRefresh={onRefresh}
               />
             </div>
           </>

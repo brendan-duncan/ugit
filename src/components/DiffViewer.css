@@ -232,3 +232,58 @@
 .d2h-file-header  {
   display: none;
 }
+
+/* Chunk wrapper and overlay buttons */
+.diff-chunk-wrapper {
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.diff-chunk-wrapper:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.chunk-overlay-buttons {
+  display: flex;
+  gap: 8px;
+  pointer-events: all;
+}
+
+.chunk-action-button {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.chunk-stash-button {
+  background-color: #1e463e;
+  color: #ececec;
+}
+
+.chunk-stash-button:hover {
+  background-color: #316d61;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.chunk-discard-button {
+  background-color: #8f4c3f;
+  color: #ececec;
+}
+
+.chunk-discard-button:hover {
+  background-color: #9c5f53;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.chunk-action-button:active {
+  transform: translateY(0px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
