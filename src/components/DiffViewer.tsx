@@ -67,6 +67,61 @@ function getCodeMirrorLanguage(filePath: string): any[] {
   }
 }
 
+interface DiffHunk {
+  fileHeader: string;
+  header: string;
+  content: string;
+  fullDiff: string;
+}
+
+function splitDiffIntoHunks(diff: string): DiffHunk[] {
+  const lines = diff.split('\n');
+  const hunks: DiffHunk[] = [];
+  
+  // Find the file header lines (---, +++, etc.)
+  let fileHeaderEndIndex = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('@@')) {
+      fileHeaderEndIndex = i;
+      break;
+    }
+  }
+  
+  const fileHeader = lines.slice(0, fileHeaderEndIndex).join('\n');
+  
+  // Split by @@ markers
+  let currentHunkStart = -1;
+  
+  for (let i = fileHeaderEndIndex; i < lines.length; i++) {
+    if (lines[i].startsWith('@@')) {
+      // If we were processing a previous hunk, save it
+      if (currentHunkStart !== -1) {
+        const hunkLines = lines.slice(currentHunkStart, i);
+        hunks.push({
+          fileHeader,
+          header: hunkLines[0],
+          content: hunkLines.slice(1).join('\n'),
+          fullDiff: fileHeader + '\n' + hunkLines.join('\n')
+        });
+      }
+      currentHunkStart = i;
+    }
+  }
+  
+  // Don't forget the last hunk
+  if (currentHunkStart !== -1) {
+    const hunkLines = lines.slice(currentHunkStart);
+    hunks.push({
+      fileHeader,
+      header: hunkLines[0],
+      content: hunkLines.slice(1).join('\n'),
+      fullDiff: fileHeader + '\n' + hunkLines.join('\n')
+    });
+  }
+  
+  return hunks;
+}
+
 interface DiffViewerProps {
   file: FileDiff;
   gitAdapter: GitAdapter;
@@ -114,7 +169,6 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
 
         // If diff is empty or indicates no changes, try to show file contents
         if (!diffResult || diffResult.trim() === '' || diffResult.startsWith('Error loading diff:')) {
-          console.log('!!!! No diff available, attempting to load file contents.');
           // Try to read the file contents for new files
           try {
             setFileType('text');
@@ -127,15 +181,26 @@ function DiffViewer({ file, gitAdapter, isStaged }: DiffViewerProps): React.Reac
           }
           setDiffHtml('');
         } else {
-          // Generate HTML using diff2html
-          const html = Diff2Html.html(diffResult, {
-            drawFileList: false,
-            outputFormat: 'side-by-side',
-            matching: 'lines',
-            diffStyle: 'word',
-            renderNothingWhenEmpty: false,
-            colorScheme: Diff2HtmlTypes.ColorSchemeType.DARK
+          const hunks = splitDiffIntoHunks(diffResult);
+
+          let html = '<div class="diff2html-diff">';
+          hunks.forEach((hunk, index) => {
+            let hunkHtml = Diff2Html.html(hunk.fullDiff, {
+              drawFileList: false,
+              outputFormat: 'side-by-side',
+              matching: 'lines',
+              diffStyle: 'word',
+              renderNothingWhenEmpty: false,
+              colorScheme: Diff2HtmlTypes.ColorSchemeType.DARK
+            });
+            if (index > 0) {
+              // Hide the file header for subsequent hunks to avoid repetition
+              hunkHtml = hunkHtml.replace('<div class="d2h-file-header">', `<div class="d2h-file-header" style="display: none;">`);
+            }
+            html += hunkHtml;
           });
+          html += '</div>';
+
           setDiffHtml(html);
           setFileType('diff');
         }
