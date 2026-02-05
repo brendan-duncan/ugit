@@ -1122,6 +1122,49 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
+  const handleDiscardAllChanges = async () => {
+    if (modifiedCount === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to discard all ${modifiedCount} local changes? This cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const git = gitAdapter.current;
+
+      // Discard staged changes
+      if (stagedFiles.length > 0) {
+        const stagedPaths = stagedFiles.map(f => f.path);
+        if (stagedPaths.length === 1) {
+          await git.reset(stagedPaths[0]);
+        } else {
+          await git.reset(stagedPaths);
+        }
+        console.log(`Reset ${stagedFiles.length} staged files`);
+      }
+
+      // Discard unstaged changes
+      if (unstagedFiles.length > 0) {
+        await git.discard(unstagedFiles.map(f => f.path));
+        console.log(`Discarded changes for ${unstagedFiles.length} files`);
+      }
+
+      // Clear branch commits cache since discarding may affect file status
+      clearBranchCache();
+
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error discarding changes:', error);
+      setError(`Discard changes failed: ${error.message}`);
+    }
+  };
+
   const handleCreateBranch = async (branchName: string, checkoutAfterCreate: boolean) => {
     try {
       const git = gitAdapter.current;
@@ -1681,6 +1724,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 onResetToOrigin={() => setShowResetDialog(true)}
                 onCleanWorkingDirectory={() => setShowCleanWorkingDirectoryDialog(true)}
                 onOriginChanged={handleOriginChanged}
+                onStashChanges={hasLocalChanges ? handleStashClick : undefined}
+                onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel

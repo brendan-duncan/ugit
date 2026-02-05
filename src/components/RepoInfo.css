@@ -114,3 +114,31 @@
   font-style: italic;
   font-size: 0.85rem;
 }
+
+.context-menu {
+  background-color: #252526;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  padding: 4px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  z-index: 10000;
+  position: fixed;
+}
+
+.context-menu-item {
+  padding: 6px 16px;
+  color: #cccccc;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.context-menu-item:hover {
+  background-color: #2a2d2e;
+}

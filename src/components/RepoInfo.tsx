@@ -22,10 +22,13 @@ interface RepoInfoProps {
   onResetToOrigin: () => void;
   onCleanWorkingDirectory: () => void;
   onOriginChanged?: () => Promise<void>;
+  onStashChanges?: () => void;
+  onDiscardChanges?: () => void;
 }
 
-const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged }) => {
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges }) => {
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
   // Extract repository directory name from the full path
@@ -85,6 +88,51 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
+  const handleLocalChangesContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Only show context menu if there are changes
+    if (modifiedCount === 0) {
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({
+      x: rect.left,
+      y: rect.top + rect.height,
+    });
+  };
+
+  const handleContextMenuAction = (action: string) => {
+    switch (action) {
+      case 'stash':
+        if (onStashChanges) {
+          onStashChanges();
+        }
+        break;
+      case 'discard':
+        if (onDiscardChanges) {
+          onDiscardChanges();
+        }
+        break;
+    }
+    setContextMenu(null);
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => closeContextMenu();
+    if (contextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
+
   return (
     <div className="repo-info">
       <div className="repo-header">
@@ -129,6 +177,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
         <div
           className={`local-changes-item ${isSelected ? 'selected' : ''}`}
           onClick={() => onSelectItem({ type: 'local-changes' })}
+          onContextMenu={handleLocalChangesContextMenu}
         >
           <span className="changes-icon">📝</span>
           Local Changes
@@ -136,6 +185,26 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           {usingCache && <span className="cache-indicator"></span>}
         </div>
       </div>
+
+      {/* Local Changes Context Menu */}
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 1000
+          }}
+        >
+          <div className="context-menu-item" onClick={() => handleContextMenuAction('stash')}>
+            Stash Changes
+          </div>
+          <div className="context-menu-item" onClick={() => handleContextMenuAction('discard')}>
+            Discard Changes
+          </div>
+        </div>
+      )}
 
       {/* Edit Origin Dialog */}
       {showEditOriginDialog && (
