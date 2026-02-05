@@ -196,7 +196,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
     }
 
-    //console.log("Loading repository data for ", repoPath, "... (isRefresh:", isRefresh, ")");
     const cacheLoadTime = performance.now();
 
     if (isRefresh) {
@@ -412,7 +411,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     if (isActiveTab) {
       // Get refresh time from settings, default to 5 seconds if not available
       const refreshTime = getSetting('localFileRefreshTime') || 5;
-      //console.log(`Setting up file status refresh interval: ${refreshTime} seconds`);
 
       refreshFileStatusId = setInterval(async () => {
         await refreshFileStatus(true);
@@ -425,7 +423,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     return () => {
       if (refreshFileStatusId !== null) {
         clearInterval(refreshFileStatusId);
-        //console.log('Cleared file status refresh interval');
       }
     };
   }, [loading, isActiveTab, settings]); // Re-run if loading state, active tab, or settings change
@@ -440,7 +437,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       const git = gitAdapter.current;
 
       // Get current branch and modified files
-      const status = await git.status(undefined, noLock);
+      const status = await git.status(undefined, noLock, true);
       setCurrentBranch(status.current);
 
       // Parse files using status.files array for accurate staging info

@@ -134,7 +134,7 @@ export abstract class GitAdapter {
    * @param path - Optional file path to limit status to that file
    * @param noLock - Optional flag to skip index refresh and avoid creating an index.lock
    */
-  abstract status(path?: string, noLock?: boolean): Promise<GitStatus>;
+  abstract status(path?: string, noLock?: boolean, skipNotification?: boolean): Promise<GitStatus>;
 
   /**
    * Get list of local branches

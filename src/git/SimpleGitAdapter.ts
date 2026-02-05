@@ -25,9 +25,9 @@ export class SimpleGitAdapter extends GitAdapter {
     this.isOpen = true;
   }
 
-  async status(path?: string, noLock?: boolean): Promise<GitStatus> {  
+  async status(path?: string, noLock?: boolean, skipNotification?: boolean): Promise<GitStatus> {  
     const startTime = performance.now();
-    const id = this._startCommand('git status', startTime);
+    const id = skipNotification ? -1 : this._startCommand('git status', startTime);
     let result: any = null;
     try {
       if (path) {
@@ -48,7 +48,9 @@ export class SimpleGitAdapter extends GitAdapter {
     } catch (error) {
       console.error('Error getting status:', error);
     }
-    this._endCommand(id, startTime);
+    if (!skipNotification) {
+      this._endCommand(id, startTime);
+    }
     this.currentBranch = result?.current || null; // Track current branch
     return {
       current: result?.current || '',
