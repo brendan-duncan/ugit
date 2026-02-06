@@ -3,7 +3,7 @@ import { DropdownMenu, DropdownItem, DropdownSeparator, DropdownSubmenu } from '
 import EditOriginDialog from './EditOriginDialog';
 import GitAdapter from '../git/GitAdapter';
 import { exec } from 'child_process';
-import { shell, clipboard } from 'electron';
+import { shell, clipboard, ipcRenderer } from 'electron';
 import './RepoInfo.css';
 
 interface SelectedItem {
@@ -24,9 +24,10 @@ interface RepoInfoProps {
   onOriginChanged?: () => Promise<void>;
   onStashChanges?: () => void;
   onDiscardChanges?: () => void;
+  onRefresh?: () => Promise<void>;
 }
 
-const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges }) => {
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh }) => {
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isLfsInitialized, setIsLfsInitialized] = useState(false);
@@ -206,6 +207,40 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
+  const handleApplyPatch = async () => {
+    try {
+      // Open file dialog to select patch file
+      const result = await ipcRenderer.invoke('show-open-dialog', {
+        title: 'Select Patch File',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Patch Files', extensions: ['patch', 'diff'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return;
+      }
+
+      const patchPath = result.filePaths[0];
+
+      // Apply the patch
+      if (gitAdapter) {
+        await gitAdapter.raw(['apply', patchPath]);
+        alert(`Patch applied successfully from:\n${patchPath}`);
+
+        // Refresh repository data
+        if (onRefresh) {
+          await onRefresh();
+        }
+      }
+    } catch (error: any) {
+      console.error('Error applying patch:', error);
+      alert(`Failed to apply patch: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
   const handleContextMenuAction = (action: string) => {
     switch (action) {
       case 'stash':
@@ -282,6 +317,10 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
               </DropdownItem>
             </DropdownSubmenu>
           )}
+          <DropdownSeparator />
+          <DropdownItem onClick={handleApplyPatch}>
+            📄 Apply Patch...
+          </DropdownItem>
           <DropdownSeparator />
           <DropdownItem onClick={onCleanWorkingDirectory}>
             🧹Clean Working Directory...

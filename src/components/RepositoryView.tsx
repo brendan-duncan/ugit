@@ -1726,6 +1726,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 onOriginChanged={handleOriginChanged}
                 onStashChanges={hasLocalChanges ? handleStashClick : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
+                onRefresh={() => loadRepoData(true)}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel
