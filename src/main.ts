@@ -149,6 +149,13 @@ function createMenu(): void {
           }
         },
         {
+          label: 'Init New Repository...',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => {
+            initRepository();
+          }
+        },
+        {
           label: 'Recent Repositories',
           submenu: recentSubmenu
         },
@@ -202,8 +209,25 @@ function createMenu(): void {
   Menu.setApplicationMenu(menu);
 }
 
+async function initRepository(): Promise<void> {
+  if (!mainWindow)
+    return;
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Init New Repository'
+  }) as any;
+
+  if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+    const repoPath = result.filePaths[0];
+    // Send the repository path to the renderer process
+    mainWindow.webContents.send('init-repository', repoPath);
+  }
+}
+
 async function openRepository(): Promise<void> {
-  if (!mainWindow) return;
+  if (!mainWindow)
+    return;
 
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
@@ -313,14 +337,34 @@ ipcMain.handle('show-item-in-folder', async (event: any, itemPath: string) => {
 
 // Show save dialog
 ipcMain.handle('show-save-dialog', async (event: any, options: any) => {
-  if (!mainWindow) return { canceled: true };
+  if (!mainWindow) {
+    return { canceled: true };
+  }
   return await dialog.showSaveDialog(mainWindow, options);
 });
 
 // Show open dialog for directory selection
 ipcMain.handle('show-open-dialog', async (event: any, options: any) => {
-  if (!mainWindow) return { canceled: true, filePaths: [] };
+  if (!mainWindow) {
+    return { canceled: true, filePaths: [] };
+  }
   return await dialog.showOpenDialog(mainWindow, options);
+});
+
+// Init repository
+ipcMain.handle('init-repository', async (event: any, repoPath: string) => {
+  try {
+    // Create git adapter
+    const gitAdapter = await GitFactory.createAdapter(repoPath, gitBackend);
+
+    // Initialize repository
+    await gitAdapter.init();
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error initializing repository:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // Clone repository

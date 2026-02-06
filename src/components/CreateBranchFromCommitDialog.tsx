@@ -42,7 +42,8 @@ function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, com
   }, [branchName]);
 
   const handleCreate = async () => {
-    if (isCreating || !branchName.trim() || branchExists) return;
+    if (isCreating || !branchName.trim() || branchExists)
+      return;
 
     setIsCreating(true);
     try {

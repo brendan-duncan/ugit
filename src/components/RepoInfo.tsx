@@ -83,7 +83,8 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
 
     try {
       const git = gitAdapter;
-      if (!git) return;
+      if (!git)
+        return;
 
       if (originUrl) {
         // Update existing origin

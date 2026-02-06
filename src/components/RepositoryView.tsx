@@ -1193,7 +1193,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   };
 
   const handleCreateBranchFromCommit = async (branchName, checkoutAfterCreate) => {
-    if (!commitForDialog) return;
+    if (!commitForDialog)
+      return;
 
     try {
       const git = gitAdapter.current;
@@ -1220,7 +1221,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   };
 
   const handleCreateTagFromCommit = async (tagName, tagMessage) => {
-    if (!commitForDialog) return;
+    if (!commitForDialog)
+      return;
 
     try {
       const git = gitAdapter.current;

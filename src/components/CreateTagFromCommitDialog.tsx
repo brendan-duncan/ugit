@@ -30,7 +30,8 @@ function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMes
   }, [tagName]);
 
   const handleCreate = async () => {
-    if (isCreating || !tagName.trim() || tagExists) return;
+    if (isCreating || !tagName.trim() || tagExists)
+      return;
 
     setIsCreating(true);
     try {

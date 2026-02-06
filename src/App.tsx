@@ -96,6 +96,10 @@ function App(): React.ReactElement {
 
   // Listen for events from main process
   useEffect(() => {
+    const handleInitRepo = (event: any, repoPath: string) => {
+      initRepository(repoPath);
+    };
+
     const handleOpenRepo = (event: any, repoPath: string) => {
       openRepository(repoPath);
     };
@@ -108,6 +112,7 @@ function App(): React.ReactElement {
       setShowSettings(true);
     };
 
+    ipcRenderer.on('init-repository', handleInitRepo);
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
     ipcRenderer.on('show-settings-dialog', handleShowSettingsDialog);
@@ -161,6 +166,7 @@ function App(): React.ReactElement {
     ipcRenderer.on('save-stash', handleSaveStash);
 
     return () => {
+      ipcRenderer.removeListener('init-repository', handleInitRepo);
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
       ipcRenderer.removeListener('show-clone-dialog', handleShowCloneDialog);
       ipcRenderer.removeListener('refresh-repository', handleRefresh);
@@ -170,6 +176,20 @@ function App(): React.ReactElement {
       ipcRenderer.removeListener('save-stash', handleSaveStash);
     };
   }, [tabs, activeTabId]);
+
+  const initRepository = async (repoPath?: string) => {
+    try {
+      const result: CloneResult = await ipcRenderer.invoke('init-repository', repoPath);
+
+      if (result.success && result.path) {
+        openRepository(result.path);
+      } else {
+        alert(`Failed to initialize repository: ${result.error}`);
+      }
+    } catch (error) {
+      alert(`Failed to initialize repository: ${error.message}`);
+    }
+  };
 
   const openRepository = (repoPath: string) => {
     // Check if path exists before opening
@@ -238,7 +258,7 @@ function App(): React.ReactElement {
         // Show error message
         alert(`Clone failed: ${result.error}`);
       }
-    } catch (error: any) {
+    } catch (error) {
       alert(`Clone failed: ${error.message}`);
     }
   };

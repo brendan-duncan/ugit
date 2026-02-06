@@ -25,6 +25,18 @@ export class SimpleGitAdapter extends GitAdapter {
     this.isOpen = true;
   }
 
+  async init(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git init', startTime);
+    try {
+      const git = simpleGit({ baseDir: this.repoPath });
+      await git.init();
+    } catch (error) {
+      console.error('Error initializing repository:', error);
+    }
+    this._endCommand(id, startTime);
+  }
+
   async status(path?: string, noLock?: boolean, skipNotification?: boolean): Promise<GitStatus> {  
     const startTime = performance.now();
     const id = skipNotification ? -1 : this._startCommand('git status', startTime);

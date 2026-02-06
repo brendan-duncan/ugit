@@ -130,6 +130,11 @@ export abstract class GitAdapter {
   }
 
   /**
+   * Initialize a directory as a git repository.
+   */
+  abstract init(): Promise<void>;
+
+  /**
    * Get repository status including current branch and file changes
    * @param path - Optional file path to limit status to that file
    * @param noLock - Optional flag to skip index refresh and avoid creating an index.lock

@@ -322,7 +322,8 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
 
   const handleRemoteAction = (action: string) => {
     const remote = remoteActionMenu?.remote;
-    if (!remote) return;
+    if (!remote)
+      return;
 
     setRemoteActionMenu(null);
 

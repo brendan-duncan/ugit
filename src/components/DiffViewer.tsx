@@ -21,7 +21,8 @@ import 'diff2html/bundles/css/diff2html.min.css';
 
 // Helper function to check if file is an image
 function isImageFile(filePath: string): boolean {
-  if (!filePath) return false;
+  if (!filePath)
+    return false;
   const imageExtensions = /\.(png|jpg|jpeg|gif|bmp|svg|ico|webp|tiff|tif)$/i;
   return imageExtensions.test(filePath);
 }
