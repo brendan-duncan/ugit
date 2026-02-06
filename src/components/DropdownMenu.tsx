@@ -37,9 +37,18 @@ function DropdownMenu({ trigger, children }: DropdownMenuProps): React.ReactElem
       </div>
       {isOpen && (
         <div className="dropdown-menu">
-          {React.Children.map(children, (child) => 
-            cloneElement(child as React.ReactElement<any>, { onClick: () => handleItemClick((child as any).props.onClick) })
-          )}
+          {React.Children.map(children, (child) => {
+            const element = child as React.ReactElement<any>;
+            // Don't add click handler to DropdownSeparator
+            if (element.type === DropdownSeparator) {
+              return element;
+            }
+            // Pass close handler to DropdownSubmenu
+            if (element.type === DropdownSubmenu) {
+              return cloneElement(element, { onItemClick: () => setIsOpen(false) });
+            }
+            return cloneElement(element, { onClick: () => handleItemClick(element.props.onClick) });
+          })}
         </div>
       )}
     </div>
@@ -67,4 +76,46 @@ function DropdownSeparator(): React.ReactElement {
   return <div className="dropdown-separator"></div>;
 };
 
-export { DropdownMenu, DropdownItem, DropdownSeparator };
+interface DropdownSubmenuProps {
+  label: string;
+  children: ReactNode;
+  onItemClick?: () => void;
+}
+
+function DropdownSubmenu({ label, children, onItemClick }: DropdownSubmenuProps): React.ReactElement {
+  const [isSubmenuOpen, setIsSubmenuOpen] = useState<boolean>(false);
+  const submenuRef = useRef<HTMLDivElement>(null);
+
+  const handleSubmenuItemClick = (callback?: () => void) => {
+    if (callback) callback();
+    if (onItemClick) onItemClick();
+  };
+
+  return (
+    <div
+      className="dropdown-submenu"
+      ref={submenuRef}
+      onMouseEnter={() => setIsSubmenuOpen(true)}
+      onMouseLeave={() => setIsSubmenuOpen(false)}
+    >
+      <div className="dropdown-item dropdown-submenu-trigger">
+        {label}
+        <span className="dropdown-submenu-arrow">▶</span>
+      </div>
+      {isSubmenuOpen && (
+        <div className="dropdown-submenu-content">
+          {React.Children.map(children, (child) => {
+            const element = child as React.ReactElement<any>;
+            // Don't add click handler to DropdownSeparator
+            if (element.type === DropdownSeparator) {
+              return element;
+            }
+            return cloneElement(element, { onClick: () => handleSubmenuItemClick(element.props.onClick) });
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export { DropdownMenu, DropdownItem, DropdownSeparator, DropdownSubmenu };

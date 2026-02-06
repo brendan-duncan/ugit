@@ -1,6 +1,7 @@
 .dropdown {
   position: relative;
   display: inline-block;
+  z-index: 10000;
 }
 
 .dropdown-trigger {
@@ -27,7 +28,7 @@
   border: 1px solid #3d3d3d;
   border-radius: 4px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: 10000;
   min-width: 200px;
   margin-top: 2px;
 }
@@ -54,4 +55,33 @@
   height: 1px;
   background-color: #3d3d3d;
   margin: 4px 0;
+}
+
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dropdown-submenu-arrow {
+  font-size: 0.7rem;
+  margin-left: 8px;
+  color: #888888;
+}
+
+.dropdown-submenu-content {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background-color: #252526;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  z-index: 10001;
+  min-width: 200px;
+  margin-left: 2px;
 }

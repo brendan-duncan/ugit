@@ -328,6 +328,47 @@ export abstract class GitAdapter {
    * @param args - Git command arguments
    */
   abstract raw(args: string[]): Promise<string>;
+
+  /**
+   * Check if Git LFS is initialized in the repository
+   */
+  abstract isLfsInitialized(): Promise<boolean>;
+
+  /**
+   * Initialize Git LFS in the repository
+   */
+  abstract lfsInstall(): Promise<void>;
+
+  /**
+   * Add a file pattern to track with Git LFS
+   * @param pattern - File pattern to track (e.g., "*.psd")
+   */
+  abstract lfsTrack(pattern: string): Promise<void>;
+
+  /**
+   * Get Git LFS status
+   */
+  abstract lfsStatus(): Promise<string>;
+
+  /**
+   * Fetch Git LFS objects
+   */
+  abstract lfsFetch(): Promise<void>;
+
+  /**
+   * Pull Git LFS objects
+   */
+  abstract lfsPull(): Promise<void>;
+
+  /**
+   * Prune old Git LFS objects
+   */
+  abstract lfsPrune(): Promise<void>;
+
+  /**
+   * Uninstall Git LFS from the repository
+   */
+  abstract lfsUninstall(): Promise<void>;
 }
 
 export default GitAdapter;

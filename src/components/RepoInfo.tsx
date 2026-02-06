@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { DropdownMenu, DropdownItem, DropdownSeparator } from './DropdownMenu';
+import React, { useState, useEffect } from 'react';
+import { DropdownMenu, DropdownItem, DropdownSeparator, DropdownSubmenu } from './DropdownMenu';
 import EditOriginDialog from './EditOriginDialog';
 import GitAdapter from '../git/GitAdapter';
 import { exec } from 'child_process';
@@ -29,10 +29,26 @@ interface RepoInfoProps {
 const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges }) => {
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [isLfsInitialized, setIsLfsInitialized] = useState(false);
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
   // Extract repository directory name from the full path
   const repoName = gitAdapter?.repoPath?.split(/[\\/]/).pop() || 'Repository';
+
+  // Check if LFS is initialized
+  useEffect(() => {
+    const checkLfsStatus = async () => {
+      if (gitAdapter) {
+        try {
+          const initialized = await gitAdapter.isLfsInitialized();
+          setIsLfsInitialized(initialized);
+        } catch (error) {
+          setIsLfsInitialized(false);
+        }
+      }
+    };
+    checkLfsStatus();
+  }, [gitAdapter]);
 
   // Menu item handlers
   const handleOpenInFileExplorer = () => {
@@ -104,6 +120,92 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     });
   };
 
+  const handleLfsInitialize = async () => {
+    try {
+      await gitAdapter?.lfsInstall();
+      alert('Git LFS has been initialized successfully.');
+      setIsLfsInitialized(true);
+    } catch (error: any) {
+      console.error('Error initializing Git LFS:', error);
+      alert(`Failed to initialize Git LFS: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleLfsTrackPattern = () => {
+    const pattern = prompt('Enter file pattern to track (e.g., *.psd, *.bin):');
+    if (pattern) {
+      gitAdapter?.lfsTrack(pattern)
+        .then(() => {
+          alert(`Now tracking "${pattern}" with Git LFS.\n\nDon't forget to commit the updated .gitattributes file.`);
+        })
+        .catch((error: any) => {
+          console.error('Error tracking pattern:', error);
+          alert(`Failed to track pattern: ${error?.message || 'Unknown error'}`);
+        });
+    }
+  };
+
+  const handleLfsStatus = async () => {
+    try {
+      const status = await gitAdapter?.lfsStatus();
+      alert(`Git LFS Status:\n\n${status}`);
+    } catch (error: any) {
+      console.error('Error getting LFS status:', error);
+      alert(`Failed to get LFS status: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleLfsFetch = async () => {
+    try {
+      await gitAdapter?.lfsFetch();
+      alert('Git LFS objects fetched successfully.');
+    } catch (error: any) {
+      console.error('Error fetching LFS objects:', error);
+      alert(`Failed to fetch LFS objects: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleLfsPull = async () => {
+    try {
+      await gitAdapter?.lfsPull();
+      alert('Git LFS objects pulled successfully.');
+    } catch (error: any) {
+      console.error('Error pulling LFS objects:', error);
+      alert(`Failed to pull LFS objects: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleLfsPrune = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to prune old Git LFS objects?\n\nThis will delete local LFS files that are no longer referenced.'
+    );
+    if (confirmed) {
+      try {
+        await gitAdapter?.lfsPrune();
+        alert('Git LFS objects pruned successfully.');
+      } catch (error: any) {
+        console.error('Error pruning LFS objects:', error);
+        alert(`Failed to prune LFS objects: ${error?.message || 'Unknown error'}`);
+      }
+    }
+  };
+
+  const handleLfsDeinitialize = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to deinitialize Git LFS?\n\nThis will remove LFS hooks from this repository.'
+    );
+    if (confirmed) {
+      try {
+        await gitAdapter?.lfsUninstall();
+        alert('Git LFS has been deinitialized.');
+        setIsLfsInitialized(false);
+      } catch (error: any) {
+        console.error('Error deinitializing Git LFS:', error);
+        alert(`Failed to deinitialize Git LFS: ${error?.message || 'Unknown error'}`);
+      }
+    }
+  };
+
   const handleContextMenuAction = (action: string) => {
     switch (action) {
       case 'stash':
@@ -147,6 +249,39 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           <DropdownItem onClick={handleCopyLocalPath}>
             📋 Copy Local Path
           </DropdownItem>
+          <DropdownSeparator />
+          {!isLfsInitialized ? (
+            <DropdownSubmenu label="Git LFS">
+              <DropdownItem onClick={handleLfsInitialize}>
+                Initialize Git LFS
+              </DropdownItem>
+            </DropdownSubmenu>
+          ) : (
+            <DropdownSubmenu label="Git LFS">
+              <DropdownItem onClick={handleLfsTrackPattern}>
+                Add Track Pattern...
+              </DropdownItem>
+              <DropdownSeparator />
+              <DropdownItem onClick={handleLfsStatus}>
+                Status (Locs)...
+              </DropdownItem>
+              <DropdownSeparator />
+              <DropdownItem onClick={handleLfsFetch}>
+                Fetch...
+              </DropdownItem>
+              <DropdownItem onClick={handleLfsPull}>
+                Pull...
+              </DropdownItem>
+              <DropdownSeparator />
+              <DropdownItem onClick={handleLfsPrune}>
+                Prune
+              </DropdownItem>
+              <DropdownSeparator />
+              <DropdownItem onClick={handleLfsDeinitialize}>
+                Deinitialize Git LFS
+              </DropdownItem>
+            </DropdownSubmenu>
+          )}
           <DropdownSeparator />
           <DropdownItem onClick={onCleanWorkingDirectory}>
             🧹Clean Working Directory...

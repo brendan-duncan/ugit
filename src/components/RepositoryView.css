@@ -83,7 +83,7 @@
 .repo-sidebar {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   height: 100%;
 }
 

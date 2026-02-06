@@ -651,6 +651,106 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
     return result || '';
   }
+
+  async isLfsInitialized(): Promise<boolean> {
+    try {
+      // Check if git-lfs is installed by running git lfs version
+      await this.git.raw(['lfs', 'version']);
+
+      // Check if LFS is initialized in this repo by checking for .gitattributes
+      const result = await this.git.raw(['lfs', 'ls-files']);
+      // If we get here without error, LFS is initialized
+      return true;
+    } catch (error) {
+      // If command fails, LFS is not initialized or not installed
+      return false;
+    }
+  }
+
+  async lfsInstall(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git lfs install', startTime);
+    try {
+      await this.git.raw(['lfs', 'install']);
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to initialize Git LFS: ${error.message}`);
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async lfsTrack(pattern: string): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git lfs track "${pattern}"`, startTime);
+    try {
+      await this.git.raw(['lfs', 'track', pattern]);
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to track pattern: ${error.message}`);
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async lfsStatus(): Promise<string> {
+    const startTime = performance.now();
+    const id = this._startCommand('git lfs status', startTime);
+    try {
+      const result = await this.git.raw(['lfs', 'status']);
+      this._endCommand(id, startTime);
+      return result;
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to get LFS status: ${error.message}`);
+    }
+  }
+
+  async lfsFetch(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git lfs fetch', startTime);
+    try {
+      await this.git.raw(['lfs', 'fetch']);
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to fetch LFS objects: ${error.message}`);
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async lfsPull(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git lfs pull', startTime);
+    try {
+      await this.git.raw(['lfs', 'pull']);
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to pull LFS objects: ${error.message}`);
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async lfsPrune(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git lfs prune', startTime);
+    try {
+      await this.git.raw(['lfs', 'prune']);
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to prune LFS objects: ${error.message}`);
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async lfsUninstall(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git lfs uninstall', startTime);
+    try {
+      await this.git.raw(['lfs', 'uninstall']);
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to uninstall Git LFS: ${error.message}`);
+    }
+    this._endCommand(id, startTime);
+  }
 }
 
 export default SimpleGitAdapter;
