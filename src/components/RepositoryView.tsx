@@ -27,6 +27,13 @@ import { ipcRenderer } from 'electron';
 import { useSettings } from '../hooks/useSettings';
 import './RepositoryView.css';
 
+type BranchStatus = {
+  [branchName: string]: {
+    ahead: number;
+    behind: number;
+  };
+};
+
 interface RepositoryViewProps {
   repoPath: string;
   isActiveTab: boolean;
@@ -37,7 +44,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
   const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
-  const [branchStatus, setBranchStatus] = useState({});
+  const [branchStatus, setBranchStatus] = useState<BranchStatus>({});
   const [originUrl, setOriginUrl] = useState('');
   const [stashes, setStashes] = useState<StashInfo[]>([]);
   const [modifiedCount, setModifiedCount] = useState<number>(0);
@@ -345,7 +352,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       });
 
       const statusResults = await Promise.all(statusPromises);
-      const statusMap = {};
+      const statusMap: BranchStatus = {};
       statusResults.forEach(result => {
         if (result) {
           statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
@@ -499,6 +506,23 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
     } catch (err) {
       console.error('Error refreshing file status:', err);
+    }
+  };
+
+  const refreshCurrentBranchStatus = async () => {
+    // Ensure git adapter is available before attempting to use it
+    if (!gitAdapter.current) {
+      return;
+    }
+    try {
+      const git = gitAdapter.current;
+      const { ahead, behind } = await git.getAheadBehind(currentBranch, `origin/${currentBranch}`);
+      setBranchStatus(prev => ({
+      ...prev,
+      [currentBranch]: { ahead, behind }
+    }));
+    } catch (error) {
+      console.error('Error refreshing current branch status:', error);
     }
   };
 
