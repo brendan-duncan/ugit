@@ -1608,7 +1608,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
               await loadRepoData(true);
             }
           } else {
-            alert('No current branch found for rebase');
+            setError('No current branch found for rebase');
           }
           break;
 
@@ -1623,7 +1623,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
               await loadRepoData(true);
             }
           } else {
-            alert('No current branch found for reset');
+            setError('No current branch found for reset');
           }
           break;
 
@@ -1649,7 +1649,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
               await loadRepoData(true);
             }
           } else {
-            alert('No current branch found for cherry-pick');
+            setError('No current branch found for cherry-pick');
           }
           break;
 
@@ -1664,7 +1664,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
               await loadRepoData(true);
             }
           } else {
-            alert('No current branch found for revert');
+            setError('No current branch found for revert');
           }
           break;
 
@@ -1683,7 +1683,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             console.log(`Saved patch for commit ${commit.hash.substring(0, 7)}`);
           } catch (error) {
             console.error('Error creating patch:', error);
-            alert('Failed to create patch: ' + error.message);
+            setError('Failed to create patch: ' + error.message);
           }
           break;
 
@@ -1713,7 +1713,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
     } catch (error) {
       console.error(`Error handling commit context menu action '${action}':`, error);
-      alert(`Error: ${error.message}`);
+      setError(`Error: ${error.message}`);
     }
   };
 
@@ -1753,6 +1753,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 onStashChanges={hasLocalChanges ? handleStashClick : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
                 onRefresh={() => loadRepoData(true)}
+                onError={setError}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel
@@ -1792,6 +1793,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 onContextMenu={handleCommitContextMenu}
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}
+                onError={setError}
               />
             </div>
           </>

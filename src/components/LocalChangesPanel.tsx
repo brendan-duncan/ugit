@@ -18,9 +18,10 @@ interface LocalChangesPanelProps {
   onRefresh: () => Promise<void>;
   currentBranch?: string;
   branchStatus?: Record<string, any>;
+  onError?: (error: string) => void;
 }
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus }: LocalChangesPanelProps) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError }: LocalChangesPanelProps) {
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -465,6 +466,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                 gitAdapter={gitAdapter}
                 isStaged={selectedFile.listType === 'staged'}
                 onRefresh={onRefresh}
+                onError={onError}
               />
             </div>
           </>

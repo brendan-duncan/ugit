@@ -25,9 +25,10 @@ interface RepoInfoProps {
   onStashChanges?: () => void;
   onDiscardChanges?: () => void;
   onRefresh?: () => Promise<void>;
+  onError?: (error: string) => void;
 }
 
-const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh }) => {
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isLfsInitialized, setIsLfsInitialized] = useState(false);
@@ -102,7 +103,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       }
     } catch (error: any) {
       console.error('Error editing origin:', error);
-      alert(`Error editing origin: ${error?.message || 'Unknown error'}`);
+      if (onError) {
+        onError(`Error editing origin: ${error?.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -129,7 +132,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       setIsLfsInitialized(true);
     } catch (error: any) {
       console.error('Error initializing Git LFS:', error);
-      alert(`Failed to initialize Git LFS: ${error?.message || 'Unknown error'}`);
+      if (onError) {
+        onError(`Failed to initialize Git LFS: ${error?.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -142,7 +147,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
         })
         .catch((error: any) => {
           console.error('Error tracking pattern:', error);
-          alert(`Failed to track pattern: ${error?.message || 'Unknown error'}`);
+          if (onError) {
+            onError(`Failed to track pattern: ${error?.message || 'Unknown error'}`);
+          }
         });
     }
   };
@@ -153,7 +160,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       alert(`Git LFS Status:\n\n${status}`);
     } catch (error: any) {
       console.error('Error getting LFS status:', error);
-      alert(`Failed to get LFS status: ${error?.message || 'Unknown error'}`);
+      if (onError) {
+        onError(`Failed to get LFS status: ${error?.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -163,7 +172,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       alert('Git LFS objects fetched successfully.');
     } catch (error: any) {
       console.error('Error fetching LFS objects:', error);
-      alert(`Failed to fetch LFS objects: ${error?.message || 'Unknown error'}`);
+      if (onError) {
+        onError(`Failed to fetch LFS objects: ${error?.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -173,7 +184,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       alert('Git LFS objects pulled successfully.');
     } catch (error: any) {
       console.error('Error pulling LFS objects:', error);
-      alert(`Failed to pull LFS objects: ${error?.message || 'Unknown error'}`);
+      if (onError) {
+        onError(`Failed to pull LFS objects: ${error?.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -187,7 +200,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
         alert('Git LFS objects pruned successfully.');
       } catch (error: any) {
         console.error('Error pruning LFS objects:', error);
-        alert(`Failed to prune LFS objects: ${error?.message || 'Unknown error'}`);
+        if (onError) {
+          onError(`Failed to prune LFS objects: ${error?.message || 'Unknown error'}`);
+        }
       }
     }
   };
@@ -203,7 +218,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
         setIsLfsInitialized(false);
       } catch (error: any) {
         console.error('Error deinitializing Git LFS:', error);
-        alert(`Failed to deinitialize Git LFS: ${error?.message || 'Unknown error'}`);
+        if (onError) {
+          onError(`Failed to deinitialize Git LFS: ${error?.message || 'Unknown error'}`);
+        }
       }
     }
   };
@@ -238,7 +255,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       }
     } catch (error: any) {
       console.error('Error applying patch:', error);
-      alert(`Failed to apply patch: ${error?.message || 'Unknown error'}`);
+      if (onError) {
+        onError(`Failed to apply patch: ${error?.message || 'Unknown error'}`);
+      }
     }
   };
 

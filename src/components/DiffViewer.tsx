@@ -130,9 +130,10 @@ interface DiffViewerProps {
   gitAdapter: GitAdapter;
   isStaged: boolean;
   onRefresh?: () => Promise<void>;
+  onError?: (error: string) => void;
 }
 
-function DiffViewer({ file, gitAdapter, isStaged, onRefresh }: DiffViewerProps): React.ReactElement {
+function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffViewerProps): React.ReactElement {
   const [diff, setDiff] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [diffHtml, setDiffHtml] = useState<string>('');
@@ -234,7 +235,9 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh }: DiffViewerProps):
       }
     } catch (error: any) {
       console.error('Error discarding chunk:', error);
-      alert(`Failed to discard chunk: ${error.message}`);
+      if (onError) {
+        onError(`Failed to discard chunk: ${error.message}`);
+      }
     }
   };
 
@@ -288,7 +291,9 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh }: DiffViewerProps):
       }
     } catch (error: any) {
       console.error('Error stashing chunk:', error);
-      alert(`Failed to stash chunk: ${error.message}`);
+      if (onError) {
+        onError(`Failed to stash chunk: ${error.message}`);
+      }
     }
   };
 
