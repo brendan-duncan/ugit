@@ -360,7 +360,7 @@ ipcMain.handle('init-repository', async (event: any, repoPath: string) => {
     // Initialize repository
     await gitAdapter.init();
 
-    return { success: true };
+    return { success: true, path: repoPath };
   } catch (error: any) {
     console.error('Error initializing repository:', error);
     return { success: false, error: error.message };
