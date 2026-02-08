@@ -7,7 +7,8 @@ import GitAdapter, {
   StashInfo,
   StashListResponse,
   CommitFile } from './GitAdapter';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as path from 'path';
 
 /**
@@ -496,8 +497,8 @@ export class SimpleGitAdapter extends GitAdapter {
         // New untracked file or new staged file - delete it from filesystem
         const fullPath = path.join(this.repoPath, filePath);
         try {
-          if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
+          if (fsSync.existsSync(fullPath)) {
+            fsSync.unlinkSync(fullPath);
             console.log(`Deleted new file: ${filePath}`);
           }
         } catch (error) {
@@ -618,7 +619,7 @@ export class SimpleGitAdapter extends GitAdapter {
       this._logCommand(`git diff -- ${filePaths.length} files > ${outputPath}`, startTime);
     }
 
-    fs.writeFileSync(outputPath, patchContent, 'utf8');
+    fsSync.writeFileSync(outputPath, patchContent, 'utf8');
     this._endCommand(id, startTime);
   }
 
@@ -762,6 +763,67 @@ export class SimpleGitAdapter extends GitAdapter {
       throw new Error(`Failed to uninstall Git LFS: ${error.message}`);
     }
     this._endCommand(id, startTime);
+  }
+
+  async addToGitignore(pattern: string): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('add to .gitignore', startTime);
+    try {
+      const gitignorePath = path.join(this.repoPath, '.gitignore');
+      let content = '';
+      
+      try {
+        content = await fs.readFile(gitignorePath, 'utf8');
+      } catch (error) {
+        // .gitignore doesn't exist, that's fine
+      }
+      
+      // Check if pattern already exists
+      const lines = content.split('\n');
+      if (lines.includes(pattern)) {
+        this._endCommand(id, startTime);
+        return;
+      }
+      
+      // Add pattern to file
+      if (content && !content.endsWith('\n')) {
+        content += '\n';
+      }
+      content += pattern + '\n';
+      
+      await fs.writeFile(gitignorePath, content, 'utf8');
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(`Failed to add to .gitignore: ${error.message}`);
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async isIgnored(filePath: string): Promise<boolean> {
+    const startTime = performance.now();
+    const id = this._startCommand('check-ignore', startTime);
+    try {
+      await this.git.raw(['check-ignore', filePath]);
+      this._endCommand(id, startTime);
+      return true;
+    } catch (error) {
+      this._endCommand(id, startTime);
+      return false;
+    }
+  }
+
+  async getGitignoreContents(): Promise<string> {
+    const startTime = performance.now();
+    const id = this._startCommand('read .gitignore', startTime);
+    try {
+      const gitignorePath = path.join(this.repoPath, '.gitignore');
+      const content = await fs.readFile(gitignorePath, 'utf8');
+      this._endCommand(id, startTime);
+      return content;
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      return '';
+    }
   }
 }
 

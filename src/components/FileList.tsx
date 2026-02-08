@@ -528,6 +528,58 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
           <div className="context-menu-item" onClick={() => handleMenuAction('save-as-patch')}>
             Save as Patch
           </div>
+          {listType === 'unstaged' && (
+            <>
+              <div className="context-menu-separator"></div>
+              <div className="context-menu-submenu">
+                <div className="context-menu-item context-menu-submenu-header">
+                  Ignore
+                  <span className="context-menu-submenu-arrow">▶</span>
+                </div>
+                <div className="context-menu-submenu-content">
+                  {contextMenu.items.length === 1 && contextMenu.items[0].type === 'file' && (() => {
+                    const fileName = contextMenu.clickedItem.split('/').pop();
+                    const fileExt = fileName.includes('.') ? fileName.split('.').pop() : '';
+                    return (
+                      <>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('ignore-file')}>
+                          Ignore '{fileName}'
+                        </div>
+                        {fileExt && (
+                          <div className="context-menu-item" onClick={() => handleMenuAction('ignore-extension')}>
+                            Ignore All .{fileExt} Files
+                          </div>
+                        )}
+                        <div className="context-menu-separator"></div>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('ignore-custom')}>
+                          Custom Pattern...
+                        </div>
+                      </>
+                    );
+                  })()}
+                  {contextMenu.items.length === 1 && contextMenu.items[0].type === 'folder' && (() => {
+                    const folderName = contextMenu.clickedItem.split('/').pop();
+                    return (
+                      <>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('ignore-folder')}>
+                          Ignore all files in {folderName}
+                        </div>
+                        <div className="context-menu-separator"></div>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('ignore-custom')}>
+                          Custom Pattern...
+                        </div>
+                      </>
+                    );
+                  })()}
+                  {contextMenu.items.length > 1 && (
+                    <div className="context-menu-item" onClick={() => handleMenuAction('ignore-custom')}>
+                      Custom Pattern...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
           <div className="context-menu-separator"></div>
           <div className="context-menu-item" onClick={() => handleMenuAction('copy-path')}>
             Copy Path

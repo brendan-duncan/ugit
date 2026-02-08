@@ -374,6 +374,21 @@ export abstract class GitAdapter {
    * Uninstall Git LFS from the repository
    */
   abstract lfsUninstall(): Promise<void>;
+
+  /**
+   * Add pattern to .gitignore file
+   */
+  abstract addToGitignore(pattern: string): Promise<void>;
+
+  /**
+   * Check if a file is already ignored by .gitignore
+   */
+  abstract isIgnored(filePath: string): Promise<boolean>;
+
+  /**
+   * Get contents of .gitignore file
+   */
+  abstract getGitignoreContents(): Promise<string>;
 }
 
 export default GitAdapter;

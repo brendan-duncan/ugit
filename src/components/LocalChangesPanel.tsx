@@ -392,6 +392,45 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
           console.log(`Copied full path: ${fullPath}`);
           break;
 
+        case 'ignore-file':
+          // Ignore specific file
+          await git.addToGitignore(clickedItem);
+          console.log(`Added '${clickedItem}' to .gitignore`);
+          if (onRefresh)
+            await onRefresh();
+          break;
+
+        case 'ignore-extension':
+          // Ignore all files with same extension
+          const fileName = clickedItem.split('/').pop();
+          const fileExt = fileName.includes('.') ? fileName.split('.').pop() : '';
+          if (fileExt) {
+            await git.addToGitignore(`*.${fileExt}`);
+            console.log(`Added '*.${fileExt}' to .gitignore`);
+            if (onRefresh)
+              await onRefresh();
+          }
+          break;
+
+        case 'ignore-folder':
+          // Ignore all files in folder
+          await git.addToGitignore(`${clickedItem}/`);
+          console.log(`Added '${clickedItem}/' to .gitignore`);
+          if (onRefresh)
+            await onRefresh();
+          break;
+
+        case 'ignore-custom':
+          // Show custom pattern dialog
+          const pattern = window.prompt('Enter ignore pattern:');
+          if (pattern && pattern.trim()) {
+            await git.addToGitignore(pattern.trim());
+            console.log(`Added '${pattern.trim()}' to .gitignore`);
+            if (onRefresh)
+              await onRefresh();
+          }
+          break;
+
         default:
           console.warn(`Unknown context menu action: ${action}`);
       }
