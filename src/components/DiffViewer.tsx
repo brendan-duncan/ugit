@@ -335,10 +335,10 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
           // Try to read the file contents for new files
           try {
             setFileType('text');
-            const content = fs.readFileSync(file.path, 'utf8');
+            const content = fs.readFileSync(path.join(gitAdapter.repoPath, file.path), 'utf8');
             setFileContent(content);
           } catch (contentError) {
-            console.error('Error loading file content:', contentError);
+            console.error(`Error loading ${file.path} content:`, contentError);
             setFileType('none');
             setFileContent(`Error loading '${file.path}' content: ${contentError.message}`);
           }

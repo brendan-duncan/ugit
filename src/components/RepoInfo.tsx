@@ -71,6 +71,20 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
+  const handleOpenInVSCode = () => {
+    const repoPath = gitAdapter?.repoPath;
+    if (repoPath) {
+      exec(`code "${repoPath}"`, (error) => {
+        if (error) {
+          console.error('Error opening VS Code:', error);
+          if (onError) {
+            onError('Failed to open Visual Studio Code. Make sure VS Code is installed and the "code" command is available in your PATH.');
+          }
+        }
+      });
+    }
+  };
+
   const handleCopyLocalPath = () => {
     clipboard.writeText(gitAdapter?.repoPath || '');
   };
@@ -300,6 +314,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           </DropdownItem>
           <DropdownItem onClick={handleOpenInConsole}>
             🖥️ Open in Console
+          </DropdownItem>
+          <DropdownItem onClick={handleOpenInVSCode}>
+            💻 Open in Visual Studio Code
           </DropdownItem>
           <DropdownItem onClick={handleCopyLocalPath}>
             📋 Copy Local Path
