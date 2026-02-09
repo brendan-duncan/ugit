@@ -512,19 +512,22 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         )}
       </div>
 
-
-
       {/* Bottom section: commit panel spanning full width */}
       <div className="commit-panel-bottom">
         <div className="commit-panel-content">
-          <input
-            type="text"
-            className="commit-message-input"
-            value={commitMessage}
-            onChange={(e) => setCommitMessage(e.target.value)}
-            placeholder="Commit message"
-            disabled={isBusy}
-          />
+          <div className="commit-message-input-wrapper">
+            <input
+              type="text"
+              className="commit-message-input"
+              value={commitMessage}
+              onChange={(e) => setCommitMessage(e.target.value)}
+              placeholder="Commit message"
+              disabled={isBusy}
+            />
+            <div className={`commit-message-counter ${commitMessage.length > 50 ? 'over-limit' : ''}`}>
+              {50 - commitMessage.length}
+            </div>
+          </div>
           <input
             type="text"
             className="commit-description-input"
