@@ -83,6 +83,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [showCreateBranchFromCommitDialog, setShowCreateBranchFromCommitDialog] = useState(false);
   const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
   const [commitForDialog, setCommitForDialog] = useState(null);
+  const [isBusy, setIsBusy] = useState<boolean>(false);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef<GitAdapter | null>(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -1726,6 +1727,13 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
+        {/* Busy indicator overlay */}
+        {isBusy && (
+          <div className="repo-busy-overlay">
+            <div className="repo-busy-spinner"></div>
+            <div className="repo-busy-message">Processing...</div>
+          </div>
+        )}
         {loading && <div className="loading">Loading repository...</div>}
         {error && !showErrorDialog && (
           <ErrorDialog
@@ -1794,6 +1802,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}
                 onError={setError}
+                onBusyChange={setIsBusy}
               />
             </div>
           </>

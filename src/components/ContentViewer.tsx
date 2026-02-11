@@ -16,9 +16,10 @@ interface ContentViewerProps {
   currentBranch: string;
   branchStatus: { [branchName: string]: { ahead: number; behind: number } };
   onError?: (error: string) => void;
+  onBusyChange?: (busy: boolean) => void;
 }
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus, onError }: ContentViewerProps): React.ReactElement {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus, onError, onBusyChange }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -44,6 +45,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           currentBranch={currentBranch}
           branchStatus={branchStatus}
           onError={onError}
+          onBusyChange={onBusyChange}
         />
       )}
       {item.type === 'stash' && selectedItem.stash && (

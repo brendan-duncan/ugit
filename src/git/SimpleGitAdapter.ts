@@ -483,39 +483,104 @@ export class SimpleGitAdapter extends GitAdapter {
 
   async discard(filePaths: string[]): Promise<void> {
     const startTime = performance.now();
-    const id = this._startCommand(`git checkout -- ${filePaths.join(' ')}`, startTime);
+    const id = this._startCommand(`git discard ${filePaths.length} files`, startTime);
 
     // Get current status to identify new vs modified files
     const statusResult = await this.git.status();
     this._logCommand('git status', startTime);
 
+    const newFiles: string[] = [];
+    const stagedFiles: string[] = [];
+    const modifiedFiles: string[] = [];
+
+    // Categorize files
     for (const filePath of filePaths) {
       const fileStatus = statusResult.files.find(f => f.path === filePath);
       const isStaged = fileStatus?.index !== ' ';
 
       if (fileStatus?.working_dir === '?' || (fileStatus?.index === 'A' && !isStaged)) {
         // New untracked file or new staged file - delete it from filesystem
-        const fullPath = path.join(this.repoPath, filePath);
-        try {
-          if (fsSync.existsSync(fullPath)) {
-            fsSync.unlinkSync(fullPath);
-            console.log(`Deleted new file: ${filePath}`);
-          }
-        } catch (error) {
-          console.error(`Failed to delete file ${filePath}:`, error);
-        }
+        newFiles.push(filePath);
+      } else if (isStaged) {
+        // Staged file - needs unstaging first
+        stagedFiles.push(filePath);
       } else {
-        // Existing file - restore it from git
-        if (isStaged) {
-          // If staged, first unstage it
-          await this.git.reset(['HEAD', '--', filePath]);
-          this._logCommand(`git reset HEAD -- ${filePath}`, startTime);
-        }
-        // Then restore the file
-        await this.git.checkout(['--', filePath]);
-        this._logCommand(`git checkout -- ${filePath}`, startTime);
+        // Modified file - just needs checkout
+        modifiedFiles.push(filePath);
       }
     }
+
+    // Helper to batch files based on command line length
+    // Windows safe limit is ~6000 characters to leave room for command and repo path
+    const batchFilesByLength = (files: string[], maxLength: number = 6000): string[][] => {
+      const batches: string[][] = [];
+      let currentBatch: string[] = [];
+      let currentLength = 0;
+
+      for (const file of files) {
+        // Add quotes and space: "file" + space = file.length + 3
+        const fileLength = file.length + 3;
+
+        if (currentLength + fileLength > maxLength && currentBatch.length > 0) {
+          // Start new batch
+          batches.push(currentBatch);
+          currentBatch = [file];
+          currentLength = fileLength;
+        } else {
+          currentBatch.push(file);
+          currentLength += fileLength;
+        }
+      }
+
+      if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+      }
+
+      return batches;
+    };
+
+    // Process new files (delete from filesystem)
+    for (const filePath of newFiles) {
+      const fullPath = path.join(this.repoPath, filePath);
+      try {
+        if (fsSync.existsSync(fullPath)) {
+          fsSync.unlinkSync(fullPath);
+          console.log(`Deleted new file: ${filePath}`);
+        }
+      } catch (error) {
+        console.error(`Failed to delete file ${filePath}:`, error);
+      }
+    }
+
+    // Process staged files in batches (unstage then checkout)
+    if (stagedFiles.length > 0) {
+      const stagedBatches = batchFilesByLength(stagedFiles);
+      console.log(`Unstaging ${stagedFiles.length} files in ${stagedBatches.length} batch(es)`);
+
+      for (const batch of stagedBatches) {
+        await this.git.reset(['HEAD', '--', ...batch]);
+        this._logCommand(`git reset HEAD -- ${batch.length} files`, startTime);
+      }
+
+      // After unstaging, checkout all staged files in batches
+      const checkoutBatches = batchFilesByLength(stagedFiles);
+      for (const batch of checkoutBatches) {
+        await this.git.checkout(['--', ...batch]);
+        this._logCommand(`git checkout -- ${batch.length} files`, startTime);
+      }
+    }
+
+    // Process modified files in batches (checkout only)
+    if (modifiedFiles.length > 0) {
+      const modifiedBatches = batchFilesByLength(modifiedFiles);
+      console.log(`Restoring ${modifiedFiles.length} files in ${modifiedBatches.length} batch(es)`);
+
+      for (const batch of modifiedBatches) {
+        await this.git.checkout(['--', ...batch]);
+        this._logCommand(`git checkout -- ${batch.length} files`, startTime);
+      }
+    }
+
     this._endCommand(id, startTime);
   }
 

@@ -19,9 +19,10 @@ interface LocalChangesPanelProps {
   currentBranch?: string;
   branchStatus?: Record<string, any>;
   onError?: (error: string) => void;
+  onBusyChange?: (busy: boolean) => void;
 }
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError }: LocalChangesPanelProps) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError, onBusyChange }: LocalChangesPanelProps) {
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -33,6 +34,13 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const [showStashConflictDialog, setShowStashConflictDialog] = useState<boolean>(false);
   const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
   const activeSplitter = useRef<string | null>(null);
+
+  // Notify parent component when busy state changes
+  React.useEffect(() => {
+    if (onBusyChange) {
+      onBusyChange(isBusy);
+    }
+  }, [isBusy, onBusyChange]);
 
   const handleMouseDown = (splitterType: string) => {
     activeSplitter.current = splitterType;
@@ -449,14 +457,6 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Busy indicator overlay */}
-      {isBusy && (
-        <div className="busy-overlay">
-          <div className="busy-spinner"></div>
-          <div className="busy-message">Processing...</div>
-        </div>
-      )}
-
       {/* Top section: file lists on left, diff viewer on right */}
       <div className="local-changes-top-section" style={{ height: `calc(100% - 60px)` }}>
         <div className="local-changes-file-lists" style={{ width: `${leftWidth}%` }}>
