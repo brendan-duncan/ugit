@@ -19,6 +19,7 @@ import LocalChangesDialog from './LocalChangesDialog';
 import CleanWorkingDirectoryDialog from './CleanWorkingDirectoryDialog';
 import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
 import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
+import PullRequestDialog from './PullRequestDialog';
 import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
 import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
@@ -83,6 +84,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [showCreateBranchFromCommitDialog, setShowCreateBranchFromCommitDialog] = useState(false);
   const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
   const [commitForDialog, setCommitForDialog] = useState(null);
+  const [showPullRequestDialog, setShowPullRequestDialog] = useState(false);
+  const [pullRequestUrl, setPullRequestUrl] = useState<string>('');
+  const [pullRequestBranch, setPullRequestBranch] = useState<string>('');
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const activeSplitter = useRef(null);
   const gitAdapter = useRef<GitAdapter | null>(null);
@@ -718,12 +722,24 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
       console.log(`Pushing ${branch} to origin/${remoteBranch}...`);
 
+      let pushOutput = '';
       if (pushAllTags) {
-        await git.push('origin', `${branch}:${remoteBranch}`, ['--tags']);
+        pushOutput = await git.push('origin', `${branch}:${remoteBranch}`, ['--tags']);
         console.log('Push with tags completed successfully');
       } else {
-        await git.push('origin', `${branch}:${remoteBranch}`);
+        pushOutput = await git.push('origin', `${branch}:${remoteBranch}`);
         console.log('Push completed successfully');
+      }
+
+      // Check for pull request URL in output
+      // The URL can appear in the format: "remote:      https://github.com/.../pull/new/branch-name"
+      const prUrlMatch = pushOutput.match(/https?:\/\/[^\s\)]+\/pull\/new\/[^\s\)]+/);
+      if (prUrlMatch) {
+        const url = prUrlMatch[0];
+        console.log('Found PR URL:', url);
+        setPullRequestUrl(url);
+        setPullRequestBranch(branch);
+        setShowPullRequestDialog(true);
       }
 
       // Clear branch commits cache since push may have changed commits
@@ -733,7 +749,25 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
     } catch (error) {
       console.error('Error during push:', error);
-      setError(`Push failed: ${error.message}`);
+
+      // Check for PR URL in error message (some git servers put it in stderr)
+      let foundPrUrl = false;
+      if (error.message) {
+        const prUrlMatch = error.message.match(/https?:\/\/[^\s\)]+\/pull\/new\/[^\s\)]+/);
+        if (prUrlMatch) {
+          const url = prUrlMatch[0];
+          console.log('Found PR URL in error:', url);
+          setPullRequestUrl(url);
+          setPullRequestBranch(branch);
+          setShowPullRequestDialog(true);
+          foundPrUrl = true;
+        }
+      }
+
+      // Only show error if we didn't find a PR URL (some servers return PR URL with non-zero exit)
+      if (!foundPrUrl) {
+        setError(`Push failed: ${error.message}`);
+      }
     }
   };
 
@@ -1982,6 +2016,13 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         <CleanWorkingDirectoryDialog
           onClose={() => setShowCleanWorkingDirectoryDialog(false)}
           onClean={handleCleanWorkingDirectory}
+        />
+      )}
+      {showPullRequestDialog && (
+        <PullRequestDialog
+          prUrl={pullRequestUrl}
+          branchName={pullRequestBranch}
+          onClose={() => setShowPullRequestDialog(false)}
         />
       )}
     </div>

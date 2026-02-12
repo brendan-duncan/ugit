@@ -10,6 +10,10 @@ import GitAdapter, {
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 /**
  * Git adapter implementation using simple-git library
@@ -262,25 +266,46 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
-  async push(remote: string, refspec: string, options: string[] = []): Promise<void> {
+  async push(remote: string, refspec: string, options: string[] = []): Promise<string> {
     const startTime = performance.now();
+    let result = '';
+
+    const args = ['push', remote, refspec];
     if (options.length > 0) {
-      const id = this._startCommand(`git push ${remote} ${refspec} ${options.join(' ')}`, startTime);
-      try {
-        await this.git.push(remote, refspec, options);
-      } catch (error) {
-        console.error(`Error pushing to ${remote} ${refspec} with options ${options.join(' ')}:`, error);
-      }
-      this._endCommand(id, startTime);
-    } else {
-      const id = this._startCommand(`git push ${remote} ${refspec}`, startTime);
-      try {
-        await this.git.push(remote, refspec);
-      } catch (error) {
-        console.error(`Error pushing to ${remote} ${refspec}:`, error);
-      }
+      args.push(...options);
+    }
+
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      // Use exec to capture both stdout and stderr
+      // Git push messages (including PR URLs) typically go to stderr
+      const command = `git ${args.map(arg => {
+        // Quote arguments that contain special characters
+        if (arg.includes(' ') || arg.includes('&') || arg.includes('|')) {
+          return `"${arg.replace(/"/g, '\\"')}"`;
+        }
+        return arg;
+      }).join(' ')}`;
+
+      const { stdout, stderr } = await execAsync(command, {
+        cwd: this.repoPath,
+        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+      });
+
+      // Combine stdout and stderr as PR URLs typically appear in stderr
+      result = stdout + '\n' + stderr;
+    } catch (error: any) {
+      console.error(`Error pushing to ${remote} ${refspec}:`, error);
+
+      // Capture stdout and stderr from error (exec includes these even on failure)
+      result = (error.stdout || '') + '\n' + (error.stderr || '');
+
+      throw error;
+    } finally {
       this._endCommand(id, startTime);
     }
+
+    return result;
   }
 
   async stashPush(message: string, filePaths: string[] | null = null): Promise<void> {

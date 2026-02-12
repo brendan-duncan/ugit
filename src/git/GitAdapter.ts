@@ -257,8 +257,9 @@ export abstract class GitAdapter {
    * @param remote - Remote name (e.g., 'origin')
    * @param refspec - Refspec (e.g., 'main:main')
    * @param options - Additional options (e.g., ['--tags'])
+   * @returns Push result with stdout/stderr output
    */
-  abstract push(remote: string, refspec: string, options?: string[]): Promise<void>;
+  abstract push(remote: string, refspec: string, options?: string[]): Promise<string>;
 
   /**
    * Create a stash
