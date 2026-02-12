@@ -233,6 +233,11 @@
   display: none;
 }
 
+.d2h-dark-color-scheme .d2h-info {
+  background: #464649;
+  color: #5dff2a;
+}
+
 /* Chunk wrapper and overlay buttons */
 .diff-chunk-wrapper {
   position: relative;

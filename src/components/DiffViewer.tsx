@@ -16,8 +16,8 @@ import * as Diff2HtmlTypes from 'diff2html/lib/types';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import './DiffViewer.css';
 import 'diff2html/bundles/css/diff2html.min.css';
+import './DiffViewer.css';
 
 // Helper function to check if file is an image
 function isImageFile(filePath: string): boolean {
