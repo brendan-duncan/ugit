@@ -32,7 +32,7 @@
   line-height: 1.3;
 }
 
-.error {
+.settings-error {
   color: #d32f2f;
   background-color: #ffebee;
   padding: 0.5rem;

@@ -201,3 +201,12 @@
 .dialog-info p:last-child {
   margin-bottom: 0;
 }
+
+.dialog-input.error {
+  border-color: #f48771;
+  color: #ffc7bc;
+}
+
+.dialog-input.error:focus {
+  border-color: #f3a595;;
+}

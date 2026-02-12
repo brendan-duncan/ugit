@@ -59,7 +59,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [branchesHeight, setBranchesHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
-  const [showPushDialog, setShowPushDialog] = useState(false);
+  const [showPushDialog, setShowPushDialog] = useState<string|null>(null);
   const [showStashDialog, setShowStashDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showCleanWorkingDirectoryDialog, setShowCleanWorkingDirectoryDialog] = useState(false);
@@ -540,23 +540,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
     } catch (err) {
       console.error('Error refreshing file status:', err);
-    }
-  };
-
-  const refreshCurrentBranchStatus = async () => {
-    // Ensure git adapter is available before attempting to use it
-    if (!gitAdapter.current) {
-      return;
-    }
-    try {
-      const git = gitAdapter.current;
-      const { ahead, behind } = await git.getAheadBehind(currentBranch, `origin/${currentBranch}`);
-      setBranchStatus(prev => ({
-      ...prev,
-      [currentBranch]: { ahead, behind }
-    }));
-    } catch (error) {
-      console.error('Error refreshing current branch status:', error);
     }
   };
 
@@ -1885,6 +1868,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           onCreateBranch={handleCreateBranch}
           currentBranch={currentBranch}
           gitAdapter={gitAdapter.current}
+          branches={branches}
         />
       )}
       {showCreateBranchFromCommitDialog && (

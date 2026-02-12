@@ -23,6 +23,7 @@
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
 }
 
@@ -30,8 +31,4 @@
   color: #f48771;
   font-size: 12px;
   margin-top: 4px;
-}
-
-.dialog-input.error {
-  border-color: #f48771;
 }
