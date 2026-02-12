@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import GitAdapter from '../git/GitAdapter';
+import GitAdapter, { BranchInfo } from '../git/GitAdapter';
 import './Dialog.css';
 import './CreateBranchDialog.css';
 
@@ -14,12 +14,21 @@ interface CreateBranchDialogProps {
 
 const CreateBranchDialog: React.FC<CreateBranchDialogProps> = ({ onClose, onCreateBranch, currentBranch, gitAdapter }) => {
   const [branchName, setBranchName] = useState<string>('');
+  const [branches, setBranches] = useState<BranchInfo|null>(null);
   const [checkoutAfterCreate, setCheckoutAfterCreate] = useState<boolean>(() => {
     const saved = localStorage.getItem(CHECKOUT_AFTER_KEY);
     return saved === 'true';
   });
   const [branchExists, setBranchExists] = useState<boolean>(false);
   const [existingBranchName, setExistingBranchName] = useState<string>('');
+
+
+  gitAdapter.branchLocal().then(localBranches => {
+    setBranches(localBranches);
+  }).catch(error => {
+    console.error('Error fetching local branches:', error);
+    setBranches(null);
+  });
 
   // Use an empty name by default
   useEffect(() => {
@@ -46,8 +55,7 @@ const CreateBranchDialog: React.FC<CreateBranchDialogProps> = ({ onClose, onCrea
     }
 
     try {
-      const branches = await gitAdapter.branchLocal();
-      const branchExists = branches.all.includes(name);
+      const branchExists = branches?.all.includes(name) ?? false;
       setBranchExists(branchExists);
       setExistingBranchName(branchExists ? name : '');
     } catch (error) {

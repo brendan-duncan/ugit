@@ -59,7 +59,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [branchesHeight, setBranchesHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(30);
   const [showPullDialog, setShowPullDialog] = useState(false);
-  const [showPushDialog, setShowPushDialog] = useState(null);
+  const [showPushDialog, setShowPushDialog] = useState(false);
   const [showStashDialog, setShowStashDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showCleanWorkingDirectoryDialog, setShowCleanWorkingDirectoryDialog] = useState(false);
