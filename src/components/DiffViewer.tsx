@@ -146,7 +146,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number } | null>(null);
   const { getSetting } = useSettings();
   const [diffViewMode, setDiffViewMode] = useState<'side-by-side' | 'line-by-line'>(
-    getSetting('diffViewMode') || 'side-by-side'
+    getSetting('diffViewMode') || 'line-by-line'
   );
 
   // Listen for diff view mode changes from menu

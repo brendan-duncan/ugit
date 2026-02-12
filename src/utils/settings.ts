@@ -7,7 +7,7 @@ export interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   localFileRefreshTime: 5,
   blockCommitBranches: ['trunk', '*/staging'],
-  diffViewMode: 'side-by-side'
+  diffViewMode: 'line-by-line'
 };
 
 /**
