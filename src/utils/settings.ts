@@ -1,11 +1,13 @@
 export interface AppSettings {
   localFileRefreshTime: number;
   blockCommitBranches: string[];
+  diffViewMode: 'side-by-side' | 'line-by-line';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   localFileRefreshTime: 5,
-  blockCommitBranches: ['trunk', '*/staging']
+  blockCommitBranches: ['trunk', '*/staging'],
+  diffViewMode: 'side-by-side'
 };
 
 /**
@@ -128,7 +130,10 @@ export class SettingsManager {
       typeof data === 'object' &&
       typeof data.localFileRefreshTime === 'number' &&
       Array.isArray(data.blockCommitBranches) &&
-      data.blockCommitBranches.every((item: any) => typeof item === 'string')
+      data.blockCommitBranches.every((item: any) => typeof item === 'string') &&
+      (data.diffViewMode === undefined ||
+       data.diffViewMode === 'side-by-side' ||
+       data.diffViewMode === 'line-by-line')
     );
   }
 

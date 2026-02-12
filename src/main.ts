@@ -117,6 +117,10 @@ function createWindow(): void {
 }
 
 function createMenu(): void {
+  // Get current diff view mode
+  const settingsManager = getSettingsManager();
+  const currentDiffViewMode = settingsManager.getSetting('diffViewMode') || 'side-by-side';
+
   // Build recent repos submenu
   const recentSubmenu = recentRepos.length > 0
     ? recentRepos.map((repoPath) => ({
@@ -183,6 +187,38 @@ function createMenu(): void {
     {
       label: 'View',
       submenu: [
+        {
+          label: 'Diff Viewer',
+          submenu: [
+            {
+              label: 'Side-by-Side',
+              type: 'checkbox',
+              checked: currentDiffViewMode === 'side-by-side',
+              click: () => {
+                const settingsManager = getSettingsManager();
+                settingsManager.updateSetting('diffViewMode', 'side-by-side');
+                createMenu(); // Rebuild menu to update checkboxes
+                if (mainWindow) {
+                  mainWindow.webContents.send('diff-view-mode-changed', 'side-by-side');
+                }
+              }
+            },
+            {
+              label: 'Line-by-Line',
+              type: 'checkbox',
+              checked: currentDiffViewMode === 'line-by-line',
+              click: () => {
+                const settingsManager = getSettingsManager();
+                settingsManager.updateSetting('diffViewMode', 'line-by-line');
+                createMenu(); // Rebuild menu to update checkboxes
+                if (mainWindow) {
+                  mainWindow.webContents.send('diff-view-mode-changed', 'line-by-line');
+                }
+              }
+            }
+          ]
+        },
+        { type: 'separator' },
         {
           label: 'Toggle Developer Tools',
           accelerator: 'F12',

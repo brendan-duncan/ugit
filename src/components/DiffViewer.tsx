@@ -18,6 +18,8 @@ import os from 'os';
 import path from 'path';
 import 'diff2html/bundles/css/diff2html.min.css';
 import './DiffViewer.css';
+import { useSettings } from '../hooks/useSettings';
+import { ipcRenderer } from 'electron';
 
 // Helper function to check if file is an image
 function isImageFile(filePath: string): boolean {
@@ -142,6 +144,23 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const [diffHunks, setDiffHunks] = useState<DiffHunk[]>([]);
   const [hoveredChunkIndex, setHoveredChunkIndex] = useState<number | null>(null);
   const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number } | null>(null);
+  const { getSetting } = useSettings();
+  const [diffViewMode, setDiffViewMode] = useState<'side-by-side' | 'line-by-line'>(
+    getSetting('diffViewMode') || 'side-by-side'
+  );
+
+  // Listen for diff view mode changes from menu
+  useEffect(() => {
+    const handleDiffViewModeChanged = (event: any, mode: 'side-by-side' | 'line-by-line') => {
+      setDiffViewMode(mode);
+    };
+
+    ipcRenderer.on('diff-view-mode-changed', handleDiffViewModeChanged);
+
+    return () => {
+      ipcRenderer.removeListener('diff-view-mode-changed', handleDiffViewModeChanged);
+    };
+  }, []);
 
   // Add event listeners for chunk hover
   useEffect(() => {
@@ -351,7 +370,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
           hunks.forEach((hunk, index) => {
             let hunkHtml = Diff2Html.html(hunk.fullDiff, {
               drawFileList: false,
-              outputFormat: 'side-by-side',
+              outputFormat: diffViewMode,
               matching: 'lines',
               diffStyle: 'word',
               renderNothingWhenEmpty: false,
@@ -379,7 +398,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     };
 
     loadContent();
-  }, [file, gitAdapter, isStaged]);
+  }, [file, gitAdapter, isStaged, diffViewMode]);
 
   if (!file) {
     return (
