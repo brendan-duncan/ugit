@@ -435,6 +435,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     };
   }, [loading, isActiveTab, settings]); // Re-run if loading state, active tab, or settings change
 
+  
   const refreshFileStatus = async (noLock: boolean) => {
     // Ensure git adapter is available before attempting to use it
     if (!gitAdapter.current || runningCommands?.length > 0) {
@@ -448,12 +449,29 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       const status = await git.status(undefined, noLock, true);
       setCurrentBranch(status.current);
 
+      // Update branch status if ahead/behind information is available
+      if (status.ahead !== undefined && status.behind !== undefined) {
+        if (status.ahead > 0 || status.behind > 0) {
+          setBranchStatus(prev => ({
+            ...prev,
+            [status.current]: { ahead: status.ahead, behind: status.behind }
+          }));
+        } else {
+          // Branch is in sync, remove from status
+          setBranchStatus(prev => {
+            const newStatus = { ...prev };
+            delete newStatus[status.current];
+            return newStatus;
+          });
+        }
+      }
+
       // Parse files using status.files array for accurate staging info
-      const unstaged = [];
-      const staged = [];
+      const unstaged: Array<FileInfo> = [];
+      const staged: Array<FileInfo> = [];
 
       status.files.forEach(file => {
-        const getStatusType = (code) => {
+        const getStatusType = (code: string): string => {
           switch (code) {
             case 'M': return 'modified';
             case 'A': return 'created';
@@ -501,6 +519,21 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         cacheData.unstagedFiles = unstaged;
         cacheData.stagedFiles = staged;
         cacheData.modifiedCount = allPaths.size;
+
+        // Update branch status if ahead/behind information is available
+        if (status.ahead !== undefined && status.behind !== undefined) {
+          if (!cacheData.branchStatus) {
+            cacheData.branchStatus = {};
+          }
+
+          if (status.ahead > 0 || status.behind > 0) {
+            cacheData.branchStatus[status.current] = { ahead: status.ahead, behind: status.behind };
+          } else {
+            // Branch is in sync, remove from status
+            delete cacheData.branchStatus[status.current];
+          }
+        }
+
         cacheManager.saveCache(repoPath, cacheData);
       } catch (cacheErr) {
         console.warn('Failed to update file status cache:', cacheErr);

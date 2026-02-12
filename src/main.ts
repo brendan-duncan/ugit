@@ -6,6 +6,7 @@ import { getSettingsManager } from './utils/settings';
 import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';
+import { exec } from 'child_process';
 
 let mainWindow: Electron.BrowserWindow | null = null;
 let recentRepos: string[] = [];
@@ -332,6 +333,32 @@ ipcMain.handle('show-item-in-folder', async (event: any, itemPath: string) => {
     }
   } catch (error) {
     console.error('Error showing item in folder:', error);
+  }
+});
+
+function openInVSCode(itemPath: string): void {
+  exec(`code "${itemPath}"`, (error) => {
+    if (error) {
+      console.error('Error opening VS Code:', error);
+    }
+  });
+}
+
+// Open item in VSCode
+ipcMain.handle('open-in-vscode', async (event: any, itemPath: string) => {
+  try {
+    // Check if the path exists
+    if (fs.existsSync(itemPath)) {
+      openInVSCode(itemPath);
+    } else {
+      // If file doesn't exist, show the parent directory
+      const parentDir = path.dirname(itemPath);
+      if (fs.existsSync(parentDir)) {
+        openInVSCode(parentDir);
+      }
+    }
+  } catch (error) {
+    console.error('Error opening item in VSCode:', error);
   }
 });
 

@@ -233,14 +233,12 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         await onRefresh();
       }
 
-      // Trigger immediate branch status refresh after commit to update push count
-      // Use setTimeout to ensure file status is updated first
+      // Trigger branch status refresh after commit to update push count
+      // Use setTimeout to ensure git has updated the ahead/behind status
       setTimeout(async () => {
-        // Call a special refresh that only updates branch status
-        const refreshEvent = new CustomEvent('refresh-branch-status', {
-          detail: {}
-        });
-        window.dispatchEvent(refreshEvent);
+        if (onRefresh) {
+          await onRefresh();
+        }
       }, 100);
     } catch (error) {
       console.error('Error committing:', error);
@@ -326,6 +324,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
           // Show the clicked item in file explorer
           const itemPath = path.join(gitAdapter.repoPath, clickedItem);
           await ipcRenderer.invoke('show-item-in-folder', itemPath);
+          break;
+        case 'open-in-vscode':
+          // Open the clicked item in Visual Studio Code
+          const vscodePath = path.join(gitAdapter.repoPath, clickedItem);
+          await ipcRenderer.invoke('open-in-vscode', vscodePath);
           break;
 
         case 'stage':

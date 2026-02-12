@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { FileInfo } from './types';
-import { Commit } from '../git/GitAdapter';
 import './FileList.css';
 
 // Build tree structure from flat file list
@@ -505,6 +504,9 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
         >
           <div className="context-menu-item" onClick={() => handleMenuAction('show-in-explorer')}>
             Show in File Explorer
+          </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('open-in-vscode')}>
+            Open in Visual Studio Code
           </div>
           <div className="context-menu-separator"></div>
           {listType === 'unstaged' && (

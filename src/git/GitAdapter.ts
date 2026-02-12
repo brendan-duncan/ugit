@@ -1,15 +1,47 @@
-/**
- * Abstract base class for Git operations
- * Defines the interface that all Git adapters must implement
- */
+export interface FileStatus {
+  // Original location of the file, when the file has been moved or renamed
+  from?: string;
+  // Path to the file relative to the repository root
+  path: string;
+  // First digit of the status code of the file, e.g. 'M' = modified.
+  // Represents the status of the index if no merge conflicts, otherwise represents
+  // status of one side of the merge.
+  index: string;
+  // Second digit of the status code of the file. Represents status of the working directory
+  // if no merge conflicts, otherwise represents status of other side of a merge.
+  // See https://git-scm.com/docs/git-status#_short_format for full documentation of possible
+  // values and their meanings.
+  working_dir: string;
+}
+
+export interface RenamedFileStatus {
+   from: string;
+   to: string;
+}
 
 export interface GitStatus {
-  current: string;
-  files: Array<{
-    path: string;
-    working_dir: string;
-    index: string;
-  }>;
+  notAdded: string[];
+  conflicted: string[];
+  created: string[];
+  deleted: string[];
+  ignored?: string[];
+  modified: string[];
+  renamed: RenamedFileStatus[];
+  staged: string[];
+
+  // Number of commits ahead of the tracked branch
+  ahead: number;
+  // Number of commits behind the tracked branch
+  behind: number;
+  // Current branch name (or null if in detached HEAD state)
+  current: string | null;
+  // Name of the remote branch being tracked (e.g., 'origin/main')
+  tracking: string | null;
+  // Detached status of the working copy, for more detail of what the working branch
+  // is detached from use `git.branch()`
+  detached: boolean;
+  // List of changed files with their status codes
+  files: Array<FileStatus>;
 }
 
 export interface BranchInfo {
@@ -64,6 +96,10 @@ export interface Commit {
   onOrigin: boolean;
 }
 
+/**
+ * Abstract base class for Git operations
+ * Defines the interface that all Git adapters must implement
+ */
 export abstract class GitAdapter {
   public repoPath: string;
   public currentBranch: string | null = null;

@@ -66,7 +66,19 @@ export class SimpleGitAdapter extends GitAdapter {
     }
     this.currentBranch = result?.current || null; // Track current branch
     return {
+      notAdded: result?.not_added || [],
+      conflicted: result?.conflicted || [],
+      created: result?.created || [],
+      deleted: result?.deleted || [],
+      ignored: result?.ignored || [],
+      modified: result?.modified || [],
+      renamed: result?.renamed || [],
+      staged: result?.staged || [],
+      ahead: result?.ahead || 0,
+      behind: result?.behind || 0,
       current: result?.current || '',
+      tracking: result?.tracking || '',
+      detached: result?.detached || false,
       files: result?.files || []
     };
   }
