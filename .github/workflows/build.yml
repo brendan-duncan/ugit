@@ -1,12 +1,10 @@
-name: Build UGit Electron App
+name: Build And Release
 
 on:
   push:
-    branches: [ main, master ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+    tags:
+      - 'v*' # Trigger on version tags like v1.0.0
+  workflow_dispatch: # Allow manual triggering from GitHub UI
 
 jobs:
   build:
@@ -36,11 +34,14 @@ jobs:
       run: npm run build:main
 
     - name: Make distribution
-      run: npm run make
+      run: npm run package
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.os }}-build
-        path: out/
-        retention-days: 30
+    - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -61,3 +61,10 @@
 .tab-close:hover {
   color: #ffffff;
 }
+
+.version-info {
+  margin-left: auto;
+  padding: 8px 12px;
+  color: #aaa;
+  font-size: 12px;
+}
