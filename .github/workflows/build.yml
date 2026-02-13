@@ -14,6 +14,16 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            artifact_name: ugit-windows-x64.zip
+            out_path: out\ugit-win32-x64
+          - os: macos-latest
+            artifact_name: ugit-macos-arm64.zip
+            out_path: out/ugit-darwin-arm64
+          - os: ubuntu-latest
+            artifact_name: ugit-linux-x64.zip
+            out_path: out/ugit-linux-x64
 
     runs-on: ${{ matrix.os }}
 
@@ -37,35 +47,23 @@ jobs:
       run: npm run build:main
 
     - name: Make distribution
-      run: npm run make
+      run: npm run package
 
-    - name: List output files (debug)
+    - name: Zip Artifact (Windows)
+      if: runner.os == 'Windows'
       run: |
-        echo "Listing out/ directory:"
-        ls -R out/ || dir out\ /s
+        cd ${{ matrix.out_path }}
+        Compress-Archive -Path * -DestinationPath ..\..\${{ matrix.artifact_name }}
 
-    - name: Upload artifacts (for all builds)
-      uses: actions/upload-artifact@v4
-      with:
-        name: ugit-${{ matrix.os }}
-        path: out/make/
-        retention-days: 30
-        if-no-files-found: warn
+    - name: Zip Artifact (macOS/Linux)
+      if: runner.os != 'Windows'
+      run: |
+        cd ${{ matrix.out_path }}
+        zip -r ../../${{ matrix.artifact_name }} *
 
-    - name: Upload to Release (tagged builds only)
+    - name: Upload to Release
       uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: |
-          out/make/**/*.exe
-          out/make/**/*.nupkg
-          out/make/**/*.zip
-          out/make/**/*.deb
-          out/make/**/*.rpm
-        tag_name: ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-        fail_on_unmatched_files: false
-        generate_release_notes: true
+        files: ${{ matrix.artifact_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
