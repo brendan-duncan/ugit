@@ -11,6 +11,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const { settings, loadingSettings, settingsError, updateSetting, resetSettings } = useSettings();
   const [localRefreshTime, setLocalRefreshTime] = useState<number>(5);
   const [blockCommitBranches, setBlockCommitBranches] = useState<string>('');
+  const [pushAllTags, setPushAllTags] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Update local state when settings load
@@ -18,6 +19,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
     if (settings) {
       setLocalRefreshTime(settings.localFileRefreshTime);
       setBlockCommitBranches(settings.blockCommitBranches.join(', '));
+      setPushAllTags(settings.pushAllTags);
     }
   }, [settings]);
 
@@ -36,6 +38,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       // Update settings
       await updateSetting('localFileRefreshTime', localRefreshTime);
       await updateSetting('blockCommitBranches', branchList);
+      await updateSetting('pushAllTags', pushAllTags);
 
       onClose();
     } catch (err) {
@@ -126,6 +129,18 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
               placeholder="trunk, */staging"
             />
             <small>Branch patterns where commits should be blocked (comma-separated)</small>
+          </div>
+
+          <div className="setting-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={pushAllTags}
+                onChange={(e) => setPushAllTags(e.target.checked)}
+              />
+              <span>Push all tags by default</span>
+            </label>
+            <small>When enabled, the "Push all tags" checkbox in the Push dialog will be checked by default</small>
           </div>
         </div>
         <div className="dialog-footer">

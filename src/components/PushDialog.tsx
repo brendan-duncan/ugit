@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './PushDialog.css';
+import { useSettings } from '../hooks/useSettings';
 
 interface PushDialogProps {
   onClose: () => void;
@@ -10,9 +11,17 @@ interface PushDialogProps {
 }
 
 const PushDialog: React.FC<PushDialogProps> = ({ onClose, onPush, branches, currentBranch }) => {
+  const { settings, updateSetting } = useSettings();
   const [selectedBranch, setSelectedBranch] = useState<string>(currentBranch || '');
   const [remoteBranch, setRemoteBranch] = useState<string>(currentBranch || '');
-  const [pushAllTags, setPushAllTags] = useState<boolean>(false);
+  const [pushAllTags, setPushAllTags] = useState<boolean>(true);
+
+  // Load pushAllTags setting on mount
+  useEffect(() => {
+    if (settings) {
+      setPushAllTags(settings.pushAllTags);
+    }
+  }, [settings]);
 
   const handlePush = (): void => {
     onPush(selectedBranch, remoteBranch, pushAllTags);
@@ -63,7 +72,11 @@ const PushDialog: React.FC<PushDialogProps> = ({ onClose, onPush, branches, curr
               <input
                 type="checkbox"
                 checked={pushAllTags}
-                onChange={(e) => setPushAllTags(e.target.checked)}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setPushAllTags(checked);
+                  updateSetting('pushAllTags', checked);
+                }}
                 className="dialog-checkbox"
               />
               <span>Push all tags</span>

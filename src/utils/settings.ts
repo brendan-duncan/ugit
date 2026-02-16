@@ -2,12 +2,14 @@ export interface AppSettings {
   localFileRefreshTime: number;
   blockCommitBranches: string[];
   diffViewMode: 'side-by-side' | 'line-by-line';
+  pushAllTags: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   localFileRefreshTime: 5,
   blockCommitBranches: ['trunk', '*/staging'],
-  diffViewMode: 'line-by-line'
+  diffViewMode: 'line-by-line',
+  pushAllTags: true
 };
 
 /**
@@ -133,7 +135,8 @@ export class SettingsManager {
       data.blockCommitBranches.every((item: any) => typeof item === 'string') &&
       (data.diffViewMode === undefined ||
        data.diffViewMode === 'side-by-side' ||
-       data.diffViewMode === 'line-by-line')
+       data.diffViewMode === 'line-by-line') &&
+      (data.pushAllTags === undefined || typeof data.pushAllTags === 'boolean')
     );
   }
 
