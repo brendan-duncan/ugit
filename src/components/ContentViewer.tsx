@@ -18,9 +18,10 @@ interface ContentViewerProps {
   onError?: (error: string) => void;
   onBusyChange?: (busy: boolean) => void;
   onBusyMessageChange?: (message: string) => void;
+  onCommitCreated?: () => void;
 }
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange }: ContentViewerProps): React.ReactElement {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -48,6 +49,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           onError={onError}
           onBusyChange={onBusyChange}
           onBusyMessageChange={onBusyMessageChange}
+          onCommitCreated={onCommitCreated}
         />
       )}
       {item.type === 'stash' && selectedItem.stash && (

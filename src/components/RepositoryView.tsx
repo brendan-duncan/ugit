@@ -793,6 +793,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       await git.pull('origin', branch);
       console.log('Pull completed successfully');
 
+      // Clear branch cache since pull may have added new commits
+      clearBranchCache(branch);
+
       // Pull may have added new commits, so refresh repo data
       // The onOrigin status will be updated during loadRepoData refresh
       await loadRepoData(true);
@@ -2024,6 +2027,12 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 onError={setError}
                 onBusyChange={setIsBusy}
                 onBusyMessageChange={setBusyMessage}
+                onCommitCreated={() => {
+                  // Clear cache for current branch after commit
+                  if (currentBranch) {
+                    clearBranchCache(currentBranch);
+                  }
+                }}
               />
             </div>
           </>

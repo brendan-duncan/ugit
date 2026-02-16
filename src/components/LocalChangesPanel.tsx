@@ -21,9 +21,10 @@ interface LocalChangesPanelProps {
   onError?: (error: string) => void;
   onBusyChange?: (busy: boolean) => void;
   onBusyMessageChange?: (message: string) => void;
+  onCommitCreated?: () => void;
 }
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange }: LocalChangesPanelProps) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: LocalChangesPanelProps) {
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -237,6 +238,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       if (onBusyMessageChange) onBusyMessageChange(`git commit -m "${commitMessage.trim()}"`);
       await git.commit(fullMessage);
       console.log('Commit successful');
+
+      // Notify parent that a commit was created (clears branch cache)
+      if (onCommitCreated) {
+        onCommitCreated();
+      }
 
       // Clear the commit fields
       setCommitMessage('');
