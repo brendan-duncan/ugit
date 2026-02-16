@@ -48,6 +48,8 @@
   font-size: 13px;
   overflow-y: auto;
   flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 .commit-list-empty {
@@ -211,12 +213,16 @@
   border-radius: 4px;
   padding: 12px;
   margin-bottom: 12px;
+  position: relative;
+  z-index: 10;
 }
 
 .commit-filter-row {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
 }
 
 .commit-filter-row:last-child {
@@ -233,11 +239,15 @@
   font-size: 12px;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   transition: border-color 0.2s;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .commit-filter-input:focus {
   outline: none;
   border-color: #4ec9b0;
+  z-index: 2;
 }
 
 .commit-filter-input::placeholder {

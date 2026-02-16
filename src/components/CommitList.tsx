@@ -153,13 +153,15 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
       </div>
 
       {showFilters && (
-        <div className="commit-filters">
+        <div className="commit-filters" onClick={(e) => e.stopPropagation()}>
           <div className="commit-filter-row">
             <input
               type="text"
               placeholder="Author (contains)"
               value={filters.author}
               onChange={(e) => handleFilterChange('author', e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="commit-filter-input"
             />
             <input
@@ -167,6 +169,8 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
               placeholder="Message (contains)"
               value={filters.message}
               onChange={(e) => handleFilterChange('message', e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="commit-filter-input"
             />
           </div>
@@ -176,6 +180,8 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
               placeholder="SHA (starts with)"
               value={filters.sha}
               onChange={(e) => handleFilterChange('sha', e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="commit-filter-input"
             />
             <input
@@ -183,6 +189,8 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
               placeholder="From Date"
               value={filters.dateFrom}
               onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="commit-filter-input"
             />
             <input
@@ -190,12 +198,21 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
               placeholder="To Date"
               value={filters.dateTo}
               onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               className="commit-filter-input"
             />
           </div>
           {hasActiveFilters && (
             <div className="commit-filter-actions">
-              <button onClick={handleClearFilters} className="commit-filter-clear">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClearFilters();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="commit-filter-clear"
+              >
                 Clear Filters
               </button>
             </div>
