@@ -50,6 +50,14 @@ jobs:
     - name: Make distribution
       run: npm run package
 
+    - name: Ad-hoc code sign (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        echo "Ad-hoc signing the macOS application..."
+        codesign --force --deep --sign - "${{ matrix.out_path }}/ugit.app"
+        echo "Verifying signature..."
+        codesign --verify --verbose "${{ matrix.out_path }}/ugit.app"
+
     - name: Zip Artifact (Windows)
       if: runner.os == 'Windows'
       run: |
@@ -66,5 +74,22 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: ${{ matrix.artifact_name }}
+        body: |
+          ## Installation
+
+          ### macOS
+          If macOS shows a security warning saying "ugit is damaged and can't be opened", run this command:
+          ```bash
+          xattr -cr /Applications/ugit.app
+          ```
+          Or right-click the app and select "Open" to bypass Gatekeeper.
+
+          ### Windows
+          Extract the ZIP file and run `ugit.exe`.
+
+          ### Linux
+          Extract the ZIP file and run `ugit`.
+
+          See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for more details.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

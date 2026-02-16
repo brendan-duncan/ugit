@@ -6,6 +6,22 @@ module.exports = {
     asar: true,
     outDir: process.env.PACKAGE_OUT_DIR || 'out',
     icon: 'assets/icon', // Electron will automatically append .ico, .icns, or .png based on platform
+    // macOS code signing configuration
+    // Set APPLE_IDENTITY environment variable to enable signing (e.g., "Developer ID Application: Your Name")
+    ...(process.env.APPLE_IDENTITY && {
+      osxSign: {
+        identity: process.env.APPLE_IDENTITY,
+        hardenedRuntime: true,
+        'gatekeeper-assess': false,
+        entitlements: 'entitlements.plist',
+        'entitlements-inherit': 'entitlements.plist',
+      },
+      osxNotarize: process.env.APPLE_ID && process.env.APPLE_PASSWORD ? {
+        appleId: process.env.APPLE_ID,
+        appleIdPassword: process.env.APPLE_PASSWORD,
+        teamId: process.env.APPLE_TEAM_ID,
+      } : undefined,
+    }),
   },
   rebuildConfig: {},
   makers: [
