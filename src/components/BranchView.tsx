@@ -18,6 +18,7 @@ interface BranchViewProps {
 function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, currentBranch }: BranchViewProps) {
   const [selectedCommit, setSelectedCommit] = useState<Commit | null>(null);
   const [commitFiles, setCommitFiles] = useState([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
   const [topHeight, setTopHeight] = useState(60);
   const activeSplitter = useRef(null);
 
@@ -50,11 +51,14 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onCon
       return;
 
     try {
+      setLoadingFiles(true);
       const files = await gitAdapter.getCommitFiles(commit.hash);
       setCommitFiles(files);
     } catch (error) {
       console.error('Error loading commit files:', error);
       setCommitFiles([]);
+    } finally {
+      setLoadingFiles(false);
     }
   };
 
@@ -94,7 +98,7 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onCon
           </div>
 
           <div className="branch-view-bottom-panel" style={{ height: `${100 - topHeight}%` }}>
-            <CommitInfo commit={selectedCommit} files={commitFiles} gitAdapter={gitAdapter} />
+            <CommitInfo commit={selectedCommit} files={commitFiles} loadingFiles={loadingFiles} gitAdapter={gitAdapter} />
           </div>
         </div>
       )}

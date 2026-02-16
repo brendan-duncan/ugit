@@ -7,10 +7,11 @@ import './CommitInfo.css';
 interface CommitInfoProps {
   commit: Commit | null;
   files: CommitFile[];
+  loadingFiles?: boolean;
   gitAdapter: GitAdapter;
 }
 
-function CommitInfo({ commit, files, gitAdapter }: CommitInfoProps) {
+function CommitInfo({ commit, files, loadingFiles = false, gitAdapter }: CommitInfoProps) {
   const [expandedFiles, setExpandedFiles] = useState<{[key: string]: boolean}>({});
   const [fileDiffs, setFileDiffs] = useState<{[key: string]: string}>({});
 
@@ -102,11 +103,20 @@ function CommitInfo({ commit, files, gitAdapter }: CommitInfoProps) {
             <pre className="commit-info-value commit-body">{commit.body}</pre>
           </div>
         )}
-        {files && files.length > 0 && (
+        {(files && files.length > 0) || loadingFiles ? (
           <div className="commit-info-row">
-            <span className="commit-info-label">Files Changed ({files.length}):</span>
+            <span className="commit-info-label">
+              Files Changed {loadingFiles ? (
+                <span className="commit-info-loading-spinner"></span>
+              ) : (
+                `(${files.length})`
+              )}:
+            </span>
             <div className="commit-info-value commit-files-list">
-              {files.map((file, index) => {
+              {loadingFiles && files.length === 0 ? (
+                <div className="commit-files-loading">Loading files...</div>
+              ) : (
+                files.map((file, index) => {
                 const key = `${file.path}-${index}`;
                 const isExpanded = expandedFiles[key];
                 const diff = fileDiffs[key];
@@ -140,10 +150,11 @@ function CommitInfo({ commit, files, gitAdapter }: CommitInfoProps) {
                     )}
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
