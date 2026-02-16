@@ -1475,8 +1475,18 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
       console.log(`Created tag '${tagName}' on commit ${commitForDialog.hash.substring(0, 7)}`);
 
+      // Clear all branch caches since tags can be on any branch
+      clearBranchCache();
+
       // Refresh all data to show new tag
       await loadRepoData(true);
+
+      // If viewing a branch, reload it to show the new tag
+      if (selectedItem?.type === 'branch' && selectedItem.branchName) {
+        await handleBranchSelect(selectedItem.branchName);
+      } else if (selectedItem?.type === 'remote-branch' && selectedItem.fullName) {
+        await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
+      }
     } catch (error) {
       console.error('Error creating tag from commit:', error);
       setError(`Tag creation failed: ${error.message}`);
