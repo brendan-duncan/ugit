@@ -677,7 +677,8 @@ export class SimpleGitAdapter extends GitAdapter {
       commit.tags = tags;
     });
 
-    Promise.all(commits .map(async (commit) => {
+    // Check onOrigin status for all commits
+    await Promise.all(commits.map(async (commit) => {
       try {
         // Check if commit exists on origin branch
         // For remote branches, we need to check against the actual remote branch name
@@ -690,6 +691,8 @@ export class SimpleGitAdapter extends GitAdapter {
           commit.onOrigin = onOrigin;
         }
       } catch (error) {
+        // If remote branch doesn't exist, commit is not on origin
+        commit.onOrigin = false;
       }
     }));
 

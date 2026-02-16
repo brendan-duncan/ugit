@@ -130,6 +130,50 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
+  // Helper function to update onOrigin status for all cached commits
+  const updateCachedCommitsOriginStatus = async () => {
+    const git = gitAdapter.current;
+    if (!git)
+      return;
+
+    const cachedBranches = Array.from(branchCommitsCache.current.keys());
+    if (cachedBranches.length === 0)
+      return;
+
+    console.log(`Updating onOrigin status for ${cachedBranches.length} cached branches...`);
+
+    // Update onOrigin status for each cached branch
+    for (const branchName of cachedBranches) {
+      try {
+        // Skip remote branches - they're always on origin
+        if (branchName.startsWith('origin/')) {
+          continue;
+        }
+
+        const commits = branchCommitsCache.current.get(branchName);
+        if (!commits || commits.length === 0) continue;
+
+        // Check onOrigin status for each commit
+        for (const commit of commits) {
+          try {
+            const unpushedCommits = await git.raw(['branch', '-r', `--contains`, `${commit.hash}`]);
+            commit.onOrigin = unpushedCommits.trim().length !== 0;
+          } catch (error) {
+            // If remote branch doesn't exist, commit is not on origin
+            commit.onOrigin = false;
+          }
+        }
+
+        // Update cache with new onOrigin values
+        updateBranchCache(branchName, commits);
+      } catch (error) {
+        console.warn(`Failed to update onOrigin status for branch ${branchName}:`, error);
+      }
+    }
+
+    console.log('Finished updating onOrigin status for cached branches');
+  };
+
   // Helper function to load branch commits from persistent cache
   const loadBranchCommitsFromCache = () => {
     const cacheData = cacheManager.loadCache(repoPath);
@@ -262,7 +306,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
       const git = gitAdapter.current;
 
-      clearBranchCache(); // Clear entire branch cache on full reload
+      // Don't clear branch cache on refresh - we'll update onOrigin status instead
 
       // Get current branch and modified files
       const status = await git.status();
@@ -398,6 +442,27 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       cacheData.branchCommits = currentBranchCommits;
 
       cacheManager.saveCache(repoPath, cacheData);
+
+      // Update onOrigin status for all cached branches after refresh
+      if (isRefresh) {
+        await updateCachedCommitsOriginStatus();
+      }
+
+      // If a branch view is currently open and this is a refresh, reload that branch
+      if (isRefresh && selectedItem) {
+        try {
+          if (selectedItem.type === 'branch' && selectedItem.branchName) {
+            console.log(`Refreshing branch view for: ${selectedItem.branchName}`);
+            await handleBranchSelect(selectedItem.branchName);
+          } else if (selectedItem.type === 'remote-branch' && selectedItem.fullName) {
+            console.log(`Refreshing remote branch view for: ${selectedItem.fullName}`);
+            await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
+          }
+        } catch (branchRefreshErr) {
+          console.error('Error refreshing branch view:', branchRefreshErr);
+          // Don't fail the entire refresh if branch refresh fails
+        }
+      }
 
     } catch (err) {
       console.error('Error loading repo data:', err);
@@ -638,8 +703,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       await git.fetch('origin');
       console.log('Fetch completed successfully');
 
-      // Clear branch commits cache since remote changes may affect commits
-      clearBranchCache();
+      // Update onOrigin status for cached commits after fetch
+      await updateCachedCommitsOriginStatus();
 
       // Refresh branch status after fetch (parallel, update UI incrementally)
       branches.forEach(async (branchName) => {
@@ -703,9 +768,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       await git.pull('origin', branch);
       console.log('Pull completed successfully');
 
-      // Clear branch commits cache since pull may have changed commits
-      clearBranchCache();
-
+      // Pull may have added new commits, so refresh repo data
+      // The onOrigin status will be updated during loadRepoData refresh
       await loadRepoData(true);
 
     } catch (error) {
@@ -743,9 +807,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         setShowPullRequestDialog(true);
       }
 
-      // Clear branch commits cache since push may have changed commits
-      clearBranchCache();
-
+      // Push updates remote state, so refresh repo data
+      // The onOrigin status will be updated during loadRepoData refresh
       await loadRepoData(true);
 
     } catch (error) {
@@ -1169,9 +1232,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       await git.stashPush(stashMessage);
       console.log('Stash created successfully');
 
-      // Clear branch commits cache since stash may affect working tree
-      clearBranchCache();
-
       // Refresh file status and stashes
       await refreshFileStatus(false);
       const stashList = await git.stashList();
@@ -1214,9 +1274,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       await git.raw(['clean', '-fdx']);
       console.log('Working directory cleaned successfully');
 
-      // Clear branch commits cache since cleaning may affect file status
-      clearBranchCache();
-
       // Refresh all data after cleaning
       await loadRepoData(true);
     } catch (error) {
@@ -1258,9 +1315,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         console.log(`Discarded changes for ${unstagedFiles.length} files`);
       }
 
-      // Clear branch commits cache since discarding may affect file status
-      clearBranchCache();
-
       await loadRepoData(true);
     } catch (error) {
       console.error('Error discarding changes:', error);
@@ -1284,9 +1338,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         await handleBranchSelect(branchName);
       }
 
-      // Clear branch commits cache since branch operations may affect commits
-      clearBranchCache();
-
       // Refresh all data after branch operations
       await loadRepoData(true);
     } catch (error) {
@@ -1308,9 +1359,6 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         // Select newly checked out branch to update branch view
         await handleBranchSelect(branchName);
       }
-
-      // Clear branch commits cache since branch operations may affect commits
-      clearBranchCache();
 
       // Refresh all data after branch operations
       await loadRepoData(true);
@@ -1684,6 +1732,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             if (confirmed) {
               await git.raw(['rebase', '--interactive', '--onto', commit.hash, `$(git merge-base ${currentBranch} ${commit.hash})`, currentBranch]);
               console.log(`Rebased '${currentBranch}' onto commit ${commit.hash.substring(0, 7)}`);
+              clearBranchCache(); // Rebase changes commit history
               await loadRepoData(true);
             }
           } else {
@@ -1699,6 +1748,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             if (confirmed) {
               await git.raw(['reset', '--hard', commit.hash]);
               console.log(`Reset '${currentBranch}' to commit ${commit.hash.substring(0, 7)}`);
+              clearBranchCache(); // Reset changes commit history
               await loadRepoData(true);
             }
           } else {
@@ -1725,6 +1775,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             if (confirmed) {
               await git.raw(['cherry-pick', commit.hash]);
               console.log(`Cherry-picked commit ${commit.hash.substring(0, 7)} onto '${currentBranch}'`);
+              clearBranchCache(); // Cherry-pick adds a new commit
               await loadRepoData(true);
             }
           } else {
@@ -1740,6 +1791,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             if (confirmed) {
               await git.raw(['revert', commit.hash]);
               console.log(`Reverted commit ${commit.hash.substring(0, 7)} on '${currentBranch}'`);
+              clearBranchCache(); // Revert adds a new commit
               await loadRepoData(true);
             }
           } else {
