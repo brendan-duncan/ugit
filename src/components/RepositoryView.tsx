@@ -142,6 +142,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
     console.log(`Updating onOrigin status for ${cachedBranches.length} cached branches...`);
 
+    let totalCommitsChecked = 0;
+
     // Update onOrigin status for each cached branch
     for (const branchName of cachedBranches) {
       try {
@@ -151,13 +153,27 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         }
 
         const commits = branchCommitsCache.current.get(branchName);
-        if (!commits || commits.length === 0) continue;
+        if (!commits || commits.length === 0) {
+          continue;
+        }
 
-        // Check onOrigin status for each commit
-        for (const commit of commits) {
+        // Only check commits where onOrigin is currently false
+        // Commits already on origin will remain on origin
+        const commitsToCheck = commits.filter(commit => commit.onOrigin === false);
+
+        if (commitsToCheck.length === 0) {
+          console.log(`Branch ${branchName}: All commits already on origin, skipping`);
+          continue;
+        }
+
+        console.log(`Branch ${branchName}: Checking ${commitsToCheck.length} commits not yet on origin`);
+
+        // Check onOrigin status for commits that aren't on origin yet
+        for (const commit of commitsToCheck) {
           try {
             const unpushedCommits = await git.raw(['branch', '-r', `--contains`, `${commit.hash}`]);
             commit.onOrigin = unpushedCommits.trim().length !== 0;
+            totalCommitsChecked++;
           } catch (error) {
             // If remote branch doesn't exist, commit is not on origin
             commit.onOrigin = false;
@@ -171,7 +187,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
     }
 
-    console.log('Finished updating onOrigin status for cached branches');
+    console.log(`Finished updating onOrigin status for cached branches (checked ${totalCommitsChecked} commits)`);
   };
 
   // Helper function to load branch commits from persistent cache
@@ -697,6 +713,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleFetchClick = async () => {
     try {
+      setIsBusy(true);
+      setBusyMessage(`git fetch origin`);
       const git = gitAdapter.current;
 
       console.log('Fetching from origin...');
@@ -704,6 +722,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       console.log('Fetch completed successfully');
 
       // Update onOrigin status for cached commits after fetch
+      setBusyMessage(`Updating branch status...`);
       await updateCachedCommitsOriginStatus();
 
       // Refresh branch status after fetch (parallel, update UI incrementally)
@@ -735,6 +754,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error during fetch:', error);
       setError(`Fetch failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -751,12 +773,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setPullingBranch(branch);
 
     try {
+      setIsBusy(true);
       const git = gitAdapter.current;
       let stashCreated = false;
       let stashMessage = '';
 
       // Stash local changes if requested
       if (stashAndReapply && (unstagedFiles.length > 0 || stagedFiles.length > 0)) {
+        setBusyMessage(`git stash push`);
         stashMessage = `Auto-stash before pull at ${new Date().toISOString()}`;
         await git.stashPush(stashMessage);
         stashCreated = true;
@@ -764,6 +788,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
 
       // Perform git pull
+      setBusyMessage(`git pull origin ${branch}`);
       console.log(`Pulling from origin/${branch}...`);
       await git.pull('origin', branch);
       console.log('Pull completed successfully');
@@ -775,23 +800,29 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error during pull:', error);
       setError(`Pull failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+      setPullingBranch(null);
     }
-    setPullingBranch(null);
   };
 
   const handlePush = async (branch, remoteBranch, pushAllTags) => {
     setShowPushDialog(null);
 
     try {
+      setIsBusy(true);
       const git = gitAdapter.current;
 
       console.log(`Pushing ${branch} to origin/${remoteBranch}...`);
 
       let pushOutput = '';
       if (pushAllTags) {
+        setBusyMessage(`git push origin ${branch}:${remoteBranch} --tags`);
         pushOutput = await git.push('origin', `${branch}:${remoteBranch}`, ['--tags']);
         console.log('Push with tags completed successfully');
       } else {
+        setBusyMessage(`git push origin ${branch}:${remoteBranch}`);
         pushOutput = await git.push('origin', `${branch}:${remoteBranch}`);
         console.log('Push completed successfully');
       }
@@ -832,6 +863,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       if (!foundPrUrl) {
         setError(`Push failed: ${error.message}`);
       }
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1004,6 +1038,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setBranchToDelete(null);
 
     try {
+      setIsBusy(true);
       const git = gitAdapter.current;
 
       // Check if trying to delete the current branch
@@ -1013,12 +1048,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
 
       // Delete local branch
+      setBusyMessage(`git branch -D ${branchName}`);
       console.log(`Deleting local branch: ${branchName}`);
       await git.raw(['branch', '-D', branchName]);
 
       // Delete remote branch if requested
       if (deleteRemote) {
         try {
+          setBusyMessage(`git push origin --delete ${branchName}`);
           console.log(`Deleting remote branch: origin/${branchName}`);
           await git.raw(['push', 'origin', '--delete', branchName]);
         } catch (remoteError) {
@@ -1039,6 +1076,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error deleting branch:', error);
       setError(`Failed to delete branch '${branchName}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1053,6 +1093,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setBranchToRename(null);
 
     try {
+      setIsBusy(true);
+      setBusyMessage(`git branch -m ${oldName} ${newName}`);
       const git = gitAdapter.current;
 
       console.log(`Renaming branch '${oldName}' to '${newName}'`);
@@ -1084,6 +1126,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error renaming branch:', error);
       setError(`Failed to rename branch '${oldName}' to '${newName}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1097,6 +1142,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setMergeSourceBranch(null);
 
     try {
+      setIsBusy(true);
       const git = gitAdapter.current;
 
       console.log(`Merging '${sourceBranch}' into '${targetBranch}' with option: ${mergeOption}`);
@@ -1109,6 +1155,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       mergeArgs.push(sourceBranch);
 
       // Perform the merge
+      setBusyMessage(`git merge ${flag ? flag + ' ' : ''}${sourceBranch}`);
       await git.raw(mergeArgs);
 
       console.log(`Merge completed successfully: '${sourceBranch}' into '${targetBranch}'`);
@@ -1127,6 +1174,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error merging branch:', error);
       setError(`Failed to merge '${sourceBranch}' into '${targetBranch}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1213,6 +1263,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setShowStashDialog(false);
 
     try {
+      setIsBusy(true);
       const git = gitAdapter.current;
 
       // If stageNewFiles is checked, stage all new (untracked) files
@@ -1221,6 +1272,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         const newFiles = unstagedFiles.filter(file => file.status === 'created');
 
         if (newFiles.length > 0) {
+          setBusyMessage(`git add (${newFiles.length} files)`);
           console.log(`Staging ${newFiles.length} new files before stash...`);
           await git.add(newFiles.map(f => f.path));
         }
@@ -1228,6 +1280,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
       // Create stash with optional message
       const stashMessage = message || `Stash created at ${new Date().toISOString()}`;
+      setBusyMessage(`git stash push`);
       console.log(`Creating stash: ${stashMessage}`);
       await git.stashPush(stashMessage);
       console.log('Stash created successfully');
@@ -1240,6 +1293,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error creating stash:', error);
       setError(`Stash failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1247,6 +1303,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setShowResetDialog(false);
 
     try {
+      setIsBusy(true);
+      setBusyMessage(`git reset --hard origin/${currentBranch}`);
       const git = gitAdapter.current;
 
       console.log(`Resetting ${currentBranch} to origin...`);
@@ -1261,6 +1319,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error resetting to origin:', error);
       setError(`Reset to origin failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1268,6 +1329,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setShowCleanWorkingDirectoryDialog(false);
 
     try {
+      setIsBusy(true);
+      setBusyMessage(`git clean -fdx`);
       const git = gitAdapter.current;
 
       console.log('Cleaning working directory...');
@@ -1279,6 +1342,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error cleaning working directory:', error);
       setError(`Clean working directory failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1296,10 +1362,12 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
 
     try {
+      setIsBusy(true);
       const git = gitAdapter.current;
 
       // Discard staged changes
       if (stagedFiles.length > 0) {
+        setBusyMessage(`git reset (${stagedFiles.length} files)`);
         const stagedPaths = stagedFiles.map(f => f.path);
         if (stagedPaths.length === 1) {
           await git.reset(stagedPaths[0]);
@@ -1311,6 +1379,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
       // Discard unstaged changes
       if (unstagedFiles.length > 0) {
+        setBusyMessage(`git checkout (${unstagedFiles.length} files)`);
         await git.discard(unstagedFiles.map(f => f.path));
         console.log(`Discarded changes for ${unstagedFiles.length} files`);
       }
@@ -1319,11 +1388,16 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error discarding changes:', error);
       setError(`Discard changes failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
   const handleCreateBranch = async (branchName: string, checkoutAfterCreate: boolean) => {
     try {
+      setIsBusy(true);
+      setBusyMessage(`git branch ${branchName}`);
       const git = gitAdapter.current;
 
       await git.createBranch(branchName);
@@ -1332,6 +1406,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       const previousBranch = gitAdapter.current.currentBranch || currentBranch;
 
       if (checkoutAfterCreate && previousBranch && previousBranch !== branchName) {
+        setBusyMessage(`git checkout ${branchName}`);
         await git.checkoutBranch(branchName);
 
         // Select the newly checked out branch to update the branch view
@@ -1343,6 +1418,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error creating branch:', error);
       setError(`Branch creation failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1351,6 +1429,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
 
     try {
+      setIsBusy(true);
+      setBusyMessage(`git checkout -b ${branchName} ${commitForDialog.hash.substring(0, 7)}`);
       const git = gitAdapter.current;
       await git.raw(['checkout', '-b', branchName, commitForDialog.hash]);
       console.log(`Created branch '${branchName}' from commit ${commitForDialog.hash.substring(0, 7)}`);
@@ -1366,6 +1446,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       console.error('Error creating branch from commit:', error);
       setError(`Branch creation failed: ${error.message}`);
     } finally {
+      setIsBusy(false);
+      setBusyMessage('');
       setShowCreateBranchFromCommitDialog(false);
       setCommitForDialog(null);
     }
@@ -1376,12 +1458,15 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
 
     try {
+      setIsBusy(true);
       const git = gitAdapter.current;
 
       // Create tag with optional message
       if (tagMessage) {
+        setBusyMessage(`git tag -a ${tagName} -m "${tagMessage}" ${commitForDialog.hash.substring(0, 7)}`);
         await git.raw(['tag', '-a', tagName, '-m', tagMessage, commitForDialog.hash]);
       } else {
+        setBusyMessage(`git tag ${tagName} ${commitForDialog.hash.substring(0, 7)}`);
         await git.raw(['tag', tagName, commitForDialog.hash]);
       }
 
@@ -1393,6 +1478,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       console.error('Error creating tag from commit:', error);
       setError(`Tag creation failed: ${error.message}`);
     } finally {
+      setIsBusy(false);
+      setBusyMessage('');
       setShowCreateTagFromCommitDialog(false);
       setCommitForDialog(null);
     }
