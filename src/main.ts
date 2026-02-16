@@ -79,6 +79,7 @@ function createWindow(): void {
     height: windowState.height,
     x: windowState.x,
     y: windowState.y,
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false

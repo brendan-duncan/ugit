@@ -5,12 +5,15 @@ module.exports = {
   packagerConfig: {
     asar: true,
     outDir: process.env.PACKAGE_OUT_DIR || 'out',
+    icon: 'assets/icon', // Electron will automatically append .ico, .icns, or .png based on platform
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        setupIcon: 'assets/icon.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
@@ -18,11 +21,19 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          icon: 'assets/icon.png',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          icon: 'assets/icon.png',
+        },
+      },
     },
   ],
   plugins: [
