@@ -88,6 +88,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [pullRequestUrl, setPullRequestUrl] = useState<string>('');
   const [pullRequestBranch, setPullRequestBranch] = useState<string>('');
   const [isBusy, setIsBusy] = useState<boolean>(false);
+  const [busyMessage, setBusyMessage] = useState<string>('');
   const activeSplitter = useRef(null);
   const gitAdapter = useRef<GitAdapter | null>(null);
   const branchCommitsCache = useRef(new Map()); // Cache commits per branch
@@ -771,6 +772,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
+  const handleCancelOperation = () => {
+    // TODO: Implement actual git operation cancellation in GitAdapter
+    // For now, this just dismisses the busy overlay
+    console.log('Cancelling git operation...');
+    setIsBusy(false);
+    setBusyMessage('');
+  };
+
   const handleBranchSwitch = async (branchName: string) => {
     // Check if there are local changes
     if (hasLocalChanges) {
@@ -783,8 +792,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     await performBranchSwitch(branchName);
   };
 
-  const performBranchSwitch = async (branchName: string) => {
+  const performBranchSwitch = async (branchName: string, skipBusyManagement = false) => {
     try {
+      if (!skipBusyManagement) {
+        setIsBusy(true);
+        setBusyMessage(`git checkout ${branchName}`);
+      } else {
+        setBusyMessage(`git checkout ${branchName}`);
+      }
       const git = gitAdapter.current;
 
       console.log(`Switching to branch: ${branchName}`);
@@ -796,6 +811,11 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error switching branch:', error);
       setError(`Branch switch failed: ${error.message}`);
+    } finally {
+      if (!skipBusyManagement) {
+        setIsBusy(false);
+        setBusyMessage('');
+      }
     }
   };
 
@@ -811,23 +831,26 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
     try {
       const git = gitAdapter.current;
+      setIsBusy(true);
 
       switch (option) {
         case 'leave-alone':
           // Just switch branches, keep changes as they are
-          await performBranchSwitch(branchName);
+          await performBranchSwitch(branchName, true);
           break;
 
         case 'stash-and-reapply':
           // Stash changes, switch branches, then reapply
+          setBusyMessage(`git stash push`);
           console.log('Stashing changes before branch switch...');
           await git.stashPush(`Auto-stash before switching to ${branchName}`);
 
           // Switch branches
-          await performBranchSwitch(branchName);
+          await performBranchSwitch(branchName, true);
 
           // Try to reapply the stash without deleting it
           try {
+            setBusyMessage(`git stash apply`);
             console.log('Reapplying stashed changes...');
             await git.stashApply();
             console.log('Stash reapplied successfully');
@@ -863,6 +886,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
           // Discard staged changes
           if (stagedFiles.length > 0) {
+            setBusyMessage(`git reset (${stagedFiles.length} files)`);
             const stagedPaths = stagedFiles.map(f => f.path);
             if (stagedPaths.length === 1) {
               await git.reset(stagedPaths[0]);
@@ -873,11 +897,12 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
           // Discard unstaged changes
           if (unstagedFiles.length > 0) {
+            setBusyMessage(`git checkout (${unstagedFiles.length} files)`);
             await git.discard(unstagedFiles.map(f => f.path));
           }
 
           // Switch branches
-          await performBranchSwitch(branchName);
+          await performBranchSwitch(branchName, true);
           break;
 
         default:
@@ -887,6 +912,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     } catch (error) {
       console.error('Error handling local changes:', error);
       setError(`Failed to handle local changes: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
     }
   };
 
@@ -1781,7 +1809,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         {isBusy && (
           <div className="repo-busy-overlay">
             <div className="repo-busy-spinner"></div>
-            <div className="repo-busy-message">Processing...</div>
+            <div className="repo-busy-message">{busyMessage || 'Processing...'}</div>
+            <button className="repo-busy-cancel-button" onClick={handleCancelOperation}>
+              Cancel
+            </button>
           </div>
         )}
         {loading && <div className="loading">Loading repository...</div>}
@@ -1853,6 +1884,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 branchStatus={branchStatus}
                 onError={setError}
                 onBusyChange={setIsBusy}
+                onBusyMessageChange={setBusyMessage}
               />
             </div>
           </>

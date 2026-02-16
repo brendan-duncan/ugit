@@ -147,4 +147,22 @@
   color: #cccccc;
   font-size: 14px;
   font-weight: 500;
+  font-family: 'Courier New', monospace;
+}
+
+.repo-busy-cancel-button {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background-color: #3d3d3d;
+  border: 1px solid #4ec9b0;
+  color: #cccccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.repo-busy-cancel-button:hover {
+  background-color: #505050;
+  border-color: #6ee7d0;
 }

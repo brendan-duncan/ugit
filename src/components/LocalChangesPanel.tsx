@@ -20,9 +20,10 @@ interface LocalChangesPanelProps {
   branchStatus?: Record<string, any>;
   onError?: (error: string) => void;
   onBusyChange?: (busy: boolean) => void;
+  onBusyMessageChange?: (message: string) => void;
 }
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError, onBusyChange }: LocalChangesPanelProps) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange }: LocalChangesPanelProps) {
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -110,6 +111,13 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         console.log(`${sourceList === 'unstaged' ? 'Staging' : 'Unstaging'} file: ${item.path}`);
       }
 
+      // Set appropriate busy message
+      if (sourceList === 'unstaged' && targetList === 'staged') {
+        if (onBusyMessageChange) onBusyMessageChange(`git add ${allFilePaths.length > 1 ? `(${allFilePaths.length} files)` : allFilePaths[0]}`);
+      } else if (sourceList === 'staged' && targetList === 'unstaged') {
+        if (onBusyMessageChange) onBusyMessageChange(`git reset ${allFilePaths.length > 1 ? `(${allFilePaths.length} files)` : allFilePaths[0]}`);
+      }
+
       // Process all files at once using consolidated add/reset methods
       if (sourceList === 'unstaged' && targetList === 'staged') {
         await git.add(allFilePaths);
@@ -127,6 +135,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       console.error('Error staging/unstaging:', error);
     } finally {
       setIsBusy(false);
+      if (onBusyMessageChange) onBusyMessageChange('');
     }
   };
 
@@ -163,22 +172,25 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       // Pull first if requested
       if (doPullFirst && currentBranch) {
         // Stash local changes before pulling
+        if (onBusyMessageChange) onBusyMessageChange(`git stash push`);
         console.log('Stashing local changes before pull...');
         const stashMessage = `Auto-stash before pull at ${new Date().toISOString()}`;
         await git.stashPush(stashMessage);
         console.log('Stashed local changes successfully');
 
         try {
+          if (onBusyMessageChange) onBusyMessageChange(`git pull origin ${currentBranch}`);
           console.log(`Pulling latest changes from origin/${currentBranch}...`);
           await git.pull('origin', currentBranch);
           console.log('Pull completed successfully');
-          
+
           // Try to apply the stash
           try {
+            if (onBusyMessageChange) onBusyMessageChange(`git stash apply`);
             console.log('Applying stashed changes...');
             await git.stashApply();
             console.log('Stash applied successfully');
-            
+
             // If apply succeeded, pop the stash to remove it
             try {
               await git.stashPop();
@@ -189,14 +201,14 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
             }
           } catch (stashError) {
             console.error('Conflicts detected when applying stash:', stashError);
-            
+
             // Show conflict dialog
             setShowStashConflictDialog(true);
             return;
           }
         } catch (pullError) {
           console.error('Pull failed, attempting to restore stash:', pullError);
-          
+
           // Pull failed, try to restore stash
           try {
             await git.stashPop();
@@ -205,11 +217,12 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
             console.error('Failed to restore stash after failed pull:', restoreError);
             // Just log the error, don't prevent the user from trying again
           }
-          
+
           setIsBusy(false);
+          if (onBusyMessageChange) onBusyMessageChange('');
           throw pullError;
         }
-        
+
         // Refresh file status after pull (and possible stash apply)
         if (onRefresh) {
           await onRefresh();
@@ -221,6 +234,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         ? `${commitMessage.trim()}\n\n${commitDescription.trim()}`
         : commitMessage.trim();
 
+      if (onBusyMessageChange) onBusyMessageChange(`git commit -m "${commitMessage.trim()}"`);
       await git.commit(fullMessage);
       console.log('Commit successful');
 
@@ -244,6 +258,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       console.error('Error committing:', error);
     } finally {
       setIsBusy(false);
+      if (onBusyMessageChange) onBusyMessageChange('');
     }
   };
 
@@ -333,6 +348,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
 
         case 'stage':
           if (allFilePaths.length > 0) {
+            if (onBusyMessageChange) onBusyMessageChange(`git add ${allFilePaths.length > 1 ? `(${allFilePaths.length} files)` : allFilePaths[0]}`);
             await git.add(allFilePaths);
             console.log(`Staged ${allFilePaths.length} files`);
             if (onRefresh)
@@ -342,6 +358,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
 
         case 'unstage':
           if (allFilePaths.length > 0) {
+            if (onBusyMessageChange) onBusyMessageChange(`git reset ${allFilePaths.length > 1 ? `(${allFilePaths.length} files)` : allFilePaths[0]}`);
             await git.reset(allFilePaths);
             console.log(`Unstaged ${allFilePaths.length} files`);
             if (onRefresh)
@@ -355,6 +372,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               `Are you sure you want to discard changes for ${allFilePaths.length} file(s)? This cannot be undone.`
             );
             if (confirmed) {
+              if (onBusyMessageChange) onBusyMessageChange(`git checkout ${allFilePaths.length > 1 ? `(${allFilePaths.length} files)` : allFilePaths[0]}`);
               await git.discard(allFilePaths);
               console.log(`Discarded changes for ${allFilePaths.length} files`);
               if (onRefresh)
@@ -450,6 +468,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       alert(`Error: ${error.message}`);
     } finally {
       setIsBusy(false);
+      if (onBusyMessageChange) onBusyMessageChange('');
     }
   };
 
