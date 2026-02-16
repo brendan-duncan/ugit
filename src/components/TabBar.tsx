@@ -91,7 +91,7 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
           </button>
         </div>
       ))}
-      <div className="version-info">v0.1.2</div>
+      <div className="version-info">v{process.env.APP_VERSION}</div>
     </div>
   );
 };

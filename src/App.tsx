@@ -3,6 +3,7 @@ import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
 import { SettingsDialog } from './components/SettingsDialog';
+import UpdateNotification from './components/UpdateNotification';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
 import { ipcRenderer } from 'electron';
 import fs from 'fs';
@@ -361,6 +362,7 @@ function App(): React.ReactElement {
           </>
         )}
       </div>
+      <UpdateNotification />
       {showSettings && (
         <SettingsDialog onClose={() => setShowSettings(false)} />
       )}

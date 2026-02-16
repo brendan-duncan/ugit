@@ -6,6 +6,9 @@ module.exports = {
     asar: true,
     outDir: process.env.PACKAGE_OUT_DIR || 'out',
     icon: 'assets/icon', // Electron will automatically append .ico, .icns, or .png based on platform
+    extraResource: [
+      'app-update.yml'
+    ],
     // macOS code signing configuration
     // Set APPLE_IDENTITY environment variable to enable signing (e.g., "Developer ID Application: Your Name")
     ...(process.env.APPLE_IDENTITY && {
@@ -24,6 +27,18 @@ module.exports = {
     }),
   },
   rebuildConfig: {},
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'brendanduncan',
+          name: 'ugit'
+        },
+        prerelease: false
+      }
+    }
+  ],
   makers: [
     {
       name: '@electron-forge/maker-squirrel',

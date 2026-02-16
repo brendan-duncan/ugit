@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import cacheManager from './utils/cacheManager';
 import { initializeSettings } from './utils/settings';
 import { getSettingsManager } from './utils/settings';
@@ -7,6 +8,10 @@ import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';
 import { exec } from 'child_process';
+
+// Configure auto-updater
+autoUpdater.autoDownload = false; // Don't auto-download, let user choose
+autoUpdater.autoInstallOnAppQuit = true; // Install when app quits
 
 let mainWindow: Electron.BrowserWindow | null = null;
 let recentRepos: string[] = [];
@@ -240,6 +245,24 @@ function createMenu(): void {
           }
         }
       ]
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('check-for-updates-manual');
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: `Version ${app.getVersion()}`,
+          enabled: false
+        }
+      ]
     }
   ];
 
@@ -294,6 +317,18 @@ app.whenReady().then(() => {
   windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
 
   createWindow();
+
+  // Check for updates after window is created (only in production)
+  if (!app.isPackaged) {
+    console.log('Running in development mode, skipping update check');
+  } else {
+    // Wait a bit before checking for updates
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch((error) => {
+        console.error('Error checking for updates:', error);
+      });
+    }, 3000);
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -312,6 +347,57 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     saveWindowState();
+  }
+});
+
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for updates...');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-status', { status: 'checking' });
+  }
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes: info.releaseNotes
+    });
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('Update not available. Current version:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-not-available', { version: info.version });
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Update error:', err);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-error', { message: err.message });
+  }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  console.log(`Download progress: ${progressObj.percent.toFixed(2)}%`);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-download-progress', {
+      percent: progressObj.percent,
+      transferred: progressObj.transferred,
+      total: progressObj.total
+    });
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', { version: info.version });
   }
 });
 
@@ -460,4 +546,49 @@ ipcMain.handle('clone-repository', async (event: any, repoUrl: string, parentFol
       error: error.message
     };
   }
+});
+
+// Auto-updater IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    if (!app.isPackaged) {
+      return {
+        success: false,
+        error: 'Updates are only available in production builds'
+      };
+    }
+    const result = await autoUpdater.checkForUpdates();
+    return {
+      success: true,
+      updateInfo: result?.updateInfo
+    };
+  } catch (error: any) {
+    console.error('Error checking for updates:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error downloading update:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+ipcMain.handle('install-update', () => {
+  // This will quit the app and install the update
+  autoUpdater.quitAndInstall(false, true);
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
