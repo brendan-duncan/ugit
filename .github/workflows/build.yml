@@ -19,6 +19,7 @@ jobs:
             artifact_name: ugit-windows-x64.zip
             out_path: out\ugit-win32-x64
           - os: macos-latest
+            architecture: 'arm64'
             artifact_name: ugit-macos-arm64.zip
             out_path: out/ugit-darwin-arm64
           - os: ubuntu-latest
