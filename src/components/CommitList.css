@@ -28,9 +28,7 @@
 }
 
 .commit-item {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto;
-  gap: 12px;
+  display: flex;
   align-items: center;
   padding: 6px 8px;
   margin-bottom: 2px;
@@ -38,6 +36,7 @@
   transition: background-color 0.2s;
   cursor: pointer;
   border: 1px solid transparent;
+  gap: 8px;
 }
 
 .commit-item:hover {
@@ -59,6 +58,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .commit-item.selected .commit-message {
@@ -84,17 +85,24 @@
   font-size: 12px;
 }
 
-.commit-remote-indicator {
-  color: #ff6b35;
-  font-size: 14px;
-  width: 16px;
-  text-align: center;
+.commit-tags {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.commit-tag {
+  background-color: #4a3b8f;
+  color: #c5a8ff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .commit-item.not-on-origin {
   background-color: #2d2d2d;
   border-color: #264f78;
-  grid-template-columns: auto 1fr auto auto auto auto;
 }
 
 .commit-item.not-on-origin .commit-message {

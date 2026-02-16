@@ -1,8 +1,8 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron';
 import cacheManager from './utils/cacheManager';
 import { initializeSettings } from './utils/settings';
-import GitFactory from './git/GitFactory';
 import { getSettingsManager } from './utils/settings';
+import GitFactory from './git/GitFactory';
 import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';

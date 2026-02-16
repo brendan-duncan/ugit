@@ -652,8 +652,30 @@ export class SimpleGitAdapter extends GitAdapter {
       date: commit.date,
       message: commit.message,
       body: commit.body,
-      onOrigin: branchName.startsWith('origin/')
+      onOrigin: branchName.startsWith('origin/'),
+      tags: [] as string[]
     }));
+
+    // Get all tags and their target commits
+    const tagResult = await this.git.raw(['tag', '-l', '--format=%(refname:short) %(objectname:short)']);
+    const tagMap = new Map<string, string[]>();
+    if (tagResult.trim()) {
+      tagResult.trim().split('\n').forEach((line: string) => {
+        const [tag, hash] = line.split(' ');
+        if (tag && hash) {
+          const existing = tagMap.get(hash) || [];
+          existing.push(tag);
+          tagMap.set(hash, existing);
+        }
+      });
+    }
+
+    // Map tags to commits
+    commits.forEach((commit: any) => {
+      const shortHash = commit.hash.substring(0, 7);
+      const tags = tagMap.get(shortHash) || [];
+      commit.tags = tags;
+    });
 
     Promise.all(commits .map(async (commit) => {
       try {

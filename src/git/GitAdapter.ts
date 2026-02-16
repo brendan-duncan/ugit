@@ -94,6 +94,7 @@ export interface Commit {
   message: string;
   body: string;
   onOrigin: boolean;
+  tags: string[];
 }
 
 /**

@@ -68,6 +68,13 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
               onContextMenu={(e) => handleContextMenu(e, commit)}
             >
               {!commit.onOrigin && <span className="commit-remote-indicator">⚡</span>}
+              {commit.tags && commit.tags.length > 0 && (
+                <span className="commit-tags">
+                  {commit.tags.map((tag) => (
+                    <span key={tag} className="commit-tag">{tag}</span>
+                  ))}
+                </span>
+              )}
               <span className={`commit-message ${!commit.onOrigin ? 'italic' : ''}`}>{commit.message}</span>
               <span className="commit-author">{commit.author_name}</span>
               <span className="commit-hash">{commit.hash.substring(0, 7)}</span>
