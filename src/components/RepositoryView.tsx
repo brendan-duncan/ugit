@@ -1807,8 +1807,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
-  const handleCommitContextMenu = async (action: string, commit: Commit, currentBranch: string) => {
-    console.log('Commit context menu action:', action, 'on commit:', commit.hash);
+  const handleCommitContextMenu = async (action: string, commit: Commit, currentBranch: string, tagName?: string) => {
+    console.log('Commit context menu action:', action, 'on commit:', commit.hash, tagName ? `tag: ${tagName}` : '');
 
     try {
       const git = gitAdapter.current;
@@ -1822,6 +1822,104 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         case 'new-tag':
           setCommitForDialog(commit);
           setShowCreateTagFromCommitDialog(true);
+          break;
+
+        case 'show-tag-details':
+          if (tagName) {
+            try {
+              // Get tag details (annotated tags have extra info)
+              const tagInfo = await git.raw(['show', tagName]);
+              alert(`Tag: ${tagName}\n\n${tagInfo}`);
+            } catch (error) {
+              console.error('Error getting tag details:', error);
+              setError('Failed to get tag details: ' + error.message);
+            }
+          }
+          break;
+
+        case 'copy-tag-name':
+          if (tagName) {
+            try {
+              await navigator.clipboard.writeText(tagName);
+              console.log(`Copied tag name to clipboard: ${tagName}`);
+            } catch (error) {
+              console.error('Failed to copy tag name:', error);
+              alert('Failed to copy tag name to clipboard');
+            }
+          }
+          break;
+
+        case 'delete-tag':
+          if (tagName) {
+            const confirmed = window.confirm(
+              `Are you sure you want to delete tag '${tagName}'?\n\nThis will delete the tag locally. You can also delete it from the remote if it exists there.`
+            );
+            if (confirmed) {
+              try {
+                setIsBusy(true);
+                setBusyMessage(`git tag -d ${tagName}`);
+
+                // Delete tag locally
+                await git.raw(['tag', '-d', tagName]);
+                console.log(`Deleted local tag '${tagName}'`);
+
+                // Ask if they want to delete from remote too
+                const deleteFromRemote = window.confirm(
+                  `Tag '${tagName}' deleted locally.\n\nDo you also want to delete it from origin?`
+                );
+
+                if (deleteFromRemote) {
+                  try {
+                    setBusyMessage(`git push origin :refs/tags/${tagName}`);
+                    await git.raw(['push', 'origin', `:refs/tags/${tagName}`]);
+                    console.log(`Deleted tag '${tagName}' from origin`);
+                  } catch (error) {
+                    console.error('Error deleting tag from remote:', error);
+                    setError('Failed to delete tag from remote: ' + error.message);
+                  }
+                }
+
+                // Clear caches and refresh
+                clearBranchCache();
+                await loadRepoData(true);
+
+                // Reload current branch view if open
+                if (selectedItem?.type === 'branch' && selectedItem.branchName) {
+                  await handleBranchSelect(selectedItem.branchName);
+                } else if (selectedItem?.type === 'remote-branch' && selectedItem.fullName) {
+                  await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
+                }
+              } catch (error) {
+                console.error('Error deleting tag:', error);
+                setError('Failed to delete tag: ' + error.message);
+              } finally {
+                setIsBusy(false);
+                setBusyMessage('');
+              }
+            }
+          }
+          break;
+
+        case 'push-tag':
+          if (tagName) {
+            const confirmed = window.confirm(
+              `Are you sure you want to push tag '${tagName}' to origin?`
+            );
+            if (confirmed) {
+              try {
+                setIsBusy(true);
+                setBusyMessage(`git push origin ${tagName}`);
+                await git.raw(['push', 'origin', tagName]);
+                console.log(`Pushed tag '${tagName}' to origin`);
+              } catch (error) {
+                console.error('Error pushing tag:', error);
+                setError('Failed to push tag: ' + error.message);
+              } finally {
+                setIsBusy(false);
+                setBusyMessage('');
+              }
+            }
+          }
           break;
 
         case 'rebase-to-here':

@@ -113,3 +113,64 @@
 .commit-item.not-on-origin.selected .commit-message {
   color: #ffffff;
 }
+
+/* Context Menu Styles */
+.context-menu {
+  background-color: #252526;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  padding: 4px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  z-index: 10000;
+  position: fixed;
+}
+
+.context-menu-item {
+  padding: 6px 16px;
+  color: #cccccc;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s;
+}
+
+.context-menu-item:hover {
+  background-color: #2a2d2e;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: #454545;
+  margin: 4px 0;
+}
+
+/* Submenu styles */
+.context-menu-submenu {
+  position: relative;
+}
+
+.context-submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background-color: #252526;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+  min-width: 200px;
+  padding: 4px 0;
+  z-index: 10001;
+  margin-left: 4px;
+}
+
+.context-submenu .context-menu-item {
+  justify-content: flex-start;
+}
+
+.commit-remote-indicator {
+  color: #ffcc00;
+  font-size: 14px;
+  margin-right: 4px;
+}

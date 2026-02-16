@@ -6,12 +6,13 @@ interface CommitListProps {
   commits: Array<Commit>;
   selectedCommit: Commit | null;
   onSelectCommit: (commit: Commit | null) => void;
-  onContextMenu: (action: string, commit: Commit, currentBranch: string) => void;
+  onContextMenu: (action: string, commit: Commit, currentBranch: string, tagName?: string) => void;
   currentBranch: string;
 }
 
 function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, currentBranch }: CommitListProps) {
   const [contextMenu, setContextMenu] = useState(null);
+  const [tagSubmenuOpen, setTagSubmenuOpen] = useState(false);
   const contextMenuRef = useRef(null);
 
   // Close context menu when clicking outside
@@ -38,11 +39,12 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
     });
   };
 
-  const handleMenuAction = (action: string) => {
+  const handleMenuAction = (action: string, tagName?: string) => {
     if (onContextMenu && contextMenu) {
-      onContextMenu(action, contextMenu.commit, currentBranch);
+      onContextMenu(action, contextMenu.commit, currentBranch, tagName);
     }
     setContextMenu(null);
+    setTagSubmenuOpen(false);
   };
 
   if (commits.length === 0) {
@@ -102,6 +104,43 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
           <div className="context-menu-item" onClick={() => handleMenuAction('new-tag')}>
             New Tag...
           </div>
+          {contextMenu.commit.tags && contextMenu.commit.tags.length > 0 && (
+            <>
+              <div className="context-menu-separator"></div>
+              <div
+                className="context-menu-item context-menu-submenu"
+                onMouseEnter={() => setTagSubmenuOpen(true)}
+                onMouseLeave={() => setTagSubmenuOpen(false)}
+              >
+                Tags ▶
+                {tagSubmenuOpen && (
+                  <div className="context-submenu">
+                    {contextMenu.commit.tags.map((tag) => (
+                      <React.Fragment key={tag}>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('show-tag-details', tag)}>
+                          Show '{tag}' details...
+                        </div>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('copy-tag-name', tag)}>
+                          Copy Tag Name
+                        </div>
+                        <div className="context-menu-separator"></div>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('delete-tag', tag)}>
+                          Delete '{tag}'...
+                        </div>
+                        <div className="context-menu-separator"></div>
+                        <div className="context-menu-item" onClick={() => handleMenuAction('push-tag', tag)}>
+                          Push '{tag}' to origin...
+                        </div>
+                        {contextMenu.commit.tags.indexOf(tag) < contextMenu.commit.tags.length - 1 && (
+                          <div className="context-menu-separator"></div>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
           <div className="context-menu-separator"></div>
           <div className="context-menu-item" onClick={() => handleMenuAction('rebase-to-here')}>
             Rebase '{currentBranch || 'current'}' to Here
