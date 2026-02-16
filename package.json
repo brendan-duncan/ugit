@@ -21,7 +21,7 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/brendanduncan/ugit"
+    "url": "https://github.com/brendan-duncan/ugit"
   },
   "build": {
     "appId": "com.ugit.app",

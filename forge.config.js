@@ -32,7 +32,7 @@ module.exports = {
       name: '@electron-forge/publisher-github',
       config: {
         repository: {
-          owner: 'brendanduncan',
+          owner: 'brendan-duncan',
           name: 'ugit'
         },
         prerelease: false
