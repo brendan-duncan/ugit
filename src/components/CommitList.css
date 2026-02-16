@@ -6,12 +6,41 @@
   padding: 16px;
 }
 
-.commit-list h4 {
-  color: #ffffff;
-  font-size: 1rem;
+.commit-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid #3d3d3d;
+}
+
+.commit-list h4 {
+  color: #ffffff;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.commit-filter-toggle {
+  background: none;
+  border: 1px solid #3d3d3d;
+  color: #cccccc;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 14px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.commit-filter-toggle:hover {
+  background-color: #2d2d2d;
+  border-color: #4ec9b0;
+}
+
+.commit-filter-toggle.active {
+  background-color: #2d2d2d;
+  border-color: #4ec9b0;
+  color: #4ec9b0;
 }
 
 .commit-list-content {
@@ -173,4 +202,66 @@
   color: #ffcc00;
   font-size: 14px;
   margin-right: 4px;
+}
+
+/* Filter Styles */
+.commit-filters {
+  background-color: #252526;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.commit-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.commit-filter-row:last-child {
+  margin-bottom: 0;
+}
+
+.commit-filter-input {
+  flex: 1;
+  background-color: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  color: #cccccc;
+  padding: 6px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  transition: border-color 0.2s;
+}
+
+.commit-filter-input:focus {
+  outline: none;
+  border-color: #4ec9b0;
+}
+
+.commit-filter-input::placeholder {
+  color: #666666;
+}
+
+.commit-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.commit-filter-clear {
+  background-color: #3d3d3d;
+  border: 1px solid #4ec9b0;
+  color: #cccccc;
+  padding: 4px 12px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.commit-filter-clear:hover {
+  background-color: #4d4d4d;
+  border-color: #5ed9c0;
 }

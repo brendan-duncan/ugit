@@ -12,6 +12,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [localRefreshTime, setLocalRefreshTime] = useState<number>(5);
   const [blockCommitBranches, setBlockCommitBranches] = useState<string>('');
   const [pushAllTags, setPushAllTags] = useState<boolean>(true);
+  const [maxCommits, setMaxCommits] = useState<number>(100);
   const [isSaving, setIsSaving] = useState(false);
 
   // Update local state when settings load
@@ -20,6 +21,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       setLocalRefreshTime(settings.localFileRefreshTime);
       setBlockCommitBranches(settings.blockCommitBranches.join(', '));
       setPushAllTags(settings.pushAllTags);
+      setMaxCommits(settings.maxCommits);
     }
   }, [settings]);
 
@@ -39,6 +41,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       await updateSetting('localFileRefreshTime', localRefreshTime);
       await updateSetting('blockCommitBranches', branchList);
       await updateSetting('pushAllTags', pushAllTags);
+      await updateSetting('maxCommits', maxCommits);
 
       onClose();
     } catch (err) {
@@ -141,6 +144,21 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
               <span>Push all tags by default</span>
             </label>
             <small>When enabled, the "Push all tags" checkbox in the Push dialog will be checked by default</small>
+          </div>
+
+          <div className="setting-group">
+            <label htmlFor="maxCommits">
+              Max Commits to Display:
+            </label>
+            <input
+              id="maxCommits"
+              type="number"
+              min="1"
+              max="10000"
+              value={maxCommits}
+              onChange={(e) => setMaxCommits(parseInt(e.target.value) || 100)}
+            />
+            <small>Maximum number of commits to show in the commit list (filters are applied before limit)</small>
           </div>
         </div>
         <div className="dialog-footer">

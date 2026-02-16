@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Commit } from '../git/GitAdapter';
+import { useSettings } from '../hooks/useSettings';
 import './CommitList.css';
 
 interface CommitListProps {
@@ -10,9 +11,26 @@ interface CommitListProps {
   currentBranch: string;
 }
 
+interface CommitFilters {
+  author: string;
+  message: string;
+  sha: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
 function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, currentBranch }: CommitListProps) {
+  const { settings } = useSettings();
   const [contextMenu, setContextMenu] = useState(null);
   const [tagSubmenuOpen, setTagSubmenuOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<CommitFilters>({
+    author: '',
+    message: '',
+    sha: '',
+    dateFrom: '',
+    dateTo: ''
+  });
   const contextMenuRef = useRef(null);
 
   // Close context menu when clicking outside
@@ -47,6 +65,69 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
     setTagSubmenuOpen(false);
   };
 
+  const handleFilterChange = (field: keyof CommitFilters, value: string) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      author: '',
+      message: '',
+      sha: '',
+      dateFrom: '',
+      dateTo: ''
+    });
+  };
+
+  // Apply filters and max commits limit
+  const filteredCommits = useMemo(() => {
+    const maxCommits = settings?.maxCommits || 100;
+
+    let result = commits.filter(commit => {
+      // Author filter - substring match (case-insensitive)
+      if (filters.author && !commit.author_name.toLowerCase().includes(filters.author.toLowerCase())) {
+        return false;
+      }
+
+      // Message filter - substring match (case-insensitive)
+      if (filters.message && !commit.message.toLowerCase().includes(filters.message.toLowerCase())) {
+        return false;
+      }
+
+      // SHA filter - starts with match (case-insensitive)
+      if (filters.sha && !commit.hash.toLowerCase().startsWith(filters.sha.toLowerCase())) {
+        return false;
+      }
+
+      // Date range filter
+      if (filters.dateFrom || filters.dateTo) {
+        const commitDate = new Date(commit.date);
+
+        if (filters.dateFrom) {
+          const fromDate = new Date(filters.dateFrom);
+          if (commitDate < fromDate) {
+            return false;
+          }
+        }
+
+        if (filters.dateTo) {
+          const toDate = new Date(filters.dateTo);
+          toDate.setHours(23, 59, 59, 999); // End of day
+          if (commitDate > toDate) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+
+    // Apply max commits limit
+    return result.slice(0, maxCommits);
+  }, [commits, filters, settings]);
+
+  const hasActiveFilters = filters.author || filters.message || filters.sha || filters.dateFrom || filters.dateTo;
+
   if (commits.length === 0) {
     return (
       <div className="commit-list">
@@ -58,9 +139,72 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
 
   return (
     <div className="commit-list">
-      <h4>Commits ({commits.length})</h4>
+      <div className="commit-list-header">
+        <h4>
+          Commits ({filteredCommits.length}{commits.length !== filteredCommits.length && ` of ${commits.length}`})
+        </h4>
+        <button
+          className={`commit-filter-toggle ${showFilters ? 'active' : ''}`}
+          onClick={() => setShowFilters(!showFilters)}
+          title="Toggle filters"
+        >
+          🔍
+        </button>
+      </div>
+
+      {showFilters && (
+        <div className="commit-filters">
+          <div className="commit-filter-row">
+            <input
+              type="text"
+              placeholder="Author (contains)"
+              value={filters.author}
+              onChange={(e) => handleFilterChange('author', e.target.value)}
+              className="commit-filter-input"
+            />
+            <input
+              type="text"
+              placeholder="Message (contains)"
+              value={filters.message}
+              onChange={(e) => handleFilterChange('message', e.target.value)}
+              className="commit-filter-input"
+            />
+          </div>
+          <div className="commit-filter-row">
+            <input
+              type="text"
+              placeholder="SHA (starts with)"
+              value={filters.sha}
+              onChange={(e) => handleFilterChange('sha', e.target.value)}
+              className="commit-filter-input"
+            />
+            <input
+              type="date"
+              placeholder="From Date"
+              value={filters.dateFrom}
+              onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+              className="commit-filter-input"
+            />
+            <input
+              type="date"
+              placeholder="To Date"
+              value={filters.dateTo}
+              onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+              className="commit-filter-input"
+            />
+          </div>
+          {hasActiveFilters && (
+            <div className="commit-filter-actions">
+              <button onClick={handleClearFilters} className="commit-filter-clear">
+                Clear Filters
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="commit-list-content">
-        {commits.map((commit, index) => {
+        {filteredCommits.map((commit, index) => {
           const isSelected = selectedCommit && selectedCommit.hash === commit.hash;
           return (
             <div
