@@ -45,7 +45,9 @@ jobs:
       run: npm run build:main
 
     - name: Make distribution (electron-builder)
-      run: npm run dist:${{ matrix.target }}
+      run: npm run dist:${{ matrix.target }} -- --publish never
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Ad-hoc code sign (macOS)
       if: runner.os == 'macOS'
