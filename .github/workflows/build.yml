@@ -50,14 +50,22 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-release-notes:
-    needs: build  # waits for all matrix builds to finish
+    needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check release exists
+        run: gh release view ${{ github.ref_name }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check release-notes.md exists
+        run: cat release-notes.md
+
       - name: Update release notes
-        run: gh release edit ${{ github.ref_name }} --notes-file release-notes.md
+        run: gh release edit ${{ github.ref_name }} --notes-file release-notes.md --verbose
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
