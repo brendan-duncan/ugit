@@ -30,6 +30,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const [selectedFile, setSelectedFile] = useState(null);
   const [commitMessage, setCommitMessage] = useState<string>('');
   const [commitDescription, setCommitDescription] = useState<string>('');
+  const [showDescriptionEditor, setShowDescriptionEditor] = useState<boolean>(false);
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [showStashDialog, setShowStashDialog] = useState<boolean>(false);
   const [showPullCommitDialog, setShowPullCommitDialog] = useState<boolean>(false);
@@ -568,6 +569,14 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
             disabled={isBusy}
           />
           <button
+            className="commit-description-expand"
+            onClick={() => setShowDescriptionEditor(true)}
+            title="Open larger editor"
+            disabled={isBusy}
+          >
+            ⤢
+          </button>
+          <button
             className="commit-button"
             onClick={handleCommit}
             disabled={stagedFiles.length === 0 || !commitMessage.trim() || isBusy}
@@ -602,6 +611,34 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         <StashConflictDialog
           onClose={() => setShowStashConflictDialog(false)}
         />
+      )}
+
+      {/* Description Editor Dialog */}
+      {showDescriptionEditor && (
+        <div className="dialog-overlay" onClick={() => setShowDescriptionEditor(false)}>
+          <div className="dialog-content dialog-content-large" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-header">
+              <h3>Edit Commit Description</h3>
+            </div>
+            <div className="dialog-body">
+              <textarea
+                className="dialog-input description-editor-textarea"
+                value={commitDescription}
+                onChange={(e) => setCommitDescription(e.target.value)}
+                autoFocus
+                rows={10}
+              />
+            </div>
+            <div className="dialog-footer">
+              <button className="dialog-button dialog-button-cancel" onClick={() => setShowDescriptionEditor(false)}>
+                Cancel
+              </button>
+              <button className="dialog-button dialog-button-primary" onClick={() => setShowDescriptionEditor(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
