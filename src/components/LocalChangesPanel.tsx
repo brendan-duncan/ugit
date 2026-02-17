@@ -81,6 +81,9 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       return;
     }
 
+    // Clean up any lingering drag state
+    document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+
     try {
       setIsBusy(true);
       const git = gitAdapter;
