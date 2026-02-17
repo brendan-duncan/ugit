@@ -17,9 +17,7 @@ I wanted a decent and free Git GUI and dislike the available options, so I thoug
   * Run the app with `npm start`.
 
 * Package into an executable:
-  * npm run package
-    * The output will be put into out/ugit-{os}-{arch}/
-
-* Package into a zip for distrobution:
-  * npm run make
-    * The output will be put into out/make/zip/{os}/{arch}/ugit-{os}-{arch}-{version}.zip
+  * npm run build:prod
+  * npm run build:main
+  * npm run build:dist
+    * The output will be put into release/ and will include an installer and sub-folder with the executable.
