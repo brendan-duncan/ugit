@@ -30,8 +30,7 @@ win:
 
 mac:
   target:
-    - target: dmg
-    - target: zip
+    - target: ["dmg", "zip"]
   icon: assets/icon
   artifactName: ${productName}-${version}.${ext}
   category: public.app-category.developer-tools
@@ -59,3 +58,4 @@ publish:
   provider: github
   owner: brendan-duncan
   repo: ugit
+  releaseType: release
