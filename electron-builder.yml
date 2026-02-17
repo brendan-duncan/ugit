@@ -31,6 +31,7 @@ win:
 mac:
   target:
     - target: dmg
+    - target: zip
   icon: assets/icon
   artifactName: ${productName}-${version}.${ext}
   category: public.app-category.developer-tools
