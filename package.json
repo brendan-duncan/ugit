@@ -9,11 +9,11 @@
     "build:prod": "webpack --mode production",
     "build:main": "tsc src/main.ts --outDir dist --target ES2020 --module commonjs --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports",
     "typecheck": "tsc --noEmit",
-    "pack": "npm run build:prod && npm run build:main && electron-builder --dir",
-    "dist": "npm run build:prod && npm run build:main && electron-builder",
-    "dist:win": "npm run build:prod && npm run build:main && electron-builder --win",
-    "dist:mac": "npm run build:prod && npm run build:main && electron-builder --mac",
-    "dist:linux": "npm run build:prod && npm run build:main && electron-builder --linux"
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
   },
   "keywords": [
     "git",
