@@ -81,6 +81,10 @@
   overflow: hidden;
   height: 60px;
   flex-shrink: 0;
+  pointer-events: auto;
+  user-select: text;
+  position: relative;
+  z-index: 1;
 }
 
 .commit-panel-content {
@@ -109,6 +113,8 @@
   font-size: 13px;
   outline: none;
   box-sizing: border-box;
+  user-select: text;
+  pointer-events: auto;
 }
 
 .commit-message-input-wrapper .commit-message-input {
