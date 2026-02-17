@@ -193,7 +193,7 @@
   min-width: 200px;
   padding: 4px 0;
   z-index: 10001;
-  margin-left: 4px;
+  margin-left: 0px;
 }
 
 .context-submenu .context-menu-item {
