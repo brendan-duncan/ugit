@@ -17,7 +17,8 @@ I wanted a decent and free Git GUI and dislike the available options, so I thoug
   * Run the app with `npm start`.
 
 * Package into an executable:
-  * npm run build:prod
-  * npm run build:main
-  * npm run build:dist
+  * `npm run build:prod`
+  * `npm run build:main`
+  * `npm run build:dist`
     * The output will be put into release/ and will include an installer and sub-folder with the executable.
+
