@@ -141,6 +141,7 @@ jobs:
         path: |
           release/*.exe
           release/*.dmg
+          release/*.zip
           release/*.AppImage
           release/latest.yml
           release/latest-mac.yml
@@ -153,6 +154,7 @@ jobs:
         files: |
           release/*.exe
           release/*.dmg
+          release/*.zip
           release/*.AppImage
           release/latest.yml
           release/latest-mac.yml
