@@ -16,14 +16,11 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-latest]
         include:
           - os: windows-latest
-            artifact_name: ugit-0.1.4-win.zip
             target: win
           - os: macos-latest
             architecture: 'arm64'
-            artifact_name: ugit-0.1.4-mac.zip
             target: mac
           - os: ubuntu-latest
-            artifact_name: ugit-0.1.4-linux.zip
             target: linux
 
     runs-on: ${{ matrix.os }}
