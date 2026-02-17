@@ -44,7 +44,7 @@ mac:
 
 linux:
   target:
-    - target: AppImage
+    - AppImage
   icon: assets/icon
   artifactName: ${productName}-${version}.${ext}
   category: Development
@@ -61,3 +61,4 @@ publish:
   repo: ugit
   releaseType: release
   releaseNotesFile: release-notes.md
+  
