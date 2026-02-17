@@ -1,0 +1,24 @@
+.amend-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-radius: 3px;
+  color: #cccccc;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.amend-textarea:focus {
+  border-color: #4ec9b0;
+}
+
+.amend-textarea:disabled {
+  background-color: #2d2d2d;
+  color: #888888;
+  cursor: not-allowed;
+}

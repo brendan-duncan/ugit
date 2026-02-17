@@ -19,6 +19,7 @@ import LocalChangesDialog from './LocalChangesDialog';
 import CleanWorkingDirectoryDialog from './CleanWorkingDirectoryDialog';
 import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
 import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
+import AmendCommitDialog from './AmendCommitDialog';
 import PullRequestDialog from './PullRequestDialog';
 import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
@@ -83,6 +84,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [stashToDelete, setStashToDelete] = useState(null);
   const [showCreateBranchFromCommitDialog, setShowCreateBranchFromCommitDialog] = useState(false);
   const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
+  const [showAmendCommitDialog, setShowAmendCommitDialog] = useState(false);
   const [commitForDialog, setCommitForDialog] = useState(null);
   const [showPullRequestDialog, setShowPullRequestDialog] = useState(false);
   const [pullRequestUrl, setPullRequestUrl] = useState<string>('');
@@ -1498,6 +1500,37 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
+  const handleAmendCommit = async (newMessage: string) => {
+    if (!commitForDialog)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git commit --amend -m "${newMessage.replace(/"/g, '\\"')}"`);
+
+      const git = gitAdapter.current;
+      await git.raw(['commit', '--amend', '-m', newMessage]);
+      console.log(`Amended commit message for ${commitForDialog.hash.substring(0, 7)}`);
+
+      clearBranchCache();
+      await loadRepoData(true);
+
+      if (selectedItem?.type === 'branch' && selectedItem.branchName) {
+        await handleBranchSelect(selectedItem.branchName);
+      } else if (selectedItem?.type === 'remote-branch' && selectedItem.fullName) {
+        await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
+      }
+    } catch (error) {
+      console.error('Error amending commit:', error);
+      setError(`Failed to amend commit: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+      setShowAmendCommitDialog(false);
+      setCommitForDialog(null);
+    }
+  };
+
   const handleBranchContextMenu = (action: string, branchName: string, currentBranch: string) => {
     console.log('Branch context menu action:', action, 'on branch:', branchName);
 
@@ -1954,6 +1987,11 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           }
           break;
 
+        case 'amend-commit':
+          setCommitForDialog(commit);
+          setShowAmendCommitDialog(true);
+          break;
+
         case 'checkout-commit':
           const confirmed = window.confirm(
             `Are you sure you want to checkout commit ${commit.hash.substring(0, 7)}?\n\nThis will put you in a 'detached HEAD' state.`
@@ -2212,6 +2250,16 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           }}
           onCreateTag={handleCreateTagFromCommit}
           commitHash={commitForDialog ? commitForDialog.hash : ''}
+          commitMessage={commitForDialog ? commitForDialog.message : ''}
+        />
+      )}
+      {showAmendCommitDialog && (
+        <AmendCommitDialog
+          onClose={() => {
+            setShowAmendCommitDialog(false);
+            setCommitForDialog(null);
+          }}
+          onAmend={handleAmendCommit}
           commitMessage={commitForDialog ? commitForDialog.message : ''}
         />
       )}
