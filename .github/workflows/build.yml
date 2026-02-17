@@ -47,18 +47,19 @@ jobs:
     - name: Build/release Electron app
       uses: samuelmeuli/action-electron-builder@v1
       with:
-        body: |
-          ## Installation
-
-          ### macOS
-          If macOS shows a security warning saying "ugit is damaged and can't be opened", run this command:
-          ```bash
-          xattr -cr /Applications/ugit.app
-          ```
-          The application isn't being properly signed currently, so this is required to bypass Gatekeeper's checks.
         # GitHub token, automatically provided to the action
         # (No need to define this secret in the repo settings)
         github_token: ${{ secrets.github_token }}
         # If the commit is tagged with a version (e.g. "v1.0.0"),
         # release the app after building
         release: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+    - name: Update release notes
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        if [ -f "release-notes.md" ]; then
+          gh release edit ${{ github.ref_name }} --notes-file release-notes.md
+        fi
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
