@@ -18,8 +18,8 @@ jobs:
           - os: windows-latest
             target: win
           - os: macos-latest
-            architecture: 'arm64'
             target: mac
+            architecture: arm64
           - os: ubuntu-latest
             target: linux
 
@@ -44,7 +44,7 @@ jobs:
     - name: Build main process
       run: npm run build:main
 
-    - name: Make distribution (electron-builder)
-      run: npm run dist:${{ matrix.target }} -- --publish always
+    - name: Build and Publish
+      run: npm run dist:${{ matrix.target }} -- --publish always ${{ matrix.arch && format('--arch {0}', matrix.arch) || '' }}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
