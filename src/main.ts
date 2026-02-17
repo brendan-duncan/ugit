@@ -84,7 +84,9 @@ function createWindow(): void {
     height: windowState.height,
     x: windowState.x,
     y: windowState.y,
-    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, 'assets', 'icon.png')
+      : path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -302,9 +304,26 @@ async function openRepository(): Promise<void> {
   }
 }
 
-// Suppress cache access denied errors
+// Suppress cache access denied errors - must be set before app.whenReady()
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-cache');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-rasterization');
+app.commandLine.appendSwitch('disable-accelerated-2d-canvas');
+app.commandLine.appendSwitch('disable-accelerated-video-decode');
+app.commandLine.appendSwitch('disable-gpu-video-decode');
+app.commandLine.appendSwitch('disk-cache-size', '0');
+app.commandLine.appendSwitch('disable-background-networking');
+app.commandLine.appendSwitch('disable-default-apps');
+app.commandLine.appendSwitch('disable-extensions');
+app.commandLine.appendSwitch('disable-sync');
+app.commandLine.appendSwitch('disable-translate');
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-gpu-virtualization');
+app.commandLine.appendSwitch('disable-virtualized-windows');
+app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
 
 app.whenReady().then(() => {
   // Initialize cache manager with user data path

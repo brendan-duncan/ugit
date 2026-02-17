@@ -1,0 +1,60 @@
+appId: com.ugit.app
+productName: ugit
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - main.js
+  - main.ts
+  - index.html
+  - dist/**/*
+  - src/**/*
+  - package.json
+  - tsconfig.json
+
+extraResources:
+  - from: app-update.yml
+    to: app-update.yml
+  - from: assets/icon.png
+    to: assets/icon.png
+
+asar: true
+
+win:
+  target:
+    - target: nsis
+  icon: assets/icon
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+mac:
+  target:
+    - target: dmg
+  icon: assets/icon
+  artifactName: ${productName}-${version}.${ext}
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: entitlements.plist
+  entitlementsInherit: entitlements.plist
+  electronLanguages:
+    - en
+
+linux:
+  target:
+    - target: AppImage
+  icon: assets/icon
+  artifactName: ${productName}-${version}.${ext}
+  category: Development
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+publish:
+  provider: github
+  owner: brendan-duncan
+  repo: ugit
