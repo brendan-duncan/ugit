@@ -311,6 +311,9 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
             Reset '{currentBranch || 'current'}' to Here
           </div>
           <div className="context-menu-separator"></div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('amend-commit')}>
+            Amend Commit...
+          </div>
           <div className="context-menu-item" onClick={() => handleMenuAction('checkout-commit')}>
             Checkout Commit...
           </div>
