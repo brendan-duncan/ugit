@@ -671,6 +671,25 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   };
 
   const handleRefreshClick = async () => {
+    // Clear branch cache so tags are reloaded
+    clearBranchCache();
+    
+    // Fetch tags from remote first
+    try {
+      const git = gitAdapter.current;
+      if (git) {
+        setIsBusy(true);
+        setBusyMessage('git fetch --tags');
+        await git.raw(['fetch', '--tags']);
+        console.log('Fetched tags from remote');
+      }
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+    
     await loadRepoData(true);
   };
 
