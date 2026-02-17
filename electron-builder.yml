@@ -60,5 +60,3 @@ publish:
   owner: brendan-duncan
   repo: ugit
   releaseType: release
-  releaseInfo:
-    releaseNotesFile: release-notes.md
