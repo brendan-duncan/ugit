@@ -49,14 +49,6 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Ad-hoc code sign (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        echo "Ad-hoc signing the macOS application..."
-        codesign --force --deep --sign - "release/ugit-darwin-arm64/ugit.app"
-        echo "Verifying signature..."
-        codesign --verify --verbose "release/ugit-darwin-arm64/ugit.app"
-
     - name: Find artifacts (Windows)
       if: runner.os == 'Windows'
       id: find-artifacts-win
