@@ -4,6 +4,7 @@ import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import UpdateNotification from './components/UpdateNotification';
+import { useAlert } from './contexts/AlertContext';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
 import { ipcRenderer } from 'electron';
 import fs from 'fs';
@@ -41,6 +42,7 @@ function App(): React.ReactElement {
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const { showAlert } = useAlert();
 
   // Load recent repos and auto-open on startup
   useEffect(() => {
@@ -185,10 +187,10 @@ function App(): React.ReactElement {
       if (result.success && result.path) {
         openRepository(result.path);
       } else {
-        alert(`Failed to initialize repository: ${result.error}`);
+        showAlert(`Failed to initialize repository: ${result.error}`, 'Error');
       }
     } catch (error) {
-      alert(`Failed to initialize repository: ${error.message}`);
+      showAlert(`Failed to initialize repository: ${(error as Error).message}`, 'Error');
     }
   };
 
@@ -196,12 +198,12 @@ function App(): React.ReactElement {
     // Check if path exists before opening
     try {
       if (!fs.existsSync(repoPath)) {
-        alert(`Repository path does not exist:\n${repoPath}`);
+        showAlert(`Repository path does not exist:\n${repoPath}`, 'Error');
         return;
       }
     } catch (error) {
       console.error(`Error checking repository path ${repoPath}:`, error);
-      alert(`Error accessing repository path:\n${repoPath}`);
+      showAlert(`Error accessing repository path:\n${repoPath}`, 'Error');
       return;
     }
 
@@ -257,10 +259,10 @@ function App(): React.ReactElement {
         openRepository(result.path);
       } else {
         // Show error message
-        alert(`Clone failed: ${result.error}`);
+        showAlert(`Clone failed: ${result.error}`, 'Error');
       }
     } catch (error) {
-      alert(`Clone failed: ${error.message}`);
+      showAlert(`Clone failed: ${(error as Error).message}`, 'Error');
     }
   };
 

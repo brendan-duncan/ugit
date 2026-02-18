@@ -6,6 +6,7 @@ import PullCommitDialog from './PullCommitDialog';
 import StashConflictDialog from './StashConflictDialog';
 import { GitAdapter } from '../git/GitAdapter';
 import { FileInfo } from './types';
+import { useAlert } from '../contexts/AlertContext';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
@@ -25,6 +26,7 @@ interface LocalChangesPanelProps {
 }
 
 function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: LocalChangesPanelProps) {
+  const { showAlert, showConfirm } = useAlert();
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -378,7 +380,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
 
         case 'discard':
           if (allFilePaths.length > 0) {
-            const confirmed = window.confirm(
+            const confirmed = await showConfirm(
               `Are you sure you want to discard changes for ${allFilePaths.length} file(s)? This cannot be undone.`
             );
             if (confirmed) {
@@ -475,7 +477,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       }
     } catch (error) {
       console.error(`Error handling context menu action '${action}':`, error);
-      alert(`Error: ${error.message}`);
+      showAlert(`Error: ${(error as Error).message}`, 'Error');
     } finally {
       setIsBusy(false);
       if (onBusyMessageChange) onBusyMessageChange('');
