@@ -57,15 +57,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check release exists
-        run: gh release view ${{ github.ref_name }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check release-notes.md exists
-        run: cat release-notes.md
-
       - name: Update release notes
-        run: gh release edit ${{ github.ref_name }} --notes-file release-notes.md --verbose
+        run: gh release edit ${{ github.ref_name }} --draft=false --notes-file release-notes.md --verbose
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
