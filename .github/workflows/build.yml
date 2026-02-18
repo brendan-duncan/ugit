@@ -52,7 +52,7 @@ jobs:
 
     - name: Build and Publish (macOS)
       if: matrix.os == 'macos-latest'
-      run: npm run dist:${{ matrix.target }} -- --publish always --arch ${{ matrix.architecture }}
+      run: npm run dist:${{ matrix.target }} -- --publish always
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CSC_LINK: ${{ secrets.MAC_CERTS }}
