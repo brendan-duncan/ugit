@@ -273,10 +273,10 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
                 onMouseEnter={() => setTagSubmenuOpen(true)}
                 onMouseLeave={() => setTagSubmenuOpen(false)}
               >
-                Tags ▶
+                Tags <span>▶</span>
                 {tagSubmenuOpen && (
                   <div className="context-submenu">
-                    {contextMenu.commit.tags.map((tag) => (
+                    {contextMenu.commit.tags.map((tag: string) => (
                       <React.Fragment key={tag}>
                         <div className="context-menu-item" onClick={() => handleMenuAction('show-tag-details', tag)}>
                           Show '{tag}' details...

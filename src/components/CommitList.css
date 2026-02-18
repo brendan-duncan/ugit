@@ -180,6 +180,8 @@
 /* Submenu styles */
 .context-menu-submenu {
   position: relative;
+  display: flex;
+  justify-content: space-between;
 }
 
 .context-submenu {
