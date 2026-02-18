@@ -49,6 +49,15 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+        # macOS Code Signing: CSC_LINK is the Base64-encoded .p12 certificate
+        CSC_LINK: ${{ secrets.MAC_CERT_BASE64 }}
+        CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        
+        # macOS Notarization (required for macOS distribution)
+        APPLE_ID: ${{ secrets.APPLE_ID }}
+        APPLE_ID_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
   update-release-notes:
     needs: build
     runs-on: ubuntu-latest
