@@ -57,7 +57,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Update release notes
-        run: gh release edit ${{ github.ref_name }} --notes-file release-notes.md
+      - name: Update release notes and publish
+        run: |
+          gh release edit ${{ github.ref_name }} \
+            --notes-file release-notes.md \
+            --draft=false \
+            --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
