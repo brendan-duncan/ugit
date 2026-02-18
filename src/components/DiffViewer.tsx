@@ -19,6 +19,7 @@ import path from 'path';
 import 'diff2html/bundles/css/diff2html.min.css';
 import './DiffViewer.css';
 import { useSettings } from '../hooks/useSettings';
+import { useAlert } from '../contexts/AlertContext';
 import { ipcRenderer } from 'electron';
 
 // Helper function to check if file is an image
@@ -136,6 +137,7 @@ interface DiffViewerProps {
 }
 
 function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffViewerProps): React.ReactElement {
+  const { showAlert, showConfirm } = useAlert();
   const [diff, setDiff] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [diffHtml, setDiffHtml] = useState<string>('');
@@ -227,7 +229,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
       return;
 
     const chunk = diffHunks[chunkIndex];
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       `Are you sure you want to discard this chunk? This cannot be undone.`
     );
 
@@ -302,7 +304,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
       // Clean up temp file
       fs.unlinkSync(tempFile);
 
-      alert(`Chunk stashed to: ${patchFile.replace(gitAdapter.repoPath, '.')}`);
+      showAlert(`Chunk stashed to: ${patchFile.replace(gitAdapter.repoPath, '.')}`);
 
       // Refresh the diff
       if (onRefresh) {

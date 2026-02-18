@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { AlertProvider } from './contexts/AlertContext';
 import './index.css';
 
 const container = document.getElementById('root');
@@ -12,6 +13,8 @@ const root = createRoot(container);
 
 root.render(
   <React.StrictMode>
-    <App />
+    <AlertProvider>
+      <App />
+    </AlertProvider>
   </React.StrictMode>
 );

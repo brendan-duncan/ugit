@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSettings } from '../hooks/useSettings';
+import { useAlert } from '../contexts/AlertContext';
 import './Dialog.css';
 import './SettingsDialog.css';
 
@@ -8,6 +9,7 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ onClose }: SettingsDialogProps) {
+  const { showConfirm } = useAlert();
   const { settings, loadingSettings, settingsError, updateSetting, resetSettings } = useSettings();
   const [localRefreshTime, setLocalRefreshTime] = useState<number>(5);
   const [blockCommitBranches, setBlockCommitBranches] = useState<string>('');
@@ -52,7 +54,8 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   };
 
   const handleReset = async () => {
-    if (window.confirm('Are you sure you want to reset all settings to defaults?')) {
+    const confirmed = await showConfirm('Are you sure you want to reset all settings to defaults?');
+    if (confirmed) {
       setIsSaving(true);
       try {
         await resetSettings();

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DropdownMenu, DropdownItem, DropdownSeparator, DropdownSubmenu } from './DropdownMenu';
 import EditOriginDialog from './EditOriginDialog';
 import GitAdapter from '../git/GitAdapter';
+import { useAlert } from '../contexts/AlertContext';
 import { exec } from 'child_process';
 import { shell, clipboard, ipcRenderer } from 'electron';
 import './RepoInfo.css';
@@ -29,6 +30,7 @@ interface RepoInfoProps {
 }
 
 const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
+  const { showAlert, showConfirm } = useAlert();
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isLfsInitialized, setIsLfsInitialized] = useState(false);
@@ -142,7 +144,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   const handleLfsInitialize = async () => {
     try {
       await gitAdapter?.lfsInstall();
-      alert('Git LFS has been initialized successfully.');
+      showAlert('Git LFS has been initialized successfully.');
       setIsLfsInitialized(true);
     } catch (error: any) {
       console.error('Error initializing Git LFS:', error);
@@ -157,7 +159,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     if (pattern) {
       gitAdapter?.lfsTrack(pattern)
         .then(() => {
-          alert(`Now tracking "${pattern}" with Git LFS.\n\nDon't forget to commit the updated .gitattributes file.`);
+          showAlert(`Now tracking "${pattern}" with Git LFS.\n\nDon't forget to commit the updated .gitattributes file.`);
         })
         .catch((error: any) => {
           console.error('Error tracking pattern:', error);
@@ -171,7 +173,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   const handleLfsStatus = async () => {
     try {
       const status = await gitAdapter?.lfsStatus();
-      alert(`Git LFS Status:\n\n${status}`);
+      showAlert(`Git LFS Status:\n\n${status}`, 'Git LFS Status');
     } catch (error: any) {
       console.error('Error getting LFS status:', error);
       if (onError) {
@@ -183,7 +185,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   const handleLfsFetch = async () => {
     try {
       await gitAdapter?.lfsFetch();
-      alert('Git LFS objects fetched successfully.');
+      showAlert('Git LFS objects fetched successfully.');
     } catch (error: any) {
       console.error('Error fetching LFS objects:', error);
       if (onError) {
@@ -195,7 +197,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   const handleLfsPull = async () => {
     try {
       await gitAdapter?.lfsPull();
-      alert('Git LFS objects pulled successfully.');
+      showAlert('Git LFS objects pulled successfully.');
     } catch (error: any) {
       console.error('Error pulling LFS objects:', error);
       if (onError) {
@@ -205,13 +207,13 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   };
 
   const handleLfsPrune = async () => {
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       'Are you sure you want to prune old Git LFS objects?\n\nThis will delete local LFS files that are no longer referenced.'
     );
     if (confirmed) {
       try {
         await gitAdapter?.lfsPrune();
-        alert('Git LFS objects pruned successfully.');
+        showAlert('Git LFS objects pruned successfully.');
       } catch (error: any) {
         console.error('Error pruning LFS objects:', error);
         if (onError) {
@@ -222,13 +224,13 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   };
 
   const handleLfsDeinitialize = async () => {
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       'Are you sure you want to deinitialize Git LFS?\n\nThis will remove LFS hooks from this repository.'
     );
     if (confirmed) {
       try {
         await gitAdapter?.lfsUninstall();
-        alert('Git LFS has been deinitialized.');
+        showAlert('Git LFS has been deinitialized.');
         setIsLfsInitialized(false);
       } catch (error: any) {
         console.error('Error deinitializing Git LFS:', error);
@@ -260,7 +262,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       // Apply the patch
       if (gitAdapter) {
         await gitAdapter.raw(['apply', patchPath]);
-        alert(`Patch applied successfully from:\n${patchPath}`);
+        showAlert(`Patch applied successfully from:\n${patchPath}`);
 
         // Refresh repository data
         if (onRefresh) {

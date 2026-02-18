@@ -27,6 +27,7 @@ import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo } from './types';
 import { ipcRenderer } from 'electron';
 import { useSettings } from '../hooks/useSettings';
+import { useAlert } from '../contexts/AlertContext';
 import './RepositoryView.css';
 
 type BranchStatus = {
@@ -42,6 +43,7 @@ interface RepositoryViewProps {
 }
 
 function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
+  const { showAlert, showConfirm } = useAlert();
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
@@ -1377,7 +1379,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
     }
 
-    const confirmed = window.confirm(
+    const confirmed = await showConfirm(
       `Are you sure you want to discard all ${modifiedCount} local changes? This cannot be undone.`
     );
 
@@ -1566,15 +1568,15 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         break;
       case 'rebase-active-onto-branch':
         // TODO: Implement rebase active branch onto branch
-        alert(`Rebase ${currentBranch} onto branch: ${branchName}`);
+        showAlert(`Rebase ${currentBranch} onto branch: ${branchName}`);
         break;
       case 'new-branch':
         // TODO: Implement new branch dialog
-        alert(`New branch from: ${currentBranch} to ${branchName}`);
+        showAlert(`New branch from: ${currentBranch} to ${branchName}`);
         break;
       case 'new-tag':
         // TODO: Implement new tag dialog
-        alert(`New tag on branch: ${branchName}`);
+        showAlert(`New tag on branch: ${branchName}`);
         break;
       case 'rename':
         setBranchToRename(branchName);
@@ -1593,7 +1595,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         });
         break;
       default:
-        alert(`Unknown context menu action: ${action}`);
+        showAlert(`Unknown context menu action: ${action}`);
     }
   };
 
@@ -1614,7 +1616,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         setShowDeleteStashDialog(true);
         break;
       default:
-        alert(`Unknown stash context menu action: ${action}`);
+        showAlert(`Unknown stash context menu action: ${action}`);
     }
   };
 
@@ -1822,27 +1824,27 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     switch (action) {
       case 'checkout':
         // TODO: Implement checkout remote branch
-        alert(`Check out remote branch: ${fullName}`);
+        showAlert(`Check out remote branch: ${fullName}`);
         break;
       case 'pull':
         // TODO: Implement pull remote branch into current branch
-        alert(`Pull '${fullName}' into '${currentBranch}'`);
+        showAlert(`Pull '${fullName}' into '${currentBranch}'`);
         break;
       case 'merge':
         // TODO: Implement merge remote branch into current branch
-        alert(`Merge '${fullName}' into '${currentBranch}'`);
+        showAlert(`Merge '${fullName}' into '${currentBranch}'`);
         break;
       case 'new-branch':
         // TODO: Implement new branch from remote branch
-        alert(`New branch from: ${fullName}`);
+        showAlert(`New branch from: ${fullName}`);
         break;
       case 'new-tag':
         // TODO: Implement new tag from remote branch
-        alert(`New tag from: ${fullName}`);
+        showAlert(`New tag from: ${fullName}`);
         break;
       case 'delete':
         // TODO: Implement delete remote branch confirmation
-        alert(`Delete remote branch: ${fullName}`);
+        showAlert(`Delete remote branch: ${fullName}`);
         break;
       case 'copy-name':
         // Copy remote branch name to clipboard
@@ -1853,7 +1855,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         });
         break;
       default:
-        alert(`Unknown remote branch context menu action: ${action}`);
+        showAlert(`Unknown remote branch context menu action: ${action}`);
     }
   };
 
@@ -1881,7 +1883,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             try {
               // Get tag details (annotated tags have extra info)
               const tagInfo = await git.raw(['show', tagName]);
-              alert(`Tag: ${tagName}\n\n${tagInfo}`);
+              showAlert(`Tag: ${tagName}\n\n${tagInfo}`, 'Tag details');
             } catch (error) {
               console.error('Error getting tag details:', error);
               setError('Failed to get tag details: ' + error.message);
@@ -1896,14 +1898,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
               console.log(`Copied tag name to clipboard: ${tagName}`);
             } catch (error) {
               console.error('Failed to copy tag name:', error);
-              alert('Failed to copy tag name to clipboard');
+              showAlert('Failed to copy tag name to clipboard', 'Error');
             }
           }
           break;
 
         case 'delete-tag':
           if (tagName) {
-            const confirmed = window.confirm(
+            const confirmed = await showConfirm(
               `Are you sure you want to delete tag '${tagName}'?\n\nThis will delete the tag locally. You can also delete it from the remote if it exists there.`
             );
             if (confirmed) {
@@ -1916,7 +1918,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 console.log(`Deleted local tag '${tagName}'`);
 
                 // Ask if they want to delete from remote too
-                const deleteFromRemote = window.confirm(
+                const deleteFromRemote = await showConfirm(
                   `Tag '${tagName}' deleted locally.\n\nDo you also want to delete it from origin?`
                 );
 
@@ -1954,7 +1956,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
         case 'push-tag':
           if (tagName) {
-            const confirmed = window.confirm(
+            const confirmed = await showConfirm(
               `Are you sure you want to push tag '${tagName}' to origin?`
             );
             if (confirmed) {
@@ -1976,7 +1978,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
         case 'rebase-to-here':
           if (currentBranch) {
-            const confirmed = window.confirm(
+            const confirmed = await showConfirm(
               `Are you sure you want to rebase '${currentBranch}' onto commit ${commit.hash.substring(0, 7)}?\n\nThis will rewrite the history of '${currentBranch}'.`
             );
             if (confirmed) {
@@ -1992,7 +1994,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
         case 'reset-to-here':
           if (currentBranch) {
-            const confirmed = window.confirm(
+            const confirmed = await showConfirm(
               `Are you sure you want to reset '${currentBranch}' to commit ${commit.hash.substring(0, 7)}?\n\nThis will discard all commits after this point.`
             );
             if (confirmed) {
@@ -2012,7 +2014,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           break;
 
         case 'checkout-commit':
-          const confirmed = window.confirm(
+          const confirmed = await showConfirm(
             `Are you sure you want to checkout commit ${commit.hash.substring(0, 7)}?\n\nThis will put you in a 'detached HEAD' state.`
           );
           if (confirmed) {
@@ -2024,7 +2026,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
         case 'cherry-pick':
           if (currentBranch) {
-            const confirmed = window.confirm(
+            const confirmed = await showConfirm(
               `Are you sure you want to cherry-pick commit ${commit.hash.substring(0, 7)} onto '${currentBranch}'?`
             );
             if (confirmed) {
@@ -2040,7 +2042,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
         case 'revert-commit':
           if (currentBranch) {
-            const confirmed = window.confirm(
+            const confirmed = await showConfirm(
               `Are you sure you want to revert commit ${commit.hash.substring(0, 7)} on '${currentBranch}'?`
             );
             if (confirmed) {
@@ -2079,7 +2081,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             console.log(`Copied commit SHA to clipboard: ${commit.hash}`);
           } catch (error) {
             console.error('Failed to copy SHA:', error);
-            alert('Failed to copy SHA to clipboard');
+            showAlert('Failed to copy SHA to clipboard', 'Error');
           }
           break;
 
@@ -2090,12 +2092,12 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             console.log(`Copied commit info to clipboard: ${commit.hash.substring(0, 7)}`);
           } catch (error) {
             console.error('Failed to copy commit info:', error);
-            alert('Failed to copy commit info to clipboard');
+            showAlert('Failed to copy commit info to clipboard', 'Error');
           }
           break;
 
         default:
-          alert(`Unknown context menu action: ${action}`);
+          showAlert(`Unknown context menu action: ${action}`);
       }
     } catch (error) {
       console.error(`Error handling commit context menu action '${action}':`, error);
