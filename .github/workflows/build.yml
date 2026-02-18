@@ -62,7 +62,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-       - name: Set VERSION environment variable without 'v' prefix
+      - name: Set VERSION environment variable without 'v' prefix
         if: ${{ github.ref_type == 'tag' }}
         run: |
           TAG=${{ github.ref_name }}
