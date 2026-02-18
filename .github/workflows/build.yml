@@ -44,16 +44,19 @@ jobs:
     - name: Build main process
       run: npm run build:main
 
-    - name: Build and Publish
-      run: npm run dist:${{ matrix.target }} -- --publish always ${{ matrix.arch && format('--arch {0}', matrix.arch) || '' }}
+    - name: Build and Publish (Windows / Linux)
+      if: matrix.os != 'macos-latest'
+      run: npm run dist:${{ matrix.target }} -- --publish always
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-        # macOS Code Signing: CSC_LINK is the Base64-encoded .p12 certificate
+    - name: Build and Publish (macOS)
+      if: matrix.os == 'macos-latest'
+      run: npm run dist:${{ matrix.target }} -- --publish always --arch ${{ matrix.architecture }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CSC_LINK: ${{ secrets.MAC_CERTS }}
         CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
-        
-        # macOS Notarization (required for macOS distribution)
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_ID_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
