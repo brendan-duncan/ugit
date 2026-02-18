@@ -57,7 +57,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: List releases
+        run: gh release list --json tagName,isDraft,isPrerelease,name
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+       - name: Set VERSION environment variable without 'v' prefix
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+          TAG=${{ github.ref_name }}
+          # Strips the leading 'v' using shell parameter expansion
+          VERSION=${TAG#v} 
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        shell: bash # Explicitly use bash to ensure compatibility
+
       - name: Update release notes
-        run: gh release edit ${GITHUB_REF_NAME#v} --notes-file release-notes.md
+        run: gh release edit ${{ env.VERSION }} --notes-file release-notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
