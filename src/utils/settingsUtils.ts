@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import { AppSettings } from './settings';
+import { AppSettings, DEFAULT_SETTINGS } from './settings';
 
 /**
  * Utility functions for working with settings in non-React contexts
@@ -28,10 +28,7 @@ export class SettingsUtils {
     } catch (error) {
       console.error('Failed to load settings:', error);
       // Return default settings on error
-      return {
-        localFileRefreshTime: 5,
-        blockCommitBranches: ['trunk', '*/staging']
-      };
+      return DEFAULT_SETTINGS;
     }
   }
 
