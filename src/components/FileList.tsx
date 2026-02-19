@@ -46,13 +46,16 @@ interface FileListProps {
   selectedFile: any;
   repoPath: string;
   onContextMenu: (action: string, items: any[], clickedItem: string, contextRepoPath: string, listType: string) => Promise<void>;
+  onDiscardAll?: () => Promise<void>;
+  onStageAll?: () => Promise<void>;
 }
 
-function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu }: FileListProps) {
+function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu, onDiscardAll, onStageAll }: FileListProps) {
   const [dragOver, setDragOver] = useState<boolean>(false);
   const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
   const [selectedItems, setSelectedItems] = useState(new Set<string>());
   const [contextMenu, setContextMenu] = useState(null);
+  const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const lastMouseButton = useRef<number>(0);
   const isDraggingEnabled = useRef<boolean>(false);
@@ -67,13 +70,19 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
         setContextMenu(null);
       }
+      if (headerMenu) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.header-menu')) {
+          setHeaderMenu(null);
+        }
+      }
     };
 
-    if (contextMenu) {
+    if (contextMenu || headerMenu) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [contextMenu]);
+  }, [contextMenu, headerMenu]);
 
   // Handle keyboard events for hotkeys
   useEffect(() => {
@@ -474,7 +483,67 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
 
   return (
     <div className="file-list">
-      <h4>{title} ({files.length})</h4>
+      <div className="file-list-header">
+        <h4>{title} ({files.length})</h4>
+        {listType === 'unstaged' && (
+          <button
+            className="header-menu-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHeaderMenu({ x: e.clientX, y: e.clientY });
+            }}
+            title="More actions"
+          >
+            ...
+          </button>
+        )}
+        {listType === 'staged' && (
+          <button
+            className="header-menu-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHeaderMenu({ x: e.clientX, y: e.clientY });
+            }}
+            title="More actions"
+          >
+            ...
+          </button>
+        )}
+      </div>
+      {headerMenu && (
+        <div
+          className="header-menu"
+          style={{
+            position: 'fixed',
+            left: `${headerMenu.x}px`,
+            top: `${headerMenu.y}px`,
+            zIndex: 1000
+          }}
+        >
+          {listType === 'unstaged' && onDiscardAll && (
+            <div
+              className="context-menu-item"
+              onClick={() => {
+                onDiscardAll();
+                setHeaderMenu(null);
+              }}
+            >
+              Discard All...
+            </div>
+          )}
+          {onStageAll && (
+            <div
+              className="context-menu-item"
+              onClick={() => {
+                onStageAll();
+                setHeaderMenu(null);
+              }}
+            >
+              {listType === 'unstaged' ? 'Stage All' : 'Unstage All'}
+            </div>
+          )}
+        </div>
+      )}
       <div
         className={`file-list-content ${dragOver ? 'drag-over' : ''}`}
         onDragOver={handleDragOver}
