@@ -2,6 +2,7 @@
   padding: 16px;
   border-bottom: 1px solid #3d3d3d;
   background-color: #272745;
+  user-select: auto;
 }
 
 .repo-header {
@@ -68,7 +69,7 @@
 }
 
 .local-changes-section {
-  /* top margin removed */
+  user-select: none;
 }
 
 .local-changes-item {
