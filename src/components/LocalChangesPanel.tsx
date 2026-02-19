@@ -504,6 +504,42 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               selectedFile={selectedFile}
               repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
+              onDiscardAll={async () => {
+                const confirmed = await showConfirm(
+                  `Are you sure you want to discard ${unstagedFiles.length} file(s)? This cannot be undone.`
+                );
+                if (confirmed) {
+                  try {
+                    setIsBusy(true);
+                    if (onBusyMessageChange) onBusyMessageChange(`Discarding ${unstagedFiles.length} files...`);
+                    const allPaths = unstagedFiles.map(f => f.path);
+                    await gitAdapter.discard(allPaths);
+                    console.log(`Discarded ${unstagedFiles.length} files`);
+                    if (onRefresh) await onRefresh();
+                  } catch (error) {
+                    console.error('Error discarding files:', error);
+                  } finally {
+                    setIsBusy(false);
+                    if (onBusyMessageChange) onBusyMessageChange('');
+                  }
+                }
+              }}
+              onStageAll={async () => {
+                if (unstagedFiles.length === 0) return;
+                try {
+                  setIsBusy(true);
+                  if (onBusyMessageChange) onBusyMessageChange(`git add (${unstagedFiles.length} files)`);
+                  const allPaths = unstagedFiles.map(f => f.path);
+                  await gitAdapter.add(allPaths);
+                  console.log(`Staged ${unstagedFiles.length} files`);
+                  if (onRefresh) await onRefresh();
+                } catch (error) {
+                  console.error('Error staging files:', error);
+                } finally {
+                  setIsBusy(false);
+                  if (onBusyMessageChange) onBusyMessageChange('');
+                }
+              }}
             />
           </div>
           <div
@@ -522,6 +558,22 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               selectedFile={selectedFile}
               repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
+              onStageAll={async () => {
+                if (stagedFiles.length === 0) return;
+                try {
+                  setIsBusy(true);
+                  if (onBusyMessageChange) onBusyMessageChange(`git reset (${stagedFiles.length} files)`);
+                  const allPaths = stagedFiles.map(f => f.path);
+                  await gitAdapter.reset(allPaths);
+                  console.log(`Unstaged ${stagedFiles.length} files`);
+                  if (onRefresh) await onRefresh();
+                } catch (error) {
+                  console.error('Error unstaging files:', error);
+                } finally {
+                  setIsBusy(false);
+                  if (onBusyMessageChange) onBusyMessageChange('');
+                }
+              }}
             />
           </div>
         </div>
