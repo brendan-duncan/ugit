@@ -5,6 +5,7 @@
 * Add `Open Remote URL` to the RepoInfo menu, to open the remote branch in a browser.
 * Add `Open PR` to the RepoInfo menu, to open the PR creation URL in a browser.
 * Add `Open Branch Compare` to the RepoInfo menu, to open the branch comparison URL in a browser.
+* Add `Copy Remote URL` to the RepoInfo menu, to copy the remote url to the clipboard.
 * Implement `Rebase 'branch' onto 'current-branch'` from Local Branch context menu, to perform a rebase.
 * Implement `Checkout` from Remote Branch context menu, to create a Local Branch from a Remote branch.
 * Implement `Delete` from Remote Branch context menu, to delete a Remote Branch.
