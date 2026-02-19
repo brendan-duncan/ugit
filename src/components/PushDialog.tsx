@@ -14,7 +14,7 @@ const PushDialog: React.FC<PushDialogProps> = ({ onClose, onPush, branches, curr
   const { settings, updateSetting } = useSettings();
   const [selectedBranch, setSelectedBranch] = useState<string>(currentBranch || '');
   const [remoteBranch, setRemoteBranch] = useState<string>(currentBranch || '');
-  const [pushAllTags, setPushAllTags] = useState<boolean>(true);
+  const [pushAllTags, setPushAllTags] = useState<boolean>(false);
 
   // Load pushAllTags setting on mount
   useEffect(() => {

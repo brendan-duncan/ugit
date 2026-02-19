@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   localFileRefreshTime: 5,
   blockCommitBranches: ['trunk', '*/staging'],
   diffViewMode: 'line-by-line',
-  pushAllTags: true,
+  pushAllTags: false,
   maxCommits: 100
 };
 
