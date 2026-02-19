@@ -37,8 +37,8 @@ mac:
   category: public.app-category.developer-tools
   hardenedRuntime: true
   gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.inherit.plist
+  entitlements: entitlements.plist
+  entitlementsInherit: entitlements.plist
   notarize: true
   electronLanguages:
     - en
