@@ -24,7 +24,7 @@ import AmendCommitDialog from './AmendCommitDialog';
 import PullRequestDialog from './PullRequestDialog';
 import GitFactory from '../git/GitFactory';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit, StashInfo } from "../git/GitAdapter"
+import { GitAdapter, Commit, StashInfo, FileStatus } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo } from './types';
 import { ipcRenderer } from 'electron';
 import { useSettings } from '../hooks/useSettings';
@@ -213,6 +213,27 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const cacheInitialized = useRef(false);
   const currentBranchLoadId = useRef(0);
 
+  const getFileStatusType = (fileStatus: FileStatus) => {
+    const code = fileStatus.index || fileStatus.working_dir;
+    switch (code) {
+      case ' ': return 'unmodified';
+      case 'M': return 'modified';
+      case 'A': return 'created';
+      case 'D': return 'deleted';
+      case 'R': return 'renamed';
+      case '?': return 'created';
+      case 'U': return 'conflict';
+      case 'AA': return 'conflict';
+      case 'DD': return 'conflict';
+      case 'UU': return 'conflict';
+      case 'AU': return 'conflict';
+      case 'UA': return 'conflict';
+      case 'DU': return 'conflict';
+      case 'UD': return 'conflict';
+      default: return 'modified';
+    }
+  };
+
   // Initialize git adapter and load repository data
   useEffect(() => {
     const initRepository = async () => {
@@ -344,36 +365,17 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       const staged = [];
 
       status.files.forEach(file => {
-        const getStatusType = (code) => {
-          switch (code) {
-            case 'M': return 'modified';
-            case 'A': return 'created';
-            case 'D': return 'deleted';
-            case 'R': return 'renamed';
-            case '?': return 'created';
-            case 'U': return 'conflict';
-            case 'AA': return 'conflict';
-            case 'DD': return 'conflict';
-            case 'UU': return 'conflict';
-            case 'AU': return 'conflict';
-            case 'UA': return 'conflict';
-            case 'DU': return 'conflict';
-            case 'UD': return 'conflict';
-            default: return 'modified';
-          }
-        };
-
         // Check if file has unstaged changes (working_dir is not empty/space)
         if (file.working_dir && file.working_dir !== ' ') {
           unstaged.push({
             path: file.path,
-            status: getStatusType(file.working_dir)
+            status: getFileStatusType(file)
           });
         } else if (file.index && file.index !== ' ' && file.index !== '?') {
           // Check if file has staged changes (index is not empty/space)
           staged.push({
             path: file.path,
-            status: getStatusType(file.index)
+            status: getFileStatusType(file)
           });
         }
       });
@@ -1198,6 +1200,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       // If we're on the target branch, refresh the commits view
       if (selectedItem?.type === 'branch' && selectedItem.branchName === targetBranch) {
         await handleBranchSelect(targetBranch);
+
+        // Auto stage merge result if --no-commit was used and there are changes to stage
+        // and the file status is not conflicted.
+        const git = gitAdapter.current;
+        const status = await git.status();
+        if (status.files.length > 0) {
+          await git.add(status.files.filter(file => getFileStatusType(file) !== 'conflict').map(file => file.path));
+        }
       }
 
     } catch (error) {
