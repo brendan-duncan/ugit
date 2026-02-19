@@ -87,6 +87,35 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
+  const convertGitSshToHttps = (sshUrl: string): string => {
+    return sshUrl
+      .replace(/^git@/, 'https://')  // Swap git@ for https://
+      .replace(/\.git$/, '')         // Remove trailing .git
+      .replace(/(?<!https):/, '/');  // Replace colon ONLY if not preceded by 'https'
+  };
+
+  const handleOpenRemoteUrl = () => {
+    if (originUrl) {
+      const httpsUrl = convertGitSshToHttps(originUrl) + `/commits/${currentBranch}`;
+      console.log('!!!! OPEN', httpsUrl);
+      shell.openExternal(httpsUrl);
+    }
+  };
+
+  const handleOpenPR = () => {
+    if (originUrl) {
+      const httpsUrl = convertGitSshToHttps(originUrl) + `/compare/${currentBranch}?expand=1`;
+      shell.openExternal(httpsUrl);
+    }
+  };
+
+  const handleOpenCompare = () => {
+    if (originUrl) {
+      const httpsUrl = convertGitSshToHttps(originUrl) + `/compare/${currentBranch}`;
+      shell.openExternal(httpsUrl);
+    }
+  };
+
   const handleCopyLocalPath = () => {
     clipboard.writeText(gitAdapter?.repoPath || '');
   };
@@ -322,6 +351,16 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           </DropdownItem>
           <DropdownItem onClick={handleCopyLocalPath}>
             📋 Copy Local Path
+          </DropdownItem>
+          <DropdownSeparator />
+          <DropdownItem onClick={handleOpenRemoteUrl}>
+            🌐 Open Remote URL
+          </DropdownItem>
+          <DropdownItem onClick={handleOpenPR}>
+            🌐 Open PR
+          </DropdownItem>
+          <DropdownItem onClick={handleOpenCompare}>
+            🌐 Open Branch Compare
           </DropdownItem>
           <DropdownSeparator />
           {!isLfsInitialized ? (
