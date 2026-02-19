@@ -1,13 +1,13 @@
 # UGit
 
 <div>
-<img src="assets/icon.png" style="width:100px">
+<img src="assets/icon.png" style="width:100px; display:block; margin: 0 auto;">
 </div>
 
 I wanted a free Git Client and disliked the available options, so I wrote one.
 
 <a href="docs/images/ugit.png">
-<img src="docs/images/ugit.png" style="width:800px">
+<img src="docs/images/ugit.png" style="width:800px; display:block; margin: 0 auto;">
 </a>
 
 ## Building From Source
