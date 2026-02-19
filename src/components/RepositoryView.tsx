@@ -1868,33 +1868,199 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     loadRepoData(true);
   };
 
-  const handleRemoteBranchContextMenu = (action: string, remoteName: string, branchName: string, fullName: string): void => {
+  const handleDeleteRemoteBranch = async (remoteName: string, branchName: string) => {
+    const confirmed = await showConfirm(
+      `Are you sure you want to delete remote branch '${remoteName}/${branchName}'? This cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      const git = gitAdapter.current;
+
+      console.log(`Deleting remote branch: ${remoteName}/${branchName}`);
+      setBusyMessage(`git push ${remoteName} --delete ${branchName}`);
+      await git.raw(['push', remoteName, '--delete', branchName]);
+
+      console.log(`Remote branch ${remoteName}/${branchName} deleted successfully`);
+
+      // Refresh repository data to show updated remote branches
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error deleting remote branch:', error);
+      setError(`Failed to delete remote branch '${remoteName}/${branchName}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  };
+
+  const handleCheckoutRemoteBranch = async (remoteName: string, branchName: string) => {
+    try {
+      setIsBusy(true);
+      const git = gitAdapter.current;
+
+      console.log(`Checking out remote branch: ${remoteName}/${branchName}`);
+      setBusyMessage(`git checkout -b ${branchName} ${remoteName}/${branchName}`);
+      await git.raw(['checkout', '-b', branchName, `${remoteName}/${branchName}`]);
+
+      console.log(`Checked out remote branch as local branch: ${branchName}`);
+
+      // Refresh repository data to show updated branches
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error checking out remote branch:', error);
+      setError(`Failed to checkout remote branch '${remoteName}/${branchName}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  };
+
+  const handlePullRemoteBranch = async (remoteName: string, branchName: string) => {
+    try {
+      setIsBusy(true);
+      const git = gitAdapter.current;
+
+      console.log(`Pulling from remote branch: ${remoteName}/${branchName} into ${currentBranch}`);
+      setBusyMessage(`git pull ${remoteName} ${branchName}`);
+      await git.pull(remoteName, branchName);
+
+      console.log(`Pull completed successfully from ${remoteName}/${branchName}`);
+
+      // Clear branch cache since pull may have added new commits
+      clearBranchCache(currentBranch);
+
+      // Refresh repository data
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error pulling remote branch:', error);
+      setError(`Failed to pull '${remoteName}/${branchName}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  };
+
+  const handleCreateTagFromRemoteBranch = async (remoteName: string, branchName: string) => {
+    try {
+      setIsBusy(true);
+      const git = gitAdapter.current;
+
+      console.log(`Creating tag from remote branch: ${remoteName}/${branchName}`);
+
+      // Fetch the latest to ensure we have the remote refs
+      setBusyMessage(`git fetch ${remoteName}`);
+      await git.fetch(remoteName);
+
+      // Get the commit hash that the remote branch points to
+      const refSpec = `${remoteName}/${branchName}`;
+      const result = await git.raw(['rev-parse', refSpec]);
+      const commitHash = result.trim();
+
+      if (!commitHash) {
+        throw new Error(`Could not find commit hash for ${refSpec}`);
+      }
+
+      // Get commit info
+      const logResult = await git.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', commitHash]);
+      const [hash, author, email, date, message] = logResult.trim().split('|');
+
+      const commitInfo: Commit = {
+        hash,
+        author_name: author,
+        author_email: email,
+        date,
+        message,
+        body: '',
+        onOrigin: true,
+        tags: []
+      };
+
+      setCommitForDialog(commitInfo);
+      setShowCreateTagFromCommitDialog(true);
+
+    } catch (error) {
+      console.error('Error creating tag from remote branch:', error);
+      setError(`Failed to create tag from '${remoteName}/${branchName}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  };
+
+  const handleCreateBranchFromRemoteBranch = async (remoteName: string, branchName: string) => {
+    try {
+      setIsBusy(true);
+      const git = gitAdapter.current;
+
+      console.log(`Creating branch from remote branch: ${remoteName}/${branchName}`);
+
+      // Fetch the latest to ensure we have the remote refs
+      setBusyMessage(`git fetch ${remoteName}`);
+      await git.fetch(remoteName);
+
+      // Get the commit hash that the remote branch points to
+      const refSpec = `${remoteName}/${branchName}`;
+      const result = await git.raw(['rev-parse', refSpec]);
+      const commitHash = result.trim();
+
+      if (!commitHash) {
+        throw new Error(`Could not find commit hash for ${refSpec}`);
+      }
+
+      // Get commit info
+      const logResult = await git.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', commitHash]);
+      const [hash, author, email, date, message] = logResult.trim().split('|');
+
+      const commitInfo: Commit = {
+        hash,
+        author_name: author,
+        author_email: email,
+        date,
+        message,
+        body: '',
+        onOrigin: true,
+        tags: []
+      };
+
+      setCommitForDialog(commitInfo);
+      setShowCreateBranchFromCommitDialog(true);
+
+    } catch (error) {
+      console.error('Error creating branch from remote branch:', error);
+      setError(`Failed to create branch from '${remoteName}/${branchName}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  };
+
+  const handleRemoteBranchContextMenu = async (action: string, remoteName: string, branchName: string, fullName: string): Promise<void> => {
     console.log('Remote branch context menu action:', action, 'on branch:', fullName);
 
     switch (action) {
       case 'checkout':
-        // TODO: Implement checkout remote branch
-        showAlert(`Check out remote branch: ${fullName}`);
+        await handleCheckoutRemoteBranch(remoteName, branchName);
         break;
       case 'pull':
-        // TODO: Implement pull remote branch into current branch
-        showAlert(`Pull '${fullName}' into '${currentBranch}'`);
+        await handlePullRemoteBranch(remoteName, branchName);
         break;
       case 'merge':
         // TODO: Implement merge remote branch into current branch
         showAlert(`Merge '${fullName}' into '${currentBranch}'`);
         break;
       case 'new-branch':
-        // TODO: Implement new branch from remote branch
-        showAlert(`New branch from: ${fullName}`);
+        await handleCreateBranchFromRemoteBranch(remoteName, branchName);
         break;
       case 'new-tag':
-        // TODO: Implement new tag from remote branch
-        showAlert(`New tag from: ${fullName}`);
+        await handleCreateTagFromRemoteBranch(remoteName, branchName);
         break;
       case 'delete':
-        // TODO: Implement delete remote branch confirmation
-        showAlert(`Delete remote branch: ${fullName}`);
+        handleDeleteRemoteBranch(remoteName, branchName);
         break;
       case 'copy-name':
         // Copy remote branch name to clipboard
