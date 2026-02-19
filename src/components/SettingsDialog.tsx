@@ -13,7 +13,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const { settings, loadingSettings, settingsError, updateSetting, resetSettings } = useSettings();
   const [localRefreshTime, setLocalRefreshTime] = useState<number>(5);
   const [blockCommitBranches, setBlockCommitBranches] = useState<string>('');
-  const [pushAllTags, setPushAllTags] = useState<boolean>(true);
+  const [pushAllTags, setPushAllTags] = useState<boolean>(false);
   const [maxCommits, setMaxCommits] = useState<number>(100);
   const [isSaving, setIsSaving] = useState(false);
 
