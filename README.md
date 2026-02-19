@@ -1,12 +1,16 @@
 # UGit
 
-I wanted a decent and free Git GUI and dislike the available options, so I thought I'd see how far I could get making one.
+<div>
+<img src="assets/icon.png" style="width:100px">
+</div>
 
-<a href="ugit.png">
-<img src="ugit.png" style="width:800px">
+I wanted a free Git Client and disliked the available options, so I wrote one.
+
+<a href="docs/images/ugit.png">
+<img src="docs/images/ugit.png" style="width:800px">
 </a>
 
-## Building
+## Building From Source
 
 * Install [Node.js](https://nodejs.org) if you don't already have it installed.
 
