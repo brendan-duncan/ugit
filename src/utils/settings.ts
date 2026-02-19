@@ -6,7 +6,7 @@ export interface AppSettings {
   maxCommits: number;
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   localFileRefreshTime: 5,
   blockCommitBranches: ['trunk', '*/staging'],
   diffViewMode: 'line-by-line',
