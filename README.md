@@ -6,11 +6,9 @@
 
 I wanted a free Git Client and disliked the available options, so I wrote one.
 
-<div align="center">
 <a href="docs/images/ugit.png">
 <img src="docs/images/ugit.png" style="width:800px; display:block; margin: 0 auto;">
 </a>
-</div>
 
 ## Building From Source
 
@@ -27,5 +25,6 @@ I wanted a free Git Client and disliked the available options, so I wrote one.
   * `npm run build:main`
   * `npm run build:dist`
     * The output will be put into release/ and will include an installer and sub-folder with the executable.
+
 
 
