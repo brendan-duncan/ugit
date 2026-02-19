@@ -1,3 +1,9 @@
+## [v0.1.6](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.6) (February 20, 2026)
+
+### New Features
+
+* Add `Git GC` to RepoInfo menu, to perform a git garbage collection pass on the repo.
+
 ## [v0.1.5](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.5) (February 19, 2026)
 
 ### New Features
