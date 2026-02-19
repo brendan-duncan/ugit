@@ -73,15 +73,16 @@ jobs:
         run: |
           VERSION=${{ github.ref_name }}
           
-          NOTES="# $VERSION\n\n"
-          NOTES+="## Downloads\n\n"
-          NOTES+="- **Windows**: [ugit-Setup-$VERSION.exe](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-Setup-$VERSION.exe)\n"
-          NOTES+="- **macOS**: [ugit-$VERSION.dmg](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION.dmg)\n"
-          NOTES+="- **Linux**: [ugit-$VERSION.AppImage](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION.AppImage)\n"
+          cat > /tmp/release-notes.md << EOF
+          # $VERSION
           
-          echo "$NOTES" | gh release edit $VERSION \
-            --notes-file - \
-            --draft=false \
-            --latest
+          ## Downloads
+          
+          - **Windows**: [ugit-Setup-$VERSION.exe](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-Setup-$VERSION.exe)
+          - **macOS**: [ugit-$VERSION.dmg](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION.dmg)
+          - **Linux**: [ugit-$VERSION.AppImage](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION.AppImage)
+          EOF
+          
+          gh release edit $VERSION --notes-file /tmp/release-notes.md --draft=false --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
