@@ -22,6 +22,7 @@ interface RepoInfoProps {
   usingCache: boolean;
   onResetToOrigin: () => void;
   onCleanWorkingDirectory: () => void;
+  onGitGC: () => Promise<void>;
   onOriginChanged?: () => Promise<void>;
   onStashChanges?: () => void;
   onDiscardChanges?: () => void;
@@ -29,7 +30,7 @@ interface RepoInfoProps {
   onError?: (error: string) => void;
 }
 
-const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
   const { showAlert, showConfirm } = useAlert();
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -403,6 +404,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
             📄 Apply Patch...
           </DropdownItem>
           <DropdownSeparator />
+          <DropdownItem onClick={onGitGC}>
+            🗑 Git GC
+          </DropdownItem>
           <DropdownItem onClick={onCleanWorkingDirectory}>
             🧹Clean Working Directory...
           </DropdownItem>
