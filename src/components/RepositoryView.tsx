@@ -1046,6 +1046,16 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
+  const handleGitGC = async () => {
+    console.log('git GC');
+    setIsBusy(true);
+    setBusyMessage('git gc');
+    const git = gitAdapter.current;
+    await git.raw(['gc']);
+    setIsBusy(false);
+    setBusyMessage('');
+  };
+
   const handleOriginChanged = async () => {
     try {
       const git = gitAdapter.current;
@@ -2363,6 +2373,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 usingCache={usingCache}
                 onResetToOrigin={() => setShowResetDialog(true)}
                 onCleanWorkingDirectory={() => setShowCleanWorkingDirectoryDialog(true)}
+                onGitGC={handleGitGC}
                 onOriginChanged={handleOriginChanged}
                 onStashChanges={hasLocalChanges ? handleStashClick : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
