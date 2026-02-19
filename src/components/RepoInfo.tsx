@@ -120,8 +120,8 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     clipboard.writeText(gitAdapter?.repoPath || '');
   };
 
-  const handleEditOrigin = () => {
-    setShowEditOriginDialog(true);
+  const handleCopyRemoteURL = () => {
+    clipboard.writeText(convertGitSshToHttps(originUrl || '') || '');
   };
 
   const handleEditOriginDialog = async (newUrl: string) => {
@@ -351,6 +351,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           </DropdownItem>
           <DropdownItem onClick={handleCopyLocalPath}>
             📋 Copy Local Path
+          </DropdownItem>
+          <DropdownItem onClick={handleCopyRemoteURL}>
+            📋 Copy Remote URL
           </DropdownItem>
           <DropdownSeparator />
           <DropdownItem onClick={handleOpenRemoteUrl}>
