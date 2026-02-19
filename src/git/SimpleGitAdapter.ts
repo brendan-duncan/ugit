@@ -266,6 +266,56 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
+  async merge(branchName: string): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git merge ${branchName}`, startTime);
+    let hasConflicts = false;
+    try {
+      await this.git.merge([branchName]);
+    } catch (error: any) {
+      if (error.message && error.message.includes('CONFLICT')) {
+        hasConflicts = true;
+      } else {
+        console.error(`Error merging ${branchName}:`, error);
+        throw error;
+      }
+    }
+    try {
+      const status = await this.status();
+      const conflictedFiles = status.conflicted;
+      const allModifiedFiles = [
+        ...status.notAdded,
+        ...status.created,
+        ...status.deleted,
+        ...status.modified,
+        ...status.renamed.map(r => r.to)
+      ];
+      const nonConflictedFiles = allModifiedFiles.filter(
+        file => !conflictedFiles.includes(file)
+      );
+      if (nonConflictedFiles.length > 0) {
+        await this.add(nonConflictedFiles);
+      }
+    } catch (error) {
+      console.error(`Error staging files after merge:`, error);
+    } finally {
+      this._endCommand(id, startTime);
+    }
+  }
+
+  async rebase(branchName: string): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git rebase ${branchName}`, startTime);
+    try {
+      await this.git.rebase([branchName]);
+    } catch (error) {
+      console.error(`Error rebasing onto ${branchName}:`, error);
+      throw error;
+    } finally {
+      this._endCommand(id, startTime);
+    }
+  }
+
   async push(remote: string, refspec: string, options: string[] = []): Promise<string> {
     const startTime = performance.now();
     let result = '';

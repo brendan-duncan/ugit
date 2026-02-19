@@ -6,6 +6,7 @@ import CreateBranchDialog from './CreateBranchDialog';
 import DeleteBranchDialog from './DeleteBranchDialog';
 import RenameBranchDialog from './RenameBranchDialog';
 import MergeBranchDialog from './MergeBranchDialog';
+import RebaseBranchDialog from './RebaseBranchDialog';
 import ApplyStashDialog from './ApplyStashDialog';
 import DeleteStashDialog from './DeleteStashDialog';
 import ContentViewer from './ContentViewer';
@@ -78,6 +79,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [branchToRename, setBranchToRename] = useState(null);
   const [showMergeBranchDialog, setShowMergeBranchDialog] = useState(false);
   const [mergeSourceBranch, setMergeSourceBranch] = useState(null);
+  const [showRebaseBranchDialog, setShowRebaseBranchDialog] = useState(false);
+  const [rebaseSourceBranch, setRebaseSourceBranch] = useState(null);
   const [showApplyStashDialog, setShowApplyStashDialog] = useState(false);
   const [stashToApply, setStashToApply] = useState(null);
   const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
@@ -1206,6 +1209,43 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
+  const handleRebaseBranchDialog = async ({ sourceBranch, targetBranch }: { sourceBranch: string; targetBranch: string }) => {
+    setShowRebaseBranchDialog(false);
+
+    if (!sourceBranch || !targetBranch) {
+      return;
+    }
+
+    setRebaseSourceBranch(null);
+
+    try {
+      setIsBusy(true);
+      const git = gitAdapter.current;
+
+      console.log(`Rebasing '${sourceBranch}' onto '${targetBranch}'`);
+
+      setBusyMessage(`git rebase ${targetBranch}`);
+      await git.rebase(targetBranch);
+
+      console.log(`Rebase completed successfully: '${sourceBranch}' onto '${targetBranch}'`);
+
+      clearBranchCache();
+
+      await loadRepoData(true);
+
+      if (selectedItem?.type === 'branch' && selectedItem.branchName === sourceBranch) {
+        await handleBranchSelect(sourceBranch);
+      }
+
+    } catch (error) {
+      console.error('Error rebasing branch:', error);
+      setError(`Failed to rebase '${sourceBranch}' onto '${targetBranch}': ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  };
+
   const handleItemSelect = (item: any) => {
     // If switching away from a branch or remote branch, cancel any pending loads
     if (item.type !== 'branch' && item.type !== 'remote-branch') {
@@ -1567,8 +1607,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         setShowMergeBranchDialog(true);
         break;
       case 'rebase-active-onto-branch':
-        // TODO: Implement rebase active branch onto branch
-        showAlert(`Rebase ${currentBranch} onto branch: ${branchName}`);
+        setRebaseSourceBranch(currentBranch);
+        setShowRebaseBranchDialog(true);
         break;
       case 'new-branch':
         // TODO: Implement new branch dialog
@@ -2312,6 +2352,18 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           }}
           onMerge={handleMergeBranchDialog}
           sourceBranch={mergeSourceBranch}
+          targetBranch={currentBranch}
+          gitAdapter={gitAdapter.current}
+        />
+      )}
+      {showRebaseBranchDialog && (
+        <RebaseBranchDialog
+          onClose={() => {
+            setShowRebaseBranchDialog(false);
+            setRebaseSourceBranch(null);
+          }}
+          onRebase={handleRebaseBranchDialog}
+          sourceBranch={rebaseSourceBranch}
           targetBranch={currentBranch}
           gitAdapter={gitAdapter.current}
         />

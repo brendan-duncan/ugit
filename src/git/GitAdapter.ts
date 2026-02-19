@@ -414,6 +414,18 @@ export abstract class GitAdapter {
   abstract lfsUninstall(): Promise<void>;
 
   /**
+   * Merge a branch into the current branch
+   * @param branchName - Name of the branch to merge into current branch
+   */
+  abstract merge(branchName: string): Promise<void>;
+
+  /**
+   * Rebase current branch onto another branch
+   * @param branchName - Name of the branch to rebase onto
+   */
+  abstract rebase(branchName: string): Promise<void>;
+
+  /**
    * Add pattern to .gitignore file
    */
   abstract addToGitignore(pattern: string): Promise<void>;
