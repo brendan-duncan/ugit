@@ -12,6 +12,7 @@ interface ContentViewerProps {
   stagedFiles: Array<FileInfo>;
   gitAdapter: GitAdapter;
   onRefresh: () => Promise<void>;
+  onBranchStatusRefresh?: () => Promise<void>;
   onContextMenu: (action: string, commit: Commit, currentBranch: string) => Promise<void>;
   currentBranch: string;
   branchStatus: { [branchName: string]: { ahead: number; behind: number } };
@@ -21,7 +22,7 @@ interface ContentViewerProps {
   onCommitCreated?: () => void;
 }
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onContextMenu, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: ContentViewerProps): React.ReactElement {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -44,6 +45,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           stagedFiles={stagedFiles}
           gitAdapter={gitAdapter}
           onRefresh={onRefresh}
+          onBranchStatusRefresh={onBranchStatusRefresh}
           currentBranch={currentBranch}
           branchStatus={branchStatus}
           onError={onError}

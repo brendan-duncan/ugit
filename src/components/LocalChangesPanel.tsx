@@ -17,6 +17,7 @@ interface LocalChangesPanelProps {
   stagedFiles: Array<FileInfo>;
   gitAdapter: GitAdapter;
   onRefresh: () => Promise<void>;
+  onBranchStatusRefresh?: () => Promise<void>;
   currentBranch?: string;
   branchStatus?: Record<string, any>;
   onError?: (error: string) => void;
@@ -25,7 +26,7 @@ interface LocalChangesPanelProps {
   onCommitCreated?: () => void;
 }
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: LocalChangesPanelProps) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: LocalChangesPanelProps) {
   const { showAlert, showConfirm } = useAlert();
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
@@ -259,13 +260,10 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         await onRefresh();
       }
 
-      // Trigger branch status refresh after commit to update push count
-      // Use setTimeout to ensure git has updated the ahead/behind status
-      setTimeout(async () => {
-        if (onRefresh) {
-          await onRefresh();
-        }
-      }, 100);
+      // Refresh branch status to update push button count
+      if (onBranchStatusRefresh) {
+        await onBranchStatusRefresh();
+      }
     } catch (error) {
       console.error('Error committing:', error);
     } finally {

@@ -2415,6 +2415,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 stagedFiles={stagedFiles}
                 gitAdapter={gitAdapter.current}
                 onRefresh={() => refreshFileStatus(false)}
+                onBranchStatusRefresh={() => refreshBranchStatus()}
                 onContextMenu={handleCommitContextMenu}
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}
