@@ -237,23 +237,22 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
       return;
 
     try {
-      // Create a temporary file with the chunk's diff
       const tempDir = os.tmpdir();
       const tempFile = path.join(tempDir, `chunk-${Date.now()}.patch`);
       fs.writeFileSync(tempFile, chunk.fullDiff, 'utf8');
 
-      // Apply reverse patch
-      await gitAdapter.raw(['apply', '--reverse', '--unidiff-zero', tempFile]);
+      await gitAdapter.raw(['apply', '-R', '--unidiff-zero', tempFile]);
 
-      // Clean up temp file
       fs.unlinkSync(tempFile);
 
       console.log(`Discarded chunk ${chunkIndex + 1}`);
 
-      // Refresh the diff
-      if (onRefresh) {
-        await onRefresh();
-      }
+      setTimeout(async () => {
+        await loadContent();
+        if (onRefresh) {
+          await onRefresh();
+        }
+      }, 50);
     } catch (error: any) {
       console.error('Error discarding chunk:', error);
       if (onError) {
@@ -262,143 +261,111 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     }
   };
 
-  const handleStashChunk = async (chunkIndex: number) => {
+  const handleStageChunk = async (chunkIndex: number) => {
     if (chunkIndex < 0 || chunkIndex >= diffHunks.length)
       return;
 
     const chunk = diffHunks[chunkIndex];
 
     try {
-      // Create a directory for chunk stashes if it doesn't exist
-      const stashDir = path.join(gitAdapter.repoPath, '.ugit', 'chunk-stashes');
-      if (!fs.existsSync(stashDir)) {
-        fs.mkdirSync(stashDir, { recursive: true });
-
-        // Add .ugit to .gitignore if not already present
-        const gitignorePath = path.join(gitAdapter.repoPath, '.gitignore');
-        let gitignoreContent = '';
-        if (fs.existsSync(gitignorePath)) {
-          gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-        }
-        if (!gitignoreContent.includes('.ugit')) {
-          gitignoreContent += (gitignoreContent && !gitignoreContent.endsWith('\n') ? '\n' : '') + '.ugit/\n';
-          fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
-          console.log('Added .ugit/ to .gitignore');
-        }
-      }
-
-      // Create a patch file with timestamp and file info
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fileName = path.basename(file.path);
-      const patchFile = path.join(stashDir, `${timestamp}_${fileName}_chunk${chunkIndex + 1}.patch`);
-
-      fs.writeFileSync(patchFile, chunk.fullDiff, 'utf8');
-      console.log(`Stashed chunk to: ${patchFile}`);
-
-      // Now discard the chunk by applying reverse patch
-      const tempFile = path.join(os.tmpdir(), `chunk-discard-${Date.now()}.patch`);
+      const tempDir = os.tmpdir();
+      const tempFile = path.join(tempDir, `chunk-${Date.now()}.patch`);
       fs.writeFileSync(tempFile, chunk.fullDiff, 'utf8');
 
-      await gitAdapter.raw(['apply', '--reverse', '--unidiff-zero', tempFile]);
+      await gitAdapter.raw(['apply', '--cached', tempFile]);
 
-      // Clean up temp file
       fs.unlinkSync(tempFile);
 
-      showAlert(`Chunk stashed to: ${patchFile.replace(gitAdapter.repoPath, '.')}`);
+      console.log(`Staged chunk ${chunkIndex + 1}`);
 
-      // Refresh the diff
+      await loadContent();
+
       if (onRefresh) {
         await onRefresh();
       }
     } catch (error: any) {
-      console.error('Error stashing chunk:', error);
+      console.error('Error staging chunk:', error);
       if (onError) {
-        onError(`Failed to stash chunk: ${error.message}`);
+        onError(`Failed to stage chunk: ${error.message}`);
       }
     }
   };
 
-  useEffect(() => {
-    const loadContent = async () => {
-      if (!file || !gitAdapter) {
+  const loadContent = async () => {
+    if (!file || !gitAdapter) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setDiff('');
+      setDiffHtml('');
+      setFileContent('');
+      setFileType('');
+
+      if (isImageFile(file.path)) {
+        setFileType('image');
+        setFileContent(file.path);
+        setLoading(false);
         return;
       }
 
-      try {
-        setLoading(true);
-        setDiff('');
-        setDiffHtml('');
-        setFileContent('');
-        setFileType('');
+      let diffResult: string;
 
-        // Check if file is an image
-        if (isImageFile(file.path)) {
-          setFileType('image');
-          setFileContent(file.path);
-          setLoading(false);
-          return;
-        }
-
-        let diffResult: string;
-
-        // If diff is already provided in the file object (for stashes), use it
-        if (file.diff) {
-          diffResult = file.diff;
-        } else {
-          // Otherwise fetch the diff from git
-          diffResult = await gitAdapter.diff(file.path, isStaged);
-        }
-
-        setDiff(diffResult);
-
-        // If diff is empty or indicates no changes, try to show file contents
-        if (!diffResult || diffResult.trim() === '' || diffResult.startsWith('Error loading diff:')) {
-          // Try to read the file contents for new files
-          try {
-            setFileType('text');
-            const content = fs.readFileSync(path.join(gitAdapter.repoPath, file.path), 'utf8');
-            setFileContent(content);
-          } catch (contentError) {
-            console.error(`Error loading ${file.path} content:`, contentError);
-            setFileType('none');
-            setFileContent(`Error loading '${file.path}' content: ${contentError.message}`);
-          }
-          setDiffHtml('');
-        } else {
-          const hunks = splitDiffIntoHunks(diffResult);
-          setDiffHunks(hunks);
-
-          let html = '<div class="diff2html-diff">';
-          hunks.forEach((hunk, index) => {
-            let hunkHtml = Diff2Html.html(hunk.fullDiff, {
-              drawFileList: false,
-              outputFormat: diffViewMode,
-              matching: 'lines',
-              diffStyle: 'word',
-              renderNothingWhenEmpty: false,
-              colorScheme: Diff2HtmlTypes.ColorSchemeType.DARK
-            });
-            if (index > 0) {
-              // Hide the file header for subsequent hunks to avoid repetition
-              hunkHtml = hunkHtml.replace('<div class="d2h-file-header">', `<div class="d2h-file-header" style="display: none;">`);
-            }
-            html += `<div class="diff-chunk-wrapper" data-chunk-index="${index}">${hunkHtml}</div>`;
-          });
-          html += '</div>';
-
-          setDiffHtml(html);
-          setFileType('diff');
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading diff:', error);
-        setFileType('none');
-        setFileContent('Error loading diff: ' + error.message);
-        setLoading(false);
+      if (file.diff) {
+        diffResult = file.diff;
+      } else {
+        diffResult = await gitAdapter.diff(file.path, isStaged);
       }
-    };
 
+      setDiff(diffResult);
+
+      if (!diffResult || diffResult.trim() === '' || diffResult.startsWith('Error loading diff:')) {
+        try {
+          setFileType('text');
+          const content = fs.readFileSync(path.join(gitAdapter.repoPath, file.path), 'utf8');
+          setFileContent(content);
+        } catch (contentError) {
+          console.error(`Error loading ${file.path} content:`, contentError);
+          setFileType('none');
+          setFileContent(`Error loading '${file.path}' content: ${contentError.message}`);
+        }
+        setDiffHtml('');
+      } else {
+        const hunks = splitDiffIntoHunks(diffResult);
+        setDiffHunks(hunks);
+
+        let html = '<div class="diff2html-diff">';
+        hunks.forEach((hunk, index) => {
+          let hunkHtml = Diff2Html.html(hunk.fullDiff, {
+            drawFileList: false,
+            outputFormat: diffViewMode,
+            matching: 'lines',
+            diffStyle: 'word',
+            renderNothingWhenEmpty: false,
+            colorScheme: Diff2HtmlTypes.ColorSchemeType.DARK
+          });
+          if (index > 0) {
+            hunkHtml = hunkHtml.replace('<div class="d2h-file-header">', `<div class="d2h-file-header" style="display: none;">`);
+          }
+          html += `<div class="diff-chunk-wrapper" data-chunk-index="${index}">${hunkHtml}</div>`;
+        });
+        html += '</div>';
+
+        setDiffHtml(html);
+        setFileType('diff');
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading diff:', error);
+      setFileType('none');
+      setFileContent('Error loading diff: ' + error.message);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadContent();
   }, [file, gitAdapter, isStaged, diffViewMode]);
 
@@ -461,11 +428,11 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
                 }}
               >
                 <button
-                  className="chunk-action-button chunk-stash-button"
-                  onClick={() => handleStashChunk(hoveredChunkIndex)}
-                  title="Stash this chunk"
+                  className="chunk-action-button chunk-stage-button"
+                  onClick={() => handleStageChunk(hoveredChunkIndex)}
+                  title="Stage this chunk"
                 >
-                  Stash
+                  Stage
                 </button>
                 <button
                   className="chunk-action-button chunk-discard-button"

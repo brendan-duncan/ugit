@@ -266,12 +266,12 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.chunk-stash-button {
+.chunk-stage-button {
   background-color: #1e463e;
   color: #ececec;
 }
 
-.chunk-stash-button:hover {
+.chunk-stage-button:hover {
   background-color: #316d61;
   transform: translateY(-1px);
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
