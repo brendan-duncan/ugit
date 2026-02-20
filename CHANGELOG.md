@@ -5,6 +5,7 @@
 * Add Pull to the branch context menu. For non-current branches, this will do a fetch of that branch.
 * Add Push to the branch context menu. This will also work for non-current branches.
 * Change "Open with Visual Studio Code" to "Open With Editor", and added a Preference setting to change the editor used.
+* Commit Block List, defined in Preferences, will check the current branch before letting you do a Commit. If the current branch is in the block list, it will notify you that you probably forgot to create a branch and prevent the Commit until you do that.
 
 ### Bug Fixes
 
