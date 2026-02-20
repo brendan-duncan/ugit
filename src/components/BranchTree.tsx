@@ -223,6 +223,9 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               <div className="context-menu-item" onClick={() => handleMenuAction('checkout')}>
                 Checkout
               </div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('pull')}>
+                Pull
+              </div>
               <div className="context-menu-item" onClick={() => handleMenuAction('push-to-origin')}>
                 Push to origin...
               </div>
