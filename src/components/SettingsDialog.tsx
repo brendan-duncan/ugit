@@ -35,13 +35,11 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
 
     setIsSaving(true);
     try {
-      // Parse the branch list
       const branchList = blockCommitBranches
         .split(',')
         .map(branch => branch.trim())
         .filter(branch => branch.length > 0);
 
-      // Update settings
       await updateSetting('localFileRefreshTime', localRefreshTime);
       await updateSetting('blockCommitBranches', branchList);
       await updateSetting('pushAllTags', pushAllTags);
@@ -74,7 +72,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   if (loadingSettings) {
     return (
       <div className="dialog-overlay">
-        <div className="dialog">
+        <div className="dialog settings-dialog">
           <div className="dialog-header">
             <h3>Settings</h3>
           </div>
@@ -89,7 +87,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   if (settingsError) {
     return (
       <div className="dialog-overlay">
-        <div className="dialog">
+        <div className="dialog settings-dialog">
           <div className="dialog-header">
             <h3>Settings</h3>
           </div>
@@ -106,79 +104,97 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
 
   return (
     <div className="dialog-overlay">
-      <div className="dialog">
+      <div className="dialog settings-dialog">
         <div className="dialog-header">
           <h3>Settings</h3>
         </div>
         <div className="dialog-content">
-          <div className="setting-group">
-            <label htmlFor="localFileRefreshTime">
-              Local File Refresh Time (seconds):
-            </label>
-            <input
-              id="localFileRefreshTime"
-              type="number"
-              min="1"
-              max="3600"
-              value={localRefreshTime}
-              onChange={(e) => setLocalRefreshTime(parseInt(e.target.value) || 5)}
-            />
-            <small>How often to refresh local file status</small>
-          </div>
-
-          <div className="setting-group">
-            <label htmlFor="blockCommitBranches">
-              Block Commit Branches:
-            </label>
-            <input
-              id="blockCommitBranches"
-              type="text"
-              value={blockCommitBranches}
-              onChange={(e) => setBlockCommitBranches(e.target.value)}
-              placeholder="trunk, */staging"
-            />
-            <small>Branch patterns where commits should be blocked (comma-separated)</small>
-          </div>
-
-          <div className="setting-group">
-            <label className="checkbox-label">
+          <div className="settings-section">
+            <h4 className="settings-section-title">Editor</h4>
+            
+            <div className="setting-group">
+              <label htmlFor="externalEditor">
+                External Editor Command
+              </label>
               <input
-                type="checkbox"
-                checked={pushAllTags}
-                onChange={(e) => setPushAllTags(e.target.checked)}
+                id="externalEditor"
+                type="text"
+                value={externalEditor}
+                onChange={(e) => setExternalEditor(e.target.value)}
+                placeholder="code"
               />
-              <span>Push all tags by default</span>
-            </label>
-            <small>When enabled, the "Push all tags" checkbox in the Push dialog will be checked by default</small>
+              <small>Command to open files in external editor (e.g., code, code-insiders, subl, idea)</small>
+            </div>
           </div>
 
-          <div className="setting-group">
-            <label htmlFor="maxCommits">
-              Max Commits to Display:
-            </label>
-            <input
-              id="maxCommits"
-              type="number"
-              min="1"
-              max="10000"
-              value={maxCommits}
-              onChange={(e) => setMaxCommits(parseInt(e.target.value) || 100)}
-            />
-            <small>Maximum number of commits to show in the commit list (filters are applied before limit)</small>
+          <div className="settings-section">
+            <h4 className="settings-section-title">Git</h4>
+
+            <div className="setting-group">
+              <label htmlFor="pushAllTags" className="checkbox-label">
+                <input
+                  id="pushAllTags"
+                  type="checkbox"
+                  checked={pushAllTags}
+                  onChange={(e) => setPushAllTags(e.target.checked)}
+                />
+                <span>Push all tags by default</span>
+              </label>
+              <small>When enabled, the "Push all tags" checkbox in the Push dialog will be checked by default</small>
+            </div>
+
+            <div className="setting-group">
+              <label htmlFor="blockCommitBranches">
+                Blocked Branch Patterns
+              </label>
+              <input
+                id="blockCommitBranches"
+                type="text"
+                value={blockCommitBranches}
+                onChange={(e) => setBlockCommitBranches(e.target.value)}
+                placeholder="trunk, main, */staging"
+              />
+              <small>Branch patterns where commits should be blocked. Use * as wildcard (comma-separated)</small>
+            </div>
           </div>
 
-          <div className="setting-group">
-            <label htmlFor="externalEditor">
-              External Editor:
-            </label>
-            <input
-              id="externalEditor"
-              type="text"
-              value={externalEditor}
-              onChange={(e) => setExternalEditor(e.target.value)}
-              placeholder="code"
-            />
-            <small>Command to open files in external editor (e.g., code, code-insiders, subl)</small>
+          <div className="settings-section">
+            <h4 className="settings-section-title">Performance</h4>
+
+            <div className="setting-row">
+              <div className="setting-group half-width">
+                <label htmlFor="localFileRefreshTime">
+                  File Refresh Time
+                </label>
+                <div className="input-with-unit">
+                  <input
+                    id="localFileRefreshTime"
+                    type="number"
+                    min="1"
+                    max="3600"
+                    value={localRefreshTime}
+                    onChange={(e) => setLocalRefreshTime(parseInt(e.target.value) || 5)}
+                  />
+                  <span className="unit">sec</span>
+                </div>
+                <small>How often to refresh local file status</small>
+              </div>
+
+              <div className="setting-group half-width">
+                <label htmlFor="maxCommits">
+                  Max Commits
+                </label>
+                <input
+                  id="maxCommits"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={maxCommits}
+                  onChange={(e) => setMaxCommits(parseInt(e.target.value) || 100)}
+                />
+                <small>Maximum number of commits to display in lists</small>
+              </div>
+            </div>
           </div>
         </div>
         <div className="dialog-footer">
@@ -189,6 +205,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
           >
             Reset to Defaults
           </button>
+          <div className="footer-spacer"></div>
           <button 
             onClick={onClose} 
             disabled={isSaving}

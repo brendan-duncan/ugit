@@ -12,6 +12,10 @@
 * Fix: Creating a Commit doesn't update the count on the Push toolbar button.
 * Fix: Discard of a chunk in a file change diff.
 
+### Improvements
+
+* Updated the layout of the Preferences dialog.
+
 ## [v0.1.6](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.6) (February 19, 2026)
 
 ### New Features
