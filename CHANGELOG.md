@@ -1,4 +1,4 @@
-## [v0.1.6](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 20, 2026)
+## [v0.1.7](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 20, 2026)
 
 ### New features
 
