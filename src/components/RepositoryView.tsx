@@ -1619,6 +1619,13 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       case 'checkout':
         handleBranchSwitch(branchName);
         break;
+      case 'pull':
+        if (branchName === currentBranch) {
+          handlePullClick();
+        } else {
+          handleFetchClick();
+        }
+        break;
       case 'push-to-origin':
         setShowPushDialog(branchName);
         break;
