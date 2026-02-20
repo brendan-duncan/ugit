@@ -1,3 +1,14 @@
+## [v0.1.6](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 20, 2026)
+
+### New features
+
+* Add Pull to the branch context menu. For non-current branches, this will do a fetch of that branch.
+
+### Bug Fixes
+
+* Creating a Commit doesn't update the count on the Push toolbar button.
+* Fix Discard of a chunk in a file change diff.
+
 ## [v0.1.6](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.6) (February 19, 2026)
 
 ### New Features
