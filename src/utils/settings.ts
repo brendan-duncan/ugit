@@ -4,6 +4,7 @@ export interface AppSettings {
   diffViewMode: 'side-by-side' | 'line-by-line';
   pushAllTags: boolean;
   maxCommits: number;
+  externalEditor: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -11,7 +12,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   blockCommitBranches: ['trunk', '*/staging'],
   diffViewMode: 'line-by-line',
   pushAllTags: false,
-  maxCommits: 100
+  maxCommits: 100,
+  externalEditor: 'code'
 };
 
 /**
@@ -139,7 +141,8 @@ export class SettingsManager {
        data.diffViewMode === 'side-by-side' ||
        data.diffViewMode === 'line-by-line') &&
       (data.pushAllTags === undefined || typeof data.pushAllTags === 'boolean') &&
-      (data.maxCommits === undefined || typeof data.maxCommits === 'number')
+      (data.maxCommits === undefined || typeof data.maxCommits === 'number') &&
+      (data.externalEditor === undefined || typeof data.externalEditor === 'string')
     );
   }
 
