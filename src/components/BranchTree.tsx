@@ -229,6 +229,9 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               <div className="context-menu-item" onClick={() => handleMenuAction('push-to-origin')}>
                 Push to origin...
               </div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('push-branch')}>
+                Push to branch...
+              </div>
               <div className="context-menu-separator"></div>
               {currentBranch !== contextMenu.branchName && (
                 <div className="context-menu-item" onClick={() => handleMenuAction('merge-into-active')}>

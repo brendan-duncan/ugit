@@ -1629,6 +1629,9 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       case 'push-to-origin':
         setShowPushDialog(branchName);
         break;
+      case 'push-branch':
+        setShowPushDialog(branchName);
+        break;
       case 'merge-into-active':
         setMergeSourceBranch(branchName);
         setShowMergeBranchDialog(true);
