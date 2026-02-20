@@ -1612,7 +1612,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   };
 
-  const handleBranchContextMenu = (action: string, branchName: string, currentBranch: string) => {
+  const handleBranchContextMenu = async (action: string, branchName: string, currentBranch: string) => {
     console.log('Branch context menu action:', action, 'on branch:', branchName);
 
     switch (action) {
@@ -1645,8 +1645,19 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         showAlert(`New branch from: ${currentBranch} to ${branchName}`);
         break;
       case 'new-tag':
-        // TODO: Implement new tag dialog
-        showAlert(`New tag on branch: ${branchName}`);
+        try {
+          const git = gitAdapter.current;
+          const commits = await git.log(branchName, 1);
+          if (commits && commits.length > 0) {
+            setCommitForDialog(commits[0]);
+            setShowCreateTagFromCommitDialog(true);
+          } else {
+            showAlert(`No commits found on branch '${branchName}'`);
+          }
+        } catch (error) {
+          console.error('Error getting branch log:', error);
+          showAlert(`Failed to get commits from branch '${branchName}': ${error.message}`);
+        }
         break;
       case 'rename':
         setBranchToRename(branchName);
