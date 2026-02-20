@@ -3,6 +3,7 @@ import { DropdownMenu, DropdownItem, DropdownSeparator, DropdownSubmenu } from '
 import EditOriginDialog from './EditOriginDialog';
 import GitAdapter from '../git/GitAdapter';
 import { useAlert } from '../contexts/AlertContext';
+import { useSettings } from '../hooks/useSettings';
 import { exec } from 'child_process';
 import { shell, clipboard, ipcRenderer } from 'electron';
 import './RepoInfo.css';
@@ -32,6 +33,7 @@ interface RepoInfoProps {
 
 const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
   const { showAlert, showConfirm } = useAlert();
+  const { getSetting } = useSettings();
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isLfsInitialized, setIsLfsInitialized] = useState(false);
@@ -76,12 +78,13 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
 
   const handleOpenInVSCode = () => {
     const repoPath = gitAdapter?.repoPath;
+    const editor = getSetting('externalEditor') || 'code';
     if (repoPath) {
-      exec(`code "${repoPath}"`, (error) => {
+      exec(`${editor} "${repoPath}"`, (error) => {
         if (error) {
-          console.error('Error opening VS Code:', error);
+          console.error('Error opening editor:', error);
           if (onError) {
-            onError('Failed to open Visual Studio Code. Make sure VS Code is installed and the "code" command is available in your PATH.');
+            onError(`Failed to open ${editor}. Make sure it's installed and available in your PATH.`);
           }
         }
       });
@@ -348,7 +351,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
             🖥️ Open in Console
           </DropdownItem>
           <DropdownItem onClick={handleOpenInVSCode}>
-            💻 Open in Visual Studio Code
+            💻 Open in Editor
           </DropdownItem>
           <DropdownItem onClick={handleCopyLocalPath}>
             📋 Copy Local Path

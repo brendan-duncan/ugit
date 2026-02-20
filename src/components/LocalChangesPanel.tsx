@@ -7,6 +7,7 @@ import StashConflictDialog from './StashConflictDialog';
 import { GitAdapter } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import { useAlert } from '../contexts/AlertContext';
+import { useSettings } from '../hooks/useSettings';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
@@ -28,6 +29,7 @@ interface LocalChangesPanelProps {
 
 function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: LocalChangesPanelProps) {
   const { showAlert, showConfirm } = useAlert();
+  const { getSetting } = useSettings();
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -350,10 +352,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
           const itemPath = path.join(gitAdapter.repoPath, clickedItem);
           await ipcRenderer.invoke('show-item-in-folder', itemPath);
           break;
-        case 'open-in-vscode':
-          // Open the clicked item in Visual Studio Code
-          const vscodePath = path.join(gitAdapter.repoPath, clickedItem);
-          await ipcRenderer.invoke('open-in-vscode', vscodePath);
+        case 'open-in-editor':
+          // Open the clicked item in external editor
+          const editorPath = path.join(gitAdapter.repoPath, clickedItem);
+          const editor = getSetting('externalEditor') || 'code';
+          await ipcRenderer.invoke('open-in-editor', editorPath, editor);
           break;
 
         case 'stage':

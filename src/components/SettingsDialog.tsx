@@ -15,6 +15,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [blockCommitBranches, setBlockCommitBranches] = useState<string>('');
   const [pushAllTags, setPushAllTags] = useState<boolean>(false);
   const [maxCommits, setMaxCommits] = useState<number>(100);
+  const [externalEditor, setExternalEditor] = useState<string>('code');
   const [isSaving, setIsSaving] = useState(false);
 
   // Update local state when settings load
@@ -24,6 +25,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       setBlockCommitBranches(settings.blockCommitBranches.join(', '));
       setPushAllTags(settings.pushAllTags);
       setMaxCommits(settings.maxCommits);
+      setExternalEditor(settings.externalEditor);
     }
   }, [settings]);
 
@@ -44,6 +46,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       await updateSetting('blockCommitBranches', branchList);
       await updateSetting('pushAllTags', pushAllTags);
       await updateSetting('maxCommits', maxCommits);
+      await updateSetting('externalEditor', externalEditor);
 
       onClose();
     } catch (err) {
@@ -162,6 +165,20 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
               onChange={(e) => setMaxCommits(parseInt(e.target.value) || 100)}
             />
             <small>Maximum number of commits to show in the commit list (filters are applied before limit)</small>
+          </div>
+
+          <div className="setting-group">
+            <label htmlFor="externalEditor">
+              External Editor:
+            </label>
+            <input
+              id="externalEditor"
+              type="text"
+              value={externalEditor}
+              onChange={(e) => setExternalEditor(e.target.value)}
+              placeholder="code"
+            />
+            <small>Command to open files in external editor (e.g., code, code-insiders, subl)</small>
           </div>
         </div>
         <div className="dialog-footer">

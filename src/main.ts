@@ -478,29 +478,29 @@ ipcMain.handle('show-item-in-folder', async (event: any, itemPath: string) => {
   }
 });
 
-function openInVSCode(itemPath: string): void {
-  exec(`code "${itemPath}"`, (error) => {
+function openInEditor(itemPath: string, editor: string = 'code'): void {
+  exec(`${editor} "${itemPath}"`, (error) => {
     if (error) {
-      console.error('Error opening VS Code:', error);
+      console.error('Error opening editor:', error);
     }
   });
 }
 
-// Open item in VSCode
-ipcMain.handle('open-in-vscode', async (event: any, itemPath: string) => {
+// Open item in editor
+ipcMain.handle('open-in-editor', async (event: any, itemPath: string, editor: string = 'code') => {
   try {
     // Check if the path exists
     if (fs.existsSync(itemPath)) {
-      openInVSCode(itemPath);
+      openInEditor(itemPath, editor);
     } else {
       // If file doesn't exist, show the parent directory
       const parentDir = path.dirname(itemPath);
       if (fs.existsSync(parentDir)) {
-        openInVSCode(parentDir);
+        openInEditor(parentDir, editor);
       }
     }
   } catch (error) {
-    console.error('Error opening item in VSCode:', error);
+    console.error('Error opening item in editor:', error);
   }
 });
 

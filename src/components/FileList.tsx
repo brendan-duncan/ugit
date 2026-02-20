@@ -574,8 +574,8 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
           <div className="context-menu-item" onClick={() => handleMenuAction('show-in-explorer')}>
             Show in File Explorer
           </div>
-          <div className="context-menu-item" onClick={() => handleMenuAction('open-in-vscode')}>
-            Open in Visual Studio Code
+          <div className="context-menu-item" onClick={() => handleMenuAction('open-in-editor')}>
+            Open in Editor
           </div>
           <div className="context-menu-separator"></div>
           {listType === 'unstaged' && (
