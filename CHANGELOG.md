@@ -4,6 +4,7 @@
 
 * Add Pull to the branch context menu. For non-current branches, this will do a fetch of that branch.
 * Add Push to the branch context menu. This will also work for non-current branches.
+* Change "Open with Visual Studio Code" to "Open With Editor", and added a Preference setting to change the editor used.
 
 ### Bug Fixes
 
