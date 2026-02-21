@@ -318,6 +318,13 @@ export abstract class GitAdapter {
   abstract show(commitHash: string, filePath: string): Promise<string>;
 
   /**
+   * Get raw file content at a specific revision
+   * @param revision - The revision (e.g., 'HEAD', 'HEAD~1', 'commit hash')
+   * @param filePath - Path to the file
+   */
+  abstract getFileContentAtRevision(revision: string, filePath: string): Promise<string>;
+
+  /**
    * Get detailed information about a git stash entry
    * @param stashIndex - The stash index (default: 0 for most recent)
    * @param repoPath - Path to the git repository (default: current directory)

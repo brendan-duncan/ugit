@@ -292,3 +292,54 @@
   transform: translateY(0px);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
+
+/* Image diff styles */
+.diff-image-container {
+  display: flex;
+  gap: 20px;
+  height: 100%;
+  overflow: auto;
+}
+
+.diff-image-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.diff-image-label {
+  padding: 8px 12px;
+  background-color: #252526;
+  color: #cccccc;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid #3d3d3d;
+  border-bottom: none;
+}
+
+.diff-image-panel .diff-image-display {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background-color: #1e1e1e;
+  border: 1px solid #3d3d3d;
+  border-top: none;
+  padding: 16px;
+  overflow: auto;
+  border-radius: 0 0 4px 4px;
+}
+
+.diff-image-panel .diff-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.diff-image-container:not(:has(.diff-image-panel)) {
+  align-items: center;
+  justify-content: center;
+}
