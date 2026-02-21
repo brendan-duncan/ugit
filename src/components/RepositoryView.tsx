@@ -2082,8 +2082,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         await handlePullRemoteBranch(remoteName, branchName);
         break;
       case 'merge':
-        // TODO: Implement merge remote branch into current branch
-        showAlert(`Merge '${fullName}' into '${currentBranch}'`);
+        setMergeSourceBranch(fullName);
+        setShowMergeBranchDialog(true);
         break;
       case 'new-branch':
         await handleCreateBranchFromRemoteBranch(remoteName, branchName);
