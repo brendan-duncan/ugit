@@ -252,6 +252,25 @@ function createMenu(): void {
       label: 'Help',
       submenu: [
         {
+          label: 'Documentation',
+          click: () => {
+            shell.openExternal('https://github.com/brendan-duncan/ugit/tree/main/docs');
+          }
+        },
+        {
+          label: 'Issue Tracker',
+          click: () => {
+            shell.openExternal('https://github.com/brendan-duncan/ugit/issues');
+          }
+        },
+        {
+          label: 'GitHub Repository',
+          click: () => {
+            shell.openExternal('https://github.com/brendan-duncan/ugit');
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'Check for Updates...',
           click: () => {
             if (mainWindow) {

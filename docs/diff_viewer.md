@@ -1,3 +1,5 @@
+[Overview](README.md)
+
 # DiffViewer
 
 The DiffViewer displays changes between files, showing what was added, removed, or modified. It's shown when you select a file in the Unstaged or Staged files list.

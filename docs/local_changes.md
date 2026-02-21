@@ -1,3 +1,5 @@
+[Overview](README.md)
+
 # Local Changes Panel
 
 The Local Changes panel is where you view, stage, and commit changes in your working directory. It's one of the main panels in ugit for managing your uncommitted work.
@@ -100,6 +102,10 @@ If your branch is behind the remote, ugit will prompt you:
 
 - **Pull & Commit** — Pull remote changes first, then commit
 - **Commit Only** — Commit without pulling (may cause conflicts)
+
+## Branch Commit Block List
+
+In Preferences you can define a list of branch names to prevent commits for. This is used to prevent committing to a branch that requires a separate Pull Request branch.
 
 ---
 

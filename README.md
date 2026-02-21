@@ -10,7 +10,7 @@ UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It pro
 <img src="docs/images/ugit.png" style="width:800px; display:block; margin: 0 auto;">
 </a>
 
-## [Documentation](docs/ugit.md)
+## [Documentation](docs/README.md)
 
 ## Building From Source
 
