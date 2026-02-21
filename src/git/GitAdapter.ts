@@ -325,6 +325,12 @@ export abstract class GitAdapter {
   abstract getFileContentAtRevision(revision: string, filePath: string): Promise<string>;
 
   /**
+   * Read file from filesystem as binary
+   * @param filePath - Path to the file relative to repo root
+   */
+  abstract readFileBinary(filePath: string): Promise<string>;
+
+  /**
    * Get detailed information about a git stash entry
    * @param stashIndex - The stash index (default: 0 for most recent)
    * @param repoPath - Path to the git repository (default: current directory)

@@ -128,6 +128,82 @@ function splitDiffIntoHunks(diff: string): DiffHunk[] {
   return hunks;
 }
 
+interface DifferenceImageViewerProps {
+  originalSrc: string;
+  modifiedSrc: string;
+}
+
+function DifferenceImageViewer({ originalSrc, modifiedSrc }: DifferenceImageViewerProps): React.ReactElement {
+  const [differenceSrc, setDifferenceSrc] = useState<string | null>(null);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const computeDifference = async () => {
+      const originalImg = new Image();
+      const modifiedImg = new Image();
+
+      originalImg.src = originalSrc;
+      modifiedImg.src = modifiedSrc;
+
+      await new Promise<void>((resolve) => {
+        originalImg.onload = () => resolve();
+      });
+
+      const width = originalImg.width;
+      const height = originalImg.height;
+
+      setDimensions({ width, height });
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.drawImage(originalImg, 0, 0);
+      const originalData = ctx.getImageData(0, 0, width, height);
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(modifiedImg, 0, 0);
+      const modifiedData = ctx.getImageData(0, 0, width, height);
+
+      const diffData = ctx.createImageData(width, height);
+
+      for (let i = 0; i < originalData.data.length; i += 4) {
+        const r = Math.abs(originalData.data[i] - modifiedData.data[i]);
+        const g = Math.abs(originalData.data[i + 1] - modifiedData.data[i + 1]);
+        const b = Math.abs(originalData.data[i + 2] - modifiedData.data[i + 2]);
+        const a = Math.max(originalData.data[i + 3], modifiedData.data[i + 3]);
+
+        diffData.data[i] = r;
+        diffData.data[i + 1] = g;
+        diffData.data[i + 2] = b;
+        diffData.data[i + 3] = a;
+      }
+
+      ctx.putImageData(diffData, 0, 0);
+      setDifferenceSrc(canvas.toDataURL());
+    };
+
+    computeDifference();
+  }, [originalSrc, modifiedSrc]);
+
+  return (
+    <div className="diff-image-difference-container">
+      {differenceSrc ? (
+        <img src={differenceSrc} alt="Difference" className="diff-image" />
+      ) : (
+        <div className="diff-loading">Computing difference...</div>
+      )}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+    </div>
+  );
+}
+
 interface DiffViewerProps {
   file: FileDiff;
   gitAdapter: GitAdapter;
@@ -151,6 +227,9 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     getSetting('diffViewMode') || 'line-by-line'
   );
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
+  const [modifiedImageSrc, setModifiedImageSrc] = useState<string | null>(null);
+  const [imageDiffMode, setImageDiffMode] = useState<'side-by-side' | 'swipe' | 'difference'>('side-by-side');
+  const [swipePosition, setSwipePosition] = useState<number>(50);
 
   // Listen for diff view mode changes from menu
   useEffect(() => {
@@ -308,20 +387,31 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
         setFileType('image');
         setFileContent(file.path);
         setOriginalImageSrc(null);
+        setModifiedImageSrc(null);
 
         if (file.status === 'modified' || file.status === 'deleted') {
           try {
             const originalContent = await gitAdapter.getFileContentAtRevision('HEAD', file.path);
-            console.log('Original image content length:', originalContent?.length);
             if (originalContent && originalContent.length > 0) {
               const extension = file.path.split('.').pop()?.toLowerCase() || 'png';
               const mimeType = extension === 'svg' ? 'image/svg+xml' : `image/${extension === 'jpg' ? 'jpeg' : extension}`;
               const base64 = Buffer.from(originalContent, 'binary').toString('base64');
-              console.log('Base64 length:', base64.length);
               setOriginalImageSrc(`data:${mimeType};base64,${base64}`);
             }
           } catch (err) {
             console.error('Error loading original image:', err);
+          }
+
+          try {
+            const modifiedContent = await gitAdapter.readFileBinary(file.path);
+            if (modifiedContent && modifiedContent.length > 0) {
+              const extension = file.path.split('.').pop()?.toLowerCase() || 'png';
+              const mimeType = extension === 'svg' ? 'image/svg+xml' : `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+              const base64 = Buffer.from(modifiedContent, 'binary').toString('base64');
+              setModifiedImageSrc(`data:${mimeType};base64,${base64}`);
+            }
+          } catch (err) {
+            console.error('Error loading modified image:', err);
           }
         }
 
@@ -403,34 +493,74 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
           <div className="diff-loading">Loading...</div>
         ) : fileType === 'image' ? (
           <div className="diff-image-container">
-            {originalImageSrc ? (
+            {originalImageSrc && modifiedImageSrc ? (
               <>
-                <div className="diff-image-panel">
-                  <div className="diff-image-label">Original (HEAD)</div>
-                  <div className="diff-image-display">
-                    <img
-                      src={originalImageSrc}
-                      alt={`Original ${file.path}`}
-                      className="diff-image"
-                    />
+                {imageDiffMode === 'side-by-side' && (
+                  <>
+                    <div className="diff-image-panel">
+                      <div className="diff-image-label">Original (HEAD)</div>
+                      <div className="diff-image-display">
+                        <img
+                          src={originalImageSrc}
+                          alt={`Original ${file.path}`}
+                          className="diff-image"
+                        />
+                      </div>
+                    </div>
+                    <div className="diff-image-panel">
+                      <div className="diff-image-label">Modified (Working)</div>
+                      <div className="diff-image-display">
+                        <img
+                          src={modifiedImageSrc}
+                          alt={file.path}
+                          className="diff-image"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+                {imageDiffMode === 'swipe' && (
+                  <div
+                    className="diff-image-swipe-container"
+                    onMouseDown={(e) => {
+                      const container = e.currentTarget;
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        const rect = container.getBoundingClientRect();
+                        const x = moveEvent.clientX - rect.left;
+                        const percentage = (x / rect.width) * 100;
+                        setSwipePosition(Math.max(0, Math.min(100, percentage)));
+                      };
+                      const handleMouseUp = () => {
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
+                  >
+                    <div className="diff-image-swipe-modified">
+                      <img src={modifiedImageSrc} alt={file.path} className="diff-image" />
+                    </div>
+                    <div
+                      className="diff-image-swipe-original"
+                      style={{ clipPath: `inset(0 ${100 - swipePosition}% 0 0)` }}
+                    >
+                      <img src={originalImageSrc} alt={`Original ${file.path}`} className="diff-image" />
+                    </div>
+                    <div
+                      className="diff-image-swipe-bar"
+                      style={{ left: `${swipePosition}%` }}
+                    >
+                      <div className="diff-image-swipe-handle" />
+                    </div>
                   </div>
-                </div>
-                <div className="diff-image-panel">
-                  <div className="diff-image-label">Modified (Working)</div>
-                  <div className="diff-image-display">
-                    <img
-                      src={`file://${gitAdapter.repoPath}/${file.path}`}
-                      alt={file.path}
-                      className="diff-image"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        const nextElement = target.nextElementSibling as HTMLElement;
-                        nextElement.style.display = 'block';
-                      }}
-                    />
-                  </div>
-                </div>
+                )}
+                {imageDiffMode === 'difference' && (
+                  <DifferenceImageViewer
+                    originalSrc={originalImageSrc}
+                    modifiedSrc={modifiedImageSrc}
+                  />
+                )}
               </>
             ) : (
               <div className="diff-image-display">
@@ -511,6 +641,28 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
           <div className="diff-empty">No changes to display</div>
         )}
       </div>
+      {fileType === 'image' && originalImageSrc && modifiedImageSrc && (
+        <div className="diff-image-mode-selector">
+          <button
+            className={`diff-image-mode-btn ${imageDiffMode === 'side-by-side' ? 'active' : ''}`}
+            onClick={() => setImageDiffMode('side-by-side')}
+          >
+            Side-by-Side
+          </button>
+          <button
+            className={`diff-image-mode-btn ${imageDiffMode === 'swipe' ? 'active' : ''}`}
+            onClick={() => setImageDiffMode('swipe')}
+          >
+            Swipe
+          </button>
+          <button
+            className={`diff-image-mode-btn ${imageDiffMode === 'difference' ? 'active' : ''}`}
+            onClick={() => setImageDiffMode('difference')}
+          >
+            Difference
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -831,6 +831,16 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async readFileBinary(filePath: string): Promise<string> {
+    try {
+      const fullPath = path.join(this.repoPath, filePath);
+      const buffer = fsSync.readFileSync(fullPath);
+      return buffer.toString('binary');
+    } catch (error: any) {
+      return '';
+    }
+  }
+
   async clone(repoUrl: string, parentFolder: string, repoName: string): Promise<void> {
     const startTime = performance.now();
     const id = this._startCommand(`git clone ${repoUrl} ${parentFolder}/${repoName}`, startTime);
