@@ -150,6 +150,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const [diffViewMode, setDiffViewMode] = useState<'side-by-side' | 'line-by-line'>(
     getSetting('diffViewMode') || 'line-by-line'
   );
+  const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
 
   // Listen for diff view mode changes from menu
   useEffect(() => {
@@ -306,6 +307,24 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
       if (isImageFile(file.path)) {
         setFileType('image');
         setFileContent(file.path);
+        setOriginalImageSrc(null);
+
+        if (file.status === 'modified' || file.status === 'deleted') {
+          try {
+            const originalContent = await gitAdapter.getFileContentAtRevision('HEAD', file.path);
+            console.log('Original image content length:', originalContent?.length);
+            if (originalContent && originalContent.length > 0) {
+              const extension = file.path.split('.').pop()?.toLowerCase() || 'png';
+              const mimeType = extension === 'svg' ? 'image/svg+xml' : `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+              const base64 = Buffer.from(originalContent, 'binary').toString('base64');
+              console.log('Base64 length:', base64.length);
+              setOriginalImageSrc(`data:${mimeType};base64,${base64}`);
+            }
+          } catch (err) {
+            console.error('Error loading original image:', err);
+          }
+        }
+
         setLoading(false);
         return;
       }
@@ -384,19 +403,50 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
           <div className="diff-loading">Loading...</div>
         ) : fileType === 'image' ? (
           <div className="diff-image-container">
-            <div className="diff-image-display">
-              <img
-                src={`file://${gitAdapter.repoPath}/${file.path}`}
-                alt={file.path}
-                className="diff-image"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const nextElement = target.nextElementSibling as HTMLElement;
-                  nextElement.style.display = 'block';
-                }}
-              />
-            </div>
+            {originalImageSrc ? (
+              <>
+                <div className="diff-image-panel">
+                  <div className="diff-image-label">Original (HEAD)</div>
+                  <div className="diff-image-display">
+                    <img
+                      src={originalImageSrc}
+                      alt={`Original ${file.path}`}
+                      className="diff-image"
+                    />
+                  </div>
+                </div>
+                <div className="diff-image-panel">
+                  <div className="diff-image-label">Modified (Working)</div>
+                  <div className="diff-image-display">
+                    <img
+                      src={`file://${gitAdapter.repoPath}/${file.path}`}
+                      alt={file.path}
+                      className="diff-image"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const nextElement = target.nextElementSibling as HTMLElement;
+                        nextElement.style.display = 'block';
+                      }}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="diff-image-display">
+                <img
+                  src={`file://${gitAdapter.repoPath}/${file.path}`}
+                  alt={file.path}
+                  className="diff-image"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const nextElement = target.nextElementSibling as HTMLElement;
+                    nextElement.style.display = 'block';
+                  }}
+                />
+              </div>
+            )}
           </div>
         ) : fileType === 'text' ? (
           <div className="diff-file-content">

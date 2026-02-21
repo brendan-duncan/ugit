@@ -815,6 +815,22 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async getFileContentAtRevision(revision: string, filePath: string): Promise<string> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git cat-file blob ${revision}:${filePath}`, startTime);
+    try {
+      const { execSync } = require('child_process');
+      const result = execSync(`git -C "${this.repoPath}" cat-file blob ${revision}:${filePath}`, {
+        encoding: 'binary'
+      });
+      this._endCommand(id, startTime);
+      return result;
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      return '';
+    }
+  }
+
   async clone(repoUrl: string, parentFolder: string, repoName: string): Promise<void> {
     const startTime = performance.now();
     const id = this._startCommand(`git clone ${repoUrl} ${parentFolder}/${repoName}`, startTime);

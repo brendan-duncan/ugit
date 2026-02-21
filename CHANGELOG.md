@@ -1,3 +1,9 @@
+## [v0.1.8](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (XXX)
+
+### New Features
+
+* Modified images will show the previous and modified image next to each other.
+
 ## [v0.1.7](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 20, 2026)
 
 ### New features
