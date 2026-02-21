@@ -196,35 +196,13 @@ function createMenu(): void {
       label: 'View',
       submenu: [
         {
-          label: 'Diff Viewer',
-          submenu: [
-            {
-              label: 'Line-by-Line',
-              type: 'checkbox',
-              checked: currentDiffViewMode === 'line-by-line',
-              click: () => {
-                const settingsManager = getSettingsManager();
-                settingsManager.updateSetting('diffViewMode', 'line-by-line');
-                createMenu(); // Rebuild menu to update checkboxes
-                if (mainWindow) {
-                  mainWindow.webContents.send('diff-view-mode-changed', 'line-by-line');
-                }
-              }
-            },
-            {
-              label: 'Side-by-Side',
-              type: 'checkbox',
-              checked: currentDiffViewMode === 'side-by-side',
-              click: () => {
-                const settingsManager = getSettingsManager();
-                settingsManager.updateSetting('diffViewMode', 'side-by-side');
-                createMenu(); // Rebuild menu to update checkboxes
-                if (mainWindow) {
-                  mainWindow.webContents.send('diff-view-mode-changed', 'side-by-side');
-                }
-              }
+          label: 'Clear All Caches',
+          click: () => {
+            cacheManager.clearAllCaches();
+            if (mainWindow) {
+              mainWindow.webContents.send('caches-cleared');
             }
-          ]
+          }
         },
         { type: 'separator' },
         {
@@ -233,16 +211,6 @@ function createMenu(): void {
           click: () => {
             if (mainWindow) {
               mainWindow.webContents.toggleDevTools();
-            }
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Clear All Caches',
-          click: () => {
-            cacheManager.clearAllCaches();
-            if (mainWindow) {
-              mainWindow.webContents.send('caches-cleared');
             }
           }
         }

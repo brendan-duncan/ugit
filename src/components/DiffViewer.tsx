@@ -234,7 +234,9 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const [selectedConflictVersion, setSelectedConflictVersion] = useState<'ours' | 'theirs' | null>(null);
   const [mergeToolDropdownOpen, setMergeToolDropdownOpen] = useState<boolean>(false);
   const [conflictResolving, setConflictResolving] = useState<boolean>(false);
+  const [settingsDropdownOpen, setSettingsDropdownOpen] = useState<boolean>(false);
   const mergeToolDropdownRef = React.useRef<HTMLDivElement>(null);
+  const settingsDropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Listen for diff view mode changes from menu
   useEffect(() => {
@@ -548,6 +550,19 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     }
   }, [mergeToolDropdownOpen]);
 
+  // Close settings dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(e.target as Node)) {
+        setSettingsDropdownOpen(false);
+      }
+    };
+    if (settingsDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [settingsDropdownOpen]);
+
   if (!file) {
     return (
       <div className="diff-viewer">
@@ -559,8 +574,69 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const isConflicted = file.status === 'conflict';
   const showConflictControls = isConflicted && conflictSources;
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'modified': return { text: 'Modified', color: '#4ec9b0' };
+      case 'created': return { text: 'Created', color: '#ce9178' };
+      case 'deleted': return { text: 'Deleted', color: '#f14c4c' };
+      case 'renamed': return { text: 'Renamed', color: '#dcdcaa' };
+      case 'conflict': return { text: 'Conflict', color: '#cca700' };
+      default: return { text: status, color: '#cccccc' };
+    }
+  };
+
   return (
     <div className="diff-viewer">
+      <div className="diff-viewer-header">
+        <div className="diff-viewer-header-path">
+          <span className="diff-viewer-file-icon">📄</span>
+          <span className="diff-viewer-file-path">{file.path}</span>
+        </div>
+        <div className="diff-viewer-header-right">
+          <span 
+            className="diff-viewer-status-badge" 
+            style={{ backgroundColor: getStatusBadge(file.status).color }}
+          >
+            {getStatusBadge(file.status).text}
+          </span>
+          <div className="diff-viewer-settings" ref={settingsDropdownRef}>
+            <button
+              className="diff-viewer-settings-btn"
+              onClick={() => setSettingsDropdownOpen(!settingsDropdownOpen)}
+              title="Settings"
+            >
+              ⚙
+            </button>
+            {settingsDropdownOpen && (
+              <div className="diff-viewer-settings-dropdown">
+                <div className="diff-viewer-settings-section">
+                  <div className="diff-viewer-settings-label">Diff View Mode</div>
+                  <button
+                    className={`diff-viewer-settings-option ${diffViewMode === 'line-by-line' ? 'active' : ''}`}
+                    onClick={() => {
+                      setDiffViewMode('line-by-line');
+                      ipcRenderer.invoke('update-setting', 'diffViewMode', 'line-by-line');
+                      setSettingsDropdownOpen(false);
+                    }}
+                  >
+                    Line-by-Line
+                  </button>
+                  <button
+                    className={`diff-viewer-settings-option ${diffViewMode === 'side-by-side' ? 'active' : ''}`}
+                    onClick={() => {
+                      setDiffViewMode('side-by-side');
+                      ipcRenderer.invoke('update-setting', 'diffViewMode', 'side-by-side');
+                      setSettingsDropdownOpen(false);
+                    }}
+                  >
+                    Side-by-Side
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       <div className="diff-content">
         {showConflictControls && (
           <div className="diff-conflict-controls">

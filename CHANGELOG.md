@@ -4,6 +4,11 @@
 
 * Added DiffViewer modes or modified images: Side-By-Side, Swipe, and Difference.
 * Add Conflict Merge tool to DiffViewer for resolving conflicted files.
+* Add documentation links to the Help menu
+
+### Improvements
+
+* Move Diff View options from the View menu to the DiffViewer.
 
 ## [v0.1.7](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 20, 2026)
 
