@@ -2,7 +2,7 @@
 
 ### New Features
 
-* Modified images will show the previous and modified image next to each other.
+* Added DiffViewer modes or modified images: Side-By-Side, Swipe, and Difference.
 
 ## [v0.1.7](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 20, 2026)
 
