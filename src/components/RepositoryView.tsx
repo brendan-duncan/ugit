@@ -73,6 +73,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
   const [pullingBranch, setPullingBranch] = useState(null);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
+  const [newBranchFrom, setNewBranchFrom] = useState<string | null>(null);
   const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState(null);
   const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
@@ -1641,8 +1642,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         setShowRebaseBranchDialog(true);
         break;
       case 'new-branch':
-        // TODO: Implement new branch dialog
-        showAlert(`New branch from: ${currentBranch} to ${branchName}`);
+        setNewBranchFrom(branchName);
+        setShowCreateBranchDialog(true);
         break;
       case 'new-tag':
         try {
@@ -2494,9 +2495,12 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       )}
       {showCreateBranchDialog && (
         <CreateBranchDialog
-          onClose={() => setShowCreateBranchDialog(false)}
+          onClose={() => {
+            setShowCreateBranchDialog(false);
+            setNewBranchFrom(null);
+          }}
           onCreateBranch={handleCreateBranch}
-          currentBranch={currentBranch}
+          currentBranch={newBranchFrom || currentBranch}
           gitAdapter={gitAdapter.current}
           branches={branches}
         />
