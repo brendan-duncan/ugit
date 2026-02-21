@@ -1,3 +1,5 @@
+[Overview](README.md)
+
 # Branches
 
 The Branches panel displays all local branches in your repository. You can view commit history, switch branches, create new branches, and manage existing branches.

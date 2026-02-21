@@ -10,12 +10,10 @@ UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It pro
 
 ## Quality Of Life Features
 
-- Checks if there are remote changes before creating a commit.
-- Lets you specify branches to prevent commits for, preventing unwanted commits for non-PR branches.
-- Merge conflict resolution.
-- Image Diff viewer.
-- Open repo or file in an editor, file explorer, shell.
-- Open remote website, PR creation, branch comparison.
+- [Checks if there are remote changes before creating a commit](local_changes.md#commit-without-pulling).
+- [Lets you specify branches to prevent commits for, preventing unwanted commits for non-PR branches](local_changes.md#branch-commit-block-list).
+- [Merge conflict resolution](diff_viewer.md#conflict-resolution).
+- [Image Diff viewer](diff_viewer.md#image-diffs).
 
 ---
 

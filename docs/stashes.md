@@ -1,3 +1,5 @@
+[Overview](README.md)
+
 # Stashes
 
 Stashes are a way to save your uncommitted changes temporarily without committing them. This is useful when you need to switch branches but have uncommitted work, or when you want to set aside changes temporarily.

@@ -1,3 +1,5 @@
+[Overview](README.md)
+
 # RepoInfo Panel
 
 The RepoInfo panel displays key information about your repository at a glance. It's located at the top of the repository view.
