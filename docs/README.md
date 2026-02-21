@@ -149,33 +149,17 @@ UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It pro
 
 ### File Menu
 
-- **Open Repository** — Open an existing repository
 - **Clone...** — Clone from a remote URL
+- **Open Repository** — Open an existing repository
 - **Init New Repository** — Create a new repository
-- **Close Repository** — Close the current repository
 - **Recent Repositories** — Quick access to recent projects
 - **Preferences** — Configure settings
 - **Exit** — Close the application
 
-### Edit Menu
-
-- **Undo/Redo** — Standard editing commands
-- **Cut/Copy/Paste** — Text editing
-
 ### View Menu
 
-- **Diff View Mode** — Switch between line-by-line and side-by-side
-- **Toggle Panels** — Show/hide various panels
-- **Refresh** — Refresh the repository view
-
-### Repository Menu
-
-- **Commit** — Commit staged changes
-- **Pull** — Pull from remote
-- **Push** — Push to remote
-- **Fetch** — Fetch from remote
-- **Branch** — Create or manage branches
-- **Tag** — Create or manage tags
+- **Clear All Caches** — Delete all caches used for repository viewing
+- **Toggle Developmer Tools** — Show/hide the developer tools window
 
 ---
 
@@ -183,7 +167,8 @@ UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It pro
 
 Access via **File → Preferences**:
 
-- Default diff view mode
-- External editor
-- Commit block list
-- Auto-fetch interval
+- **External editor** — The editor to use for "Open in Editor"
+- **Push all tags by default** — Push will include pushing all tags
+- **Commit block list** — Comma separated list of branch names to prevent creating Commmits from
+- **File Refresh Time** — How frequent the Local Changes will be refreshed
+- **Max Commits** — The number of commits to list in a Branch view
