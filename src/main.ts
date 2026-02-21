@@ -254,7 +254,7 @@ function createMenu(): void {
         {
           label: 'Documentation',
           click: () => {
-            shell.openExternal('https://github.com/brendan-duncan/ugit/tree/main/docs');
+            shell.openExternal('https://github.com/brendan-duncan/ugit/tree/main/docs/README.md');
           }
         },
         {
