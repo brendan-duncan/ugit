@@ -1028,6 +1028,82 @@ export class SimpleGitAdapter extends GitAdapter {
       return '';
     }
   }
+
+  async getConflictSources(): Promise<{ oursLabel: string; theirsLabel: string } | null> {
+    const gitDir = path.join(this.repoPath, '.git');
+    try {
+      const mergeHeadPath = path.join(gitDir, 'MERGE_HEAD');
+      const rebaseHeadPath = path.join(gitDir, 'REBASE_HEAD');
+      const mergeHeadExists = await fs.access(mergeHeadPath).then(() => true).catch(() => false);
+      const rebaseHeadExists = await fs.access(rebaseHeadPath).then(() => true).catch(() => false);
+
+      if (mergeHeadExists) {
+        const oursLabel = this.currentBranch || 'HEAD';
+        let theirsLabel = 'Incoming';
+        try {
+          const nameRev = await this.git!.raw(['name-rev', '--name-only', 'MERGE_HEAD']);
+          const trimmed = nameRev.trim();
+          if (trimmed && !/^[0-9a-f]+$/.test(trimmed)) {
+            theirsLabel = trimmed.replace(/~[0-9]+$/, '');
+          }
+        } catch {
+          // keep default
+        }
+        return { oursLabel, theirsLabel };
+      }
+
+      if (rebaseHeadExists) {
+        return { oursLabel: 'Current', theirsLabel: 'Incoming' };
+      }
+    } catch {
+    }
+    return { oursLabel: 'Current', theirsLabel: 'Incoming' };
+  }
+
+  async getConflictVersionContent(filePath: string, version: 'ours' | 'theirs'): Promise<string> {
+    const stage = version === 'ours' ? '2' : '3';
+    try {
+      const content = await this.git!.raw(['show', `:${stage}:${filePath}`]);
+      return content;
+    } catch {
+      return '';
+    }
+  }
+
+  async resolveConflictWithVersion(filePath: string, version: 'ours' | 'theirs'): Promise<void> {
+    const startTime = performance.now();
+    const flag = version === 'ours' ? '--ours' : '--theirs';
+    const id = this._startCommand(`git checkout ${flag} -- ${filePath}`, startTime);
+    try {
+      await this.git!.raw(['checkout', flag, '--', filePath]);
+      await this.git!.add([filePath]);
+    } catch (error) {
+      console.error(`Error resolving conflict with ${version}:`, error);
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async runMergetool(filePath?: string, tool?: string): Promise<void> {
+    const startTime = performance.now();
+    const args = ['mergetool'];
+    if (tool) {
+      args.push(`--tool=${tool}`);
+    }
+    if (filePath) {
+      args.push('--', filePath);
+    }
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      await this.git!.raw(args);
+    } catch (error) {
+      console.error('Error running mergetool:', error);
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+  }
 }
 
 export default SimpleGitAdapter;

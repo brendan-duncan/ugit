@@ -452,6 +452,29 @@ export abstract class GitAdapter {
    * Get contents of .gitignore file
    */
   abstract getGitignoreContents(): Promise<string>;
+
+  /**
+   * Get labels for conflict sources (ours/theirs) when in merge or rebase.
+   * Returns null if not in a conflicted state.
+   */
+  abstract getConflictSources(): Promise<{ oursLabel: string; theirsLabel: string } | null>;
+
+  /**
+   * Get file content from conflict index (stage 2 = ours, stage 3 = theirs).
+   */
+  abstract getConflictVersionContent(filePath: string, version: 'ours' | 'theirs'): Promise<string>;
+
+  /**
+   * Resolve conflict by keeping one version and staging the file.
+   */
+  abstract resolveConflictWithVersion(filePath: string, version: 'ours' | 'theirs'): Promise<void>;
+
+  /**
+   * Run mergetool for path (or all conflicted files if path omitted).
+   * @param filePath - Conflicted file path (optional)
+   * @param tool - Mergetool name (e.g. 'vscode', 'cursor', 'winmerge')
+   */
+  abstract runMergetool(filePath?: string, tool?: string): Promise<void>;
 }
 
 export default GitAdapter;

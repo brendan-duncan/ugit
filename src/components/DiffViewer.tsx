@@ -230,6 +230,11 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const [modifiedImageSrc, setModifiedImageSrc] = useState<string | null>(null);
   const [imageDiffMode, setImageDiffMode] = useState<'side-by-side' | 'swipe' | 'difference'>('side-by-side');
   const [swipePosition, setSwipePosition] = useState<number>(50);
+  const [conflictSources, setConflictSources] = useState<{ oursLabel: string; theirsLabel: string } | null>(null);
+  const [selectedConflictVersion, setSelectedConflictVersion] = useState<'ours' | 'theirs' | null>(null);
+  const [mergeToolDropdownOpen, setMergeToolDropdownOpen] = useState<boolean>(false);
+  const [conflictResolving, setConflictResolving] = useState<boolean>(false);
+  const mergeToolDropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Listen for diff view mode changes from menu
   useEffect(() => {
@@ -371,6 +376,38 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     }
   };
 
+  const handleResolveConflictWithVersion = async () => {
+    if (!file || selectedConflictVersion === null || !gitAdapter)
+      return;
+    setConflictResolving(true);
+    try {
+      await gitAdapter.resolveConflictWithVersion(file.path, selectedConflictVersion);
+      if (onRefresh) await onRefresh();
+      await loadContent();
+    } catch (error: any) {
+      if (onError) onError(`Failed to resolve conflict: ${error.message}`);
+    } finally {
+      setConflictResolving(false);
+    }
+  };
+
+  const handleRunMergetool = async (tool?: string) => {
+    if (!file || !gitAdapter) return;
+    setMergeToolDropdownOpen(false);
+    setConflictResolving(true);
+    try {
+      await gitAdapter.runMergetool(file.path, tool);
+      setTimeout(async () => {
+        if (onRefresh) await onRefresh();
+        await loadContent();
+      }, 500);
+    } catch (error: any) {
+      if (onError) onError(`Failed to run merge tool: ${error.message}`);
+    } finally {
+      setConflictResolving(false);
+    }
+  };
+
   const loadContent = async () => {
     if (!file || !gitAdapter) {
       return;
@@ -478,6 +515,39 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     loadContent();
   }, [file, gitAdapter, isStaged, diffViewMode]);
 
+  // Also reload when file status changes (e.g., after merge resolution)
+  useEffect(() => {
+    if (file) {
+      loadContent();
+    }
+  }, [file?.status]);
+
+  // Load conflict source labels when viewing a conflicted file
+  useEffect(() => {
+    if (file?.status === 'conflict' && gitAdapter) {
+      gitAdapter.getConflictSources().then((sources) => {
+        setConflictSources(sources || null);
+        setSelectedConflictVersion(null);
+      });
+    } else {
+      setConflictSources(null);
+      setSelectedConflictVersion(null);
+    }
+  }, [file?.path, file?.status, gitAdapter]);
+
+  // Close merge tool dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mergeToolDropdownRef.current && !mergeToolDropdownRef.current.contains(e.target as Node)) {
+        setMergeToolDropdownOpen(false);
+      }
+    };
+    if (mergeToolDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [mergeToolDropdownOpen]);
+
   if (!file) {
     return (
       <div className="diff-viewer">
@@ -486,9 +556,94 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     );
   }
 
+  const isConflicted = file.status === 'conflict';
+  const showConflictControls = isConflicted && conflictSources;
+
   return (
     <div className="diff-viewer">
       <div className="diff-content">
+        {showConflictControls && (
+          <div className="diff-conflict-controls">
+            <div className="diff-conflict-header">
+              <span className="diff-conflict-warning-icon" title="Merge conflict">⚠</span>
+              <span className="diff-conflict-title">Merge conflict</span>
+            </div>
+            <div className="diff-conflict-filename">
+              <span className="diff-conflict-file-icon">📄</span>
+              {file.path}
+            </div>
+            <div className="diff-conflict-file-row">
+              <div
+                className={`diff-conflict-source ${selectedConflictVersion === 'ours' ? 'selected' : ''}`}
+                onClick={() => setSelectedConflictVersion('ours')}
+              >
+                <span className="diff-conflict-source-icon">⇄</span>
+                <span className="diff-conflict-source-label">{conflictSources.oursLabel}</span>
+                <span className="diff-conflict-source-badge">modified</span>
+                <input
+                  type="checkbox"
+                  className="diff-conflict-source-checkbox"
+                  checked={selectedConflictVersion === 'ours'}
+                  onChange={() => setSelectedConflictVersion('ours')}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div
+                className={`diff-conflict-source ${selectedConflictVersion === 'theirs' ? 'selected' : ''}`}
+                onClick={() => setSelectedConflictVersion('theirs')}
+              >
+                <input
+                  type="checkbox"
+                  className="diff-conflict-source-checkbox"
+                  checked={selectedConflictVersion === 'theirs'}
+                  onChange={() => setSelectedConflictVersion('theirs')}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="diff-conflict-source-icon">⇄</span>
+                <span className="diff-conflict-source-label">{conflictSources.theirsLabel}</span>
+                <span className="diff-conflict-source-badge">modified</span>
+              </div>
+            </div>
+            <div className="diff-conflict-actions">
+              <button
+                className="diff-conflict-merge-btn"
+                onClick={handleResolveConflictWithVersion}
+                disabled={selectedConflictVersion === null || conflictResolving}
+                title="Use selected version and mark conflict resolved"
+              >
+                Merge
+              </button>
+              <div className="diff-conflict-mergetool-dropdown" ref={mergeToolDropdownRef}>
+                <div
+                  className="diff-conflict-mergetool-trigger"
+                  title="Open in merge tool"
+                >
+                  <button
+                    type="button"
+                    disabled={conflictResolving} onClick={() => handleRunMergetool('vscode')}>
+                      Merge in VS Code
+                  </button> 
+                  <button
+                    className="diff-conflict-dropdown-arrow"
+                    onClick={() => setMergeToolDropdownOpen((v) => !v)}
+                    disabled={conflictResolving}
+                    title="Open in merge tool"
+                  >
+                    ▼
+                  </button>
+                </div>
+                {mergeToolDropdownOpen && (
+                  <div className="diff-conflict-mergetool-menu">
+                    <button type="button" onClick={() => handleRunMergetool('vscode')}>VS Code</button>
+                    <button type="button" onClick={() => handleRunMergetool('visualstudio')}>Visual Studio</button>
+                    <button type="button" onClick={() => handleRunMergetool('winmerge')}>WinMerge</button>
+                    <button type="button" onClick={() => handleRunMergetool('cursor')}>Cursor</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="diff-loading">Loading...</div>
         ) : fileType === 'image' ? (
