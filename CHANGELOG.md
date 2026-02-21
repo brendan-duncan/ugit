@@ -1,10 +1,12 @@
-## [v0.1.8](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (XXX)
+## [v0.1.8](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 21, 2026)
 
 ### New Features
 
 * Added DiffViewer modes or modified images: Side-By-Side, Swipe, and Difference.
 * Add Conflict Merge tool to DiffViewer for resolving conflicted files.
-* Add documentation links to the Help menu
+* Add documentation links to the Help menu.
+* Implement "New Branch from Branch" for local branches.
+* Implement 'Merge' for remote branches.
 
 ### Improvements
 
