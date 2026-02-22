@@ -235,8 +235,10 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const [mergeToolDropdownOpen, setMergeToolDropdownOpen] = useState<boolean>(false);
   const [conflictResolving, setConflictResolving] = useState<boolean>(false);
   const [settingsDropdownOpen, setSettingsDropdownOpen] = useState<boolean>(false);
+  const [fileMenuOpen, setFileMenuOpen] = useState<boolean>(false);
   const mergeToolDropdownRef = React.useRef<HTMLDivElement>(null);
   const settingsDropdownRef = React.useRef<HTMLDivElement>(null);
+  const fileMenuRef = React.useRef<HTMLDivElement>(null);
 
   // Listen for diff view mode changes from menu
   useEffect(() => {
@@ -375,6 +377,56 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
       if (onError) {
         onError(`Failed to stage chunk: ${error.message}`);
       }
+    }
+  };
+
+  const handleStageFile = async () => {
+    if (!file || !gitAdapter) return;
+    setFileMenuOpen(false);
+    try {
+      await gitAdapter.add(file.path);
+      console.log(`Staged file: ${file.path}`);
+      if (onRefresh) await onRefresh();
+      await loadContent();
+    } catch (error: any) {
+      console.error('Error staging file:', error);
+      if (onError) onError(`Failed to stage file: ${error.message}`);
+    }
+  };
+
+  const handleUnstageFile = async () => {
+    if (!file || !gitAdapter) return;
+    setFileMenuOpen(false);
+    try {
+      await gitAdapter.reset(['HEAD', '--', file.path]);
+      console.log(`Unstaged file: ${file.path}`);
+      if (onRefresh) await onRefresh();
+      await loadContent();
+    } catch (error: any) {
+      console.error('Error unstaging file:', error);
+      if (onError) onError(`Failed to unstage file: ${error.message}`);
+    }
+  };
+
+  const handleDiscardFile = async () => {
+    if (!file || !gitAdapter) return;
+    const confirmed = await showConfirm(
+      `Are you sure you want to discard all changes to '${file.path}'? This cannot be undone.`
+    );
+    if (!confirmed) return;
+    setFileMenuOpen(false);
+    try {
+      if (isStaged) {
+        await gitAdapter.checkout(['HEAD', '--', file.path]);
+      } else {
+        await gitAdapter.checkout(['--', file.path]);
+      }
+      console.log(`Discarded changes to: ${file.path}`);
+      if (onRefresh) await onRefresh();
+      await loadContent();
+    } catch (error: any) {
+      console.error('Error discarding file:', error);
+      if (onError) onError(`Failed to discard file: ${error.message}`);
     }
   };
 
@@ -563,6 +615,19 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     }
   }, [settingsDropdownOpen]);
 
+  // Close file menu dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+        setFileMenuOpen(false);
+      }
+    };
+    if (fileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [fileMenuOpen]);
+
   if (!file) {
     return (
       <div className="diff-viewer">
@@ -591,6 +656,43 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
         <div className="diff-viewer-header-path">
           <span className="diff-viewer-file-icon">📄</span>
           <span className="diff-viewer-file-path">{file.path}</span>
+          <div className="diff-viewer-file-menu" ref={fileMenuRef}>
+            <button
+              className="diff-viewer-file-menu-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFileMenuOpen(!fileMenuOpen);
+              }}
+              title="File actions"
+            >
+              ...
+            </button>
+            {fileMenuOpen && (
+              <div className="diff-viewer-file-menu-dropdown">
+                {!isStaged ? (
+                  <>
+                    <button className="diff-viewer-file-menu-item" onClick={handleStageFile}>
+                      Stage
+                    </button>
+                    <div className="diff-viewer-file-menu-separator" />
+                    <button className="diff-viewer-file-menu-item" onClick={handleDiscardFile}>
+                      Discard
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="diff-viewer-file-menu-item" onClick={handleUnstageFile}>
+                      Unstage
+                    </button>
+                    <div className="diff-viewer-file-menu-separator" />
+                    <button className="diff-viewer-file-menu-item" onClick={handleDiscardFile}>
+                      Unstage and Discard
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div className="diff-viewer-header-right">
           <span 

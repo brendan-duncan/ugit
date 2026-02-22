@@ -1,4 +1,8 @@
-## [v0.1.8](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 21, 2026)
+## [v0.1.9](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.9) (XXX)
+
+* Add "..." menu to DiffView. If a file is unstaged, this will have "Stage" and "Discard". If the file is staged, it will have "Unstage" and "Unstage and Discard".
+
+## [v0.1.8](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.8) (February 21, 2026)
 
 ### New Features
 
