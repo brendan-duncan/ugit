@@ -1,7 +1,7 @@
 .tab-bar {
   display: flex;
-  background-color: #2d2d2d;
-  border-bottom: 1px solid #1e1e1e;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--bg-primary);
   overflow-x: auto;
   overflow-y: hidden;
   flex-shrink: 0;
@@ -11,8 +11,8 @@
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  background-color: #2d2d2d;
-  border-right: 1px solid #1e1e1e;
+  background-color: var(--bg-tertiary);
+  border-right: 1px solid var(--bg-primary);
   cursor: grab;
   user-select: none;
   min-width: 120px;
@@ -26,16 +26,16 @@
 }
 
 .tab.drag-over {
-  border-left: 2px solid #007acc;
+  border-left: 2px solid var(--accent-color);
 }
 
 .tab:hover {
-  background-color: #3d3d3d;
+  background-color: var(--border-color);
 }
 
 .tab.active {
-  background-color: #4a4a4a;
-  border-bottom: 2px solid #007acc;
+  background-color: var(--bg-primary);
+  border-bottom: 2px solid var(--accent-color);
 }
 
 .tab-name {
@@ -50,7 +50,7 @@
   margin-left: 8px;
   background: none;
   border: none;
-  color: #888888;
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 18px;
   line-height: 1;

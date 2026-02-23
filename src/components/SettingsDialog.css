@@ -10,7 +10,7 @@
 .settings-section {
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .settings-section:last-child {
@@ -24,7 +24,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 1rem;
   margin-top: 0;
 }
@@ -36,7 +36,7 @@
 
 .setting-group {
   margin-bottom: 1rem;
-  color: #ccc;
+  color: var(--text-primary);
 }
 
 .setting-group.half-width {
@@ -48,24 +48,27 @@
   margin-bottom: 0.5rem;
   font-weight: 500;
   font-size: 0.95rem;
+  color: var(--text-primary);
 }
 
 .setting-group input[type="text"],
-.setting-group input[type="number"] {
+.setting-group input[type="number"],
+.setting-group select {
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border: 1px solid #444;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 0.9rem;
-  background-color: #2a2a2a;
-  color: #ddd;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   box-sizing: border-box;
 }
 
 .setting-group input[type="text"]:focus,
-.setting-group input[type="number"]:focus {
+.setting-group input[type="number"]:focus,
+.setting-group select:focus {
   outline: none;
-  border-color: #007acc;
+  border-color: var(--accent-color);
   box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
 }
 
@@ -79,7 +82,7 @@
 .setting-group small {
   display: block;
   font-size: 0.8rem;
-  color: #888;
+  color: var(--text-secondary);
   line-height: 1.4;
   margin-top: 0.35rem;
 }
@@ -101,7 +104,7 @@
 }
 
 .input-with-unit .unit {
-  color: #888;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -110,7 +113,7 @@
 }
 
 .settings-error {
-  color: #d32f2f;
+  color: var(--danger-color);
   background-color: #ffebee;
   padding: 0.5rem;
   border-radius: 4px;

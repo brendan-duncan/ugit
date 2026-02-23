@@ -85,10 +85,10 @@ const PushDialog: React.FC<PushDialogProps> = ({ onClose, onPush, branches, curr
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+          <button className="dialog-button button-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="dialog-button dialog-button-primary" onClick={handlePush}>
+          <button className="dialog-button button-primary" onClick={handlePush}>
             Push
           </button>
         </div>

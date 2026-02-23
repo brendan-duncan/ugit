@@ -1,5 +1,5 @@
 .remote-list {
-  background-color: #1e1e1e;
+  background-color: var(--bg-primary);
   border-radius: 4px;
   padding: 16px;
   height: 100%;
@@ -14,7 +14,7 @@
   justify-content: space-between;
   margin-bottom: 16px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3d3d3d;
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
@@ -25,7 +25,7 @@
 }
 
 .panel-header h3 {
-  color: #ffffff;
+  color: var(--text-highlight);
   font-size: 1.0rem;
   margin: 0;
 }
@@ -33,7 +33,7 @@
 .collapse-button {
   background: none;
   border: none;
-  color: #cccccc;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 4px 8px;
   font-size: 12px;
@@ -42,12 +42,12 @@
 }
 
 .collapse-button:hover {
-  background-color: #2d2d2d;
-  color: #ffffff;
+  background-color: var(--border-color);
+  color: var(--text-highlight);
 }
 
 .collapse-button:active {
-  background-color: #3d3d3d;
+  background-color: var(--bg-tertiary);
 }
 
 .remote-list-content {
@@ -58,7 +58,7 @@
 }
 
 .remote-list-empty {
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
   padding: 20px 0;
 }
@@ -80,18 +80,18 @@
 }
 
 .remote-header:hover {
-  background-color: #2d2d2d;
-  border-color: #3d3d3d;
+  background-color: #c9c9c9;
+  border-color: var(--border-color);
 }
 
 .remote-header.selected {
-  background-color: #264f78;
+  background-color: var(--accent-color);
   border: 1px solid #4ec9b0;
   border-left: 3px solid #4ec9b0;
 }
 
 .remote-toggle-icon {
-  color: #cccccc;
+  color: var(--text-primary);
   font-size: 10px;
   width: 12px;
   text-align: center;
@@ -103,11 +103,11 @@
 
 .remote-name {
   flex: 1;
-  color: #cccccc;
+  color: var(--text-primary);
 }
 
 .remote-url {
-  color: #888888;
+  color: var(--text-secondary);
   font-size: 12px;
   font-family: monospace;
   max-width: 200px;
@@ -118,7 +118,7 @@
 
 .remote-branches {
   margin-left: 24px;
-  border-left: 1px solid #3d3d3d;
+  border-left: 1px solid var(--border-color);
   padding-left: 12px;
   margin-top: 4px;
 }
@@ -137,11 +137,11 @@
 
 .remote-branch-item:hover {
   background-color: #2d2d2d;
-  border-color: #3d3d3d;
+  border-color: var(--border-color);
 }
 
 .remote-branch-item.selected {
-  background-color: #264f78;
+  background-color: var(--accent-color);
   border: 1px solid #4ec9b0;
   border-left: 3px solid #4ec9b0;
 }
@@ -153,28 +153,28 @@
 
 .remote-branch-name {
   flex: 1;
-  color: #cccccc;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .loading-branches {
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
   padding: 8px 12px;
   font-size: 12px;
 }
 
 .branches-placeholder {
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
   padding: 8px 12px;
   font-size: 12px;
 }
 
 .no-branches {
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
   padding: 8px 12px;
   font-size: 12px;
@@ -186,7 +186,7 @@
 }
 
 .folder-toggle {
-  color: #888888;
+  color: var(--text-secondary);
   font-size: 10px;
   margin-left: auto;
 }
@@ -213,13 +213,13 @@
 }
 
 .add-button:active {
-  background-color: #3d3d3d;
+  background-color: var(--border-color);
 }
 
 .remote-action-button {
   background: none;
   border: none;
-  color: #cccccc;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 2px 6px;
   font-size: 12px;
@@ -239,13 +239,13 @@
 }
 
 .remote-action-button:active {
-  background-color: #3d3d3d;
+  background-color: var(--border-color);
 }
 
 .remote-action-menu {
   position: fixed;
   background-color: #2d2d2d;
-  border: 1px solid #3d3d3d;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 1001;
@@ -259,18 +259,18 @@
   background: none;
   text-align: left;
   width: 100%;
-  color: #cccccc;
+  color: var(--text-primary);
   font-size: 13px;
   transition: background-color 0.2s;
 }
 
 .remote-action-menu-item:hover {
-  background-color: #3d3d3d;
+  background-color: var(--border-color);
   color: #ffffff;
 }
 
 .remote-action-menu-item-separator {
   height: 1px;
-  background-color: #3d3d3d;
+  background-color: var(--border-color);
   margin: 4px 0;
 }

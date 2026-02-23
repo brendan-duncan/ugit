@@ -6,6 +6,7 @@ import { SettingsDialog } from './components/SettingsDialog';
 import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
+import { useSettings } from './hooks/useSettings';
 import { ipcRenderer } from 'electron';
 import fs from 'fs';
 import './App.css';
@@ -43,6 +44,17 @@ function App(): React.ReactElement {
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const { showAlert } = useAlert();
+  const { settings, getSetting } = useSettings();
+
+  // Apply theme class based on setting
+  useEffect(() => {
+    const theme = settings?.theme || 'dark';
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+  }, [settings?.theme]);
 
   // Load recent repos and auto-open on startup
   useEffect(() => {

@@ -5,6 +5,7 @@ export interface AppSettings {
   pushAllTags: boolean;
   maxCommits: number;
   externalEditor: string;
+  theme: 'dark' | 'light';
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -13,7 +14,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   diffViewMode: 'line-by-line',
   pushAllTags: false,
   maxCommits: 100,
-  externalEditor: 'code'
+  externalEditor: 'code',
+  theme: 'dark'
 };
 
 /**
@@ -142,7 +144,8 @@ export class SettingsManager {
        data.diffViewMode === 'line-by-line') &&
       (data.pushAllTags === undefined || typeof data.pushAllTags === 'boolean') &&
       (data.maxCommits === undefined || typeof data.maxCommits === 'number') &&
-      (data.externalEditor === undefined || typeof data.externalEditor === 'string')
+      (data.externalEditor === undefined || typeof data.externalEditor === 'string') &&
+      (data.theme === undefined || data.theme === 'dark' || data.theme === 'light')
     );
   }
 
