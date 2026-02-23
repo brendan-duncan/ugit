@@ -1,6 +1,6 @@
 .content-viewer {
   height: 100%;
-  background-color: #1e1e1e;
+  background-color: var(--bg-primary);
 }
 
 .content-viewer-empty {
@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -17,6 +17,6 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
 }
