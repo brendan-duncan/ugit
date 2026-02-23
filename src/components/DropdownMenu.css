@@ -35,19 +35,20 @@
 
 .dropdown-item {
   padding: 8px 12px;
-  color: #cccccc;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.9rem;
   transition: background-color 0.2s;
 }
 
 .dropdown-item:hover:not(.disabled) {
+  font-style: italic;
   background-color: var(--bg-tertiary);
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .dropdown-item.disabled {
-  color: #666666;
+  color: var(--text-tertiary);
   cursor: default;
 }
 
@@ -70,7 +71,7 @@
 .dropdown-submenu-arrow {
   font-size: 0.7rem;
   margin-left: 8px;
-  color: #888888;
+  color: var(--text-tertiary);
 }
 
 .dropdown-submenu-content {
