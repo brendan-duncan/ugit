@@ -80,7 +80,7 @@
 }
 
 .remote-header:hover {
-  background-color: #c9c9c9;
+  filter: brightness(150%);
   border-color: var(--border-color);
 }
 
@@ -136,7 +136,7 @@
 }
 
 .remote-branch-item:hover {
-  filter: brightness(75%);
+  filter: brightness(150%);
   border-color: var(--border-color);
 }
 
@@ -147,7 +147,7 @@
 }
 
 .remote-branch-icon {
-  color: #4ec9b0;
+  color: var(--accent-color);
   font-size: 12px;
 }
 
@@ -157,6 +157,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.remote-branch-item.selected .remote-branch-name {
+  color: var(--text-selected);
 }
 
 .loading-branches {
@@ -208,7 +212,7 @@
 }
 
 .add-button:hover {
-  background-color: #2d2d2d;
+  filter: brightness(150%);
   color: #5ed9c3;
 }
 

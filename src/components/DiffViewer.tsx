@@ -210,11 +210,12 @@ interface DiffViewerProps {
   file: FileDiff;
   gitAdapter: GitAdapter;
   isStaged: boolean;
+  showChunkControls?: boolean;
   onRefresh?: () => Promise<void>;
   onError?: (error: string) => void;
 }
 
-function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffViewerProps): React.ReactElement {
+function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRefresh, onError }: DiffViewerProps): React.ReactElement {
   const { showAlert, showConfirm } = useAlert();
   const { settings, getSetting } = useSettings();
   const [diff, setDiff] = useState<string>('');
@@ -672,43 +673,45 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
         <div className="diff-viewer-header-path">
           <span className="diff-viewer-file-icon">📄</span>
           <span className="diff-viewer-file-path">{file.path}</span>
-          <div className="diff-viewer-file-menu" ref={fileMenuRef}>
-            <button
-              className="diff-viewer-file-menu-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setFileMenuOpen(!fileMenuOpen);
-              }}
-              title="File actions"
-            >
-              ...
-            </button>
-            {fileMenuOpen && (
-              <div className="diff-viewer-file-menu-dropdown">
-                {!isStaged ? (
-                  <>
-                    <button className="diff-viewer-file-menu-item" onClick={handleStageFile}>
-                      Stage
-                    </button>
-                    <div className="diff-viewer-file-menu-separator" />
-                    <button className="diff-viewer-file-menu-item" onClick={handleDiscardFile}>
-                      Discard
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button className="diff-viewer-file-menu-item" onClick={handleUnstageFile}>
-                      Unstage
-                    </button>
-                    <div className="diff-viewer-file-menu-separator" />
-                    <button className="diff-viewer-file-menu-item" onClick={handleDiscardFile}>
-                      Unstage and Discard
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          {showChunkControls && (
+            <div className="diff-viewer-file-menu" ref={fileMenuRef}>
+              <button
+                className="diff-viewer-file-menu-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFileMenuOpen(!fileMenuOpen);
+                }}
+                title="File actions"
+              >
+                ...
+              </button>
+              {fileMenuOpen && (
+                <div className="diff-viewer-file-menu-dropdown">
+                  {!isStaged ? (
+                    <>
+                      <button className="diff-viewer-file-menu-item" onClick={handleStageFile}>
+                        Stage
+                      </button>
+                      <div className="diff-viewer-file-menu-separator" />
+                      <button className="diff-viewer-file-menu-item" onClick={handleDiscardFile}>
+                        Discard
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="diff-viewer-file-menu-item" onClick={handleUnstageFile}>
+                        Unstage
+                      </button>
+                      <div className="diff-viewer-file-menu-separator" />
+                      <button className="diff-viewer-file-menu-item" onClick={handleDiscardFile}>
+                        Unstage and Discard
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="diff-viewer-header-right">
           <span 
@@ -946,7 +949,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
               className="diff2html-container"
               dangerouslySetInnerHTML={{ __html: diffHtml }}
             />
-            {hoveredChunkIndex !== null && buttonPosition && (
+            {showChunkControls &&hoveredChunkIndex !== null && buttonPosition && (
               <div
                 className="chunk-overlay-buttons"
                 style={{

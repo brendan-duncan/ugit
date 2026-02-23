@@ -81,7 +81,7 @@
 }
 
 .tree-node-content:hover {
-  background-color: #2d2d2d;
+  background-color: var(--bg-tertiary);
 }
 
 .tree-node-content.current {
