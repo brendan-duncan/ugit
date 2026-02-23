@@ -40,7 +40,7 @@
   --text-selected: #fff;
   --text-highlight: #000000;
   --accent-color: #0078d4;
-  --accent-hover: #106ebe;
+  --accent-hover: rgb(23, 130, 224);
   --danger-color: #d32f2f;
   --success-color: #2e7d32;
   --warning-color: #f57c00;

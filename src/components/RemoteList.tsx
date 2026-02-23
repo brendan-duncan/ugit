@@ -4,7 +4,9 @@ import RemoteBranchContextMenu from './RemoteBranchContextMenu';
 import AddRemoteDialog from './AddRemoteDialog';
 import EditRemoteDialog from './EditRemoteDialog';
 import DeleteRemoteDialog from './DeleteRemoteDialog';
+import { convertGitSshToHttps } from '../utils/utils';
 import { SelectedItem, RemoteInfo } from './types';
+import { shell, clipboard } from 'electron';
 import './RemoteList.css';
 
 interface RemoteListProps {
@@ -336,12 +338,14 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
         break;
       case 'open':
         if (remote.url) {
-          window.open(remote.url, '_blank');
+          const httpsUrl = convertGitSshToHttps(remote.url);
+          shell.openExternal(httpsUrl);
         }
         break;
       case 'copy':
         if (remote.url) {
-          navigator.clipboard.writeText(remote.url);
+          const httpsUrl = convertGitSshToHttps(remote.url);
+          clipboard.writeText(httpsUrl);
         }
         break;
     }
