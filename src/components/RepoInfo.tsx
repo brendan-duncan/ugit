@@ -4,6 +4,7 @@ import EditOriginDialog from './EditOriginDialog';
 import GitAdapter from '../git/GitAdapter';
 import { useAlert } from '../contexts/AlertContext';
 import { useSettings } from '../hooks/useSettings';
+import { convertGitSshToHttps } from '../utils/utils';
 import { exec } from 'child_process';
 import { shell, clipboard, ipcRenderer } from 'electron';
 import './RepoInfo.css';
@@ -89,13 +90,6 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
         }
       });
     }
-  };
-
-  const convertGitSshToHttps = (sshUrl: string): string => {
-    return sshUrl
-      .replace(/^git@/, 'https://')  // Swap git@ for https://
-      .replace(/\.git$/, '')         // Remove trailing .git
-      .replace(/(?<!https):/, '/');  // Replace colon ONLY if not preceded by 'https'
   };
 
   const handleOpenRemoteUrl = () => {

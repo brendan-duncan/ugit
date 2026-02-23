@@ -87,7 +87,7 @@
 }
 
 .local-changes-item:hover {
-  filter: brightness(150%);
+  border: 1px solid var(--success-color);
 }
 
 .changes-icon {
@@ -102,15 +102,14 @@
   margin-left: 6px;
 }
 
-.local-changes-item:hover {
-  background-color: var(--border-color);
-  border-color: var(--accent-color);
-}
-
 .local-changes-item.selected {
   background-color: var(--accent-color);
   color: #ffffff;
   border-color: var(--accent-color);
+}
+
+.local-changes-item.selected:hover {
+  background-color: var(--accent-hover);
 }
 
 .cache-indicator {
