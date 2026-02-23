@@ -2,18 +2,18 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #1e1e1e;
+  background-color: var(--bg-primary);
   user-select: text;
 }
 
 .branch-view-header {
   padding: 16px;
-  background-color: #252526;
-  border-bottom: 1px solid #3d3d3d;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .branch-view-header h3 {
-  color: #ffffff;
+  color: var(--text-highlight);
   font-size: 1.1rem;
   margin: 0;
 }
@@ -35,7 +35,7 @@
 
 .branch-view-splitter {
   height: 8px;
-  background-color: #2d2d2d;
+  background-color: var(--bg-tertiary);
   cursor: ns-resize;
   display: flex;
   align-items: center;
@@ -45,13 +45,13 @@
 }
 
 .branch-view-splitter:hover {
-  background-color: #3d3d3d;
+  background-color: var(--border-color);
 }
 
 .branch-view-splitter-line {
   width: 100%;
   height: 1px;
-  background-color: #1e1e1e;
+  background-color: var(--bg-primary);
 }
 
 .branch-view-loading {
@@ -60,7 +60,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #cccccc;
+  color: var(--text-primary);
   font-size: 1rem;
 }
 

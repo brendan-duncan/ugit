@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #1e1e1e;
-  color: #cccccc;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .content {
@@ -23,10 +23,10 @@
 .welcome h1 {
   font-size: 2.5rem;
   margin-bottom: 1rem;
-  color: #ffffff;
+  color: var(--text-highlight);
 }
 
 .welcome p {
   font-size: 1.2rem;
-  color: #888888;
+  color: var(--text-secondary);
 }

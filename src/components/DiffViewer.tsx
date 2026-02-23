@@ -30,6 +30,8 @@ function isImageFile(filePath: string): boolean {
   return imageExtensions.test(filePath);
 }
 
+let _isLightMode = false; // Module-level variable to track light mode for Diff2Html
+
 // Helper function to get CodeMirror language extension based on file extension
 function getCodeMirrorLanguage(filePath: string): any[] {
   if (!filePath)
@@ -73,16 +75,16 @@ function getCodeMirrorLanguage(filePath: string): any[] {
   }
 }
 
-interface DiffHunk {
+interface DiffChunk {
   fileHeader: string;
   header: string;
   content: string;
   fullDiff: string;
 }
 
-function splitDiffIntoHunks(diff: string): DiffHunk[] {
+function splitDiffIntoChunks(diff: string): DiffChunk[] {
   const lines = diff.split('\n');
-  const hunks: DiffHunk[] = [];
+  const hunks: DiffChunk[] = [];
   
   // Find the file header lines (---, +++, etc.)
   let fileHeaderEndIndex = 0;
@@ -96,32 +98,32 @@ function splitDiffIntoHunks(diff: string): DiffHunk[] {
   const fileHeader = lines.slice(0, fileHeaderEndIndex).join('\n');
   
   // Split by @@ markers
-  let currentHunkStart = -1;
+  let currentChunkStart = -1;
   
   for (let i = fileHeaderEndIndex; i < lines.length; i++) {
     if (lines[i].startsWith('@@')) {
-      // If we were processing a previous hunk, save it
-      if (currentHunkStart !== -1) {
-        const hunkLines = lines.slice(currentHunkStart, i);
+      // If we were processing a previous chunk, save it
+      if (currentChunkStart !== -1) {
+        const chunkLines = lines.slice(currentChunkStart, i);
         hunks.push({
           fileHeader,
-          header: hunkLines[0],
-          content: hunkLines.slice(1).join('\n'),
-          fullDiff: fileHeader + '\n' + hunkLines.join('\n')
+          header: chunkLines[0],
+          content: chunkLines.slice(1).join('\n'),
+          fullDiff: fileHeader + '\n' + chunkLines.join('\n')
         });
       }
-      currentHunkStart = i;
+      currentChunkStart = i;
     }
   }
   
-  // Don't forget the last hunk
-  if (currentHunkStart !== -1) {
-    const hunkLines = lines.slice(currentHunkStart);
+  // Don't forget the last chunk
+  if (currentChunkStart !== -1) {
+    const chunkLines = lines.slice(currentChunkStart);
     hunks.push({
       fileHeader,
-      header: hunkLines[0],
-      content: hunkLines.slice(1).join('\n'),
-      fullDiff: fileHeader + '\n' + hunkLines.join('\n')
+      header: chunkLines[0],
+      content: chunkLines.slice(1).join('\n'),
+      fullDiff: fileHeader + '\n' + chunkLines.join('\n')
     });
   }
   
@@ -214,18 +216,19 @@ interface DiffViewerProps {
 
 function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffViewerProps): React.ReactElement {
   const { showAlert, showConfirm } = useAlert();
+  const { settings, getSetting } = useSettings();
   const [diff, setDiff] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [diffHtml, setDiffHtml] = useState<string>('');
   const [fileContent, setFileContent] = useState<string>('');
   const [fileType, setFileType] = useState<string>(''); // 'text' or 'image'
-  const [diffHunks, setDiffHunks] = useState<DiffHunk[]>([]);
+  const [diffChunks, setDiffChunks] = useState<DiffChunk[]>([]);
   const [hoveredChunkIndex, setHoveredChunkIndex] = useState<number | null>(null);
   const [buttonPosition, setButtonPosition] = useState<{ top: number; left: number } | null>(null);
-  const { getSetting } = useSettings();
   const [diffViewMode, setDiffViewMode] = useState<'side-by-side' | 'line-by-line'>(
     getSetting('diffViewMode') || 'line-by-line'
   );
+  const [isLightMode, setIsLightMode] = useState<boolean>(getSetting('theme') === 'light');
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [modifiedImageSrc, setModifiedImageSrc] = useState<string | null>(null);
   const [imageDiffMode, setImageDiffMode] = useState<'side-by-side' | 'swipe' | 'difference'>('side-by-side');
@@ -239,6 +242,13 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   const mergeToolDropdownRef = React.useRef<HTMLDivElement>(null);
   const settingsDropdownRef = React.useRef<HTMLDivElement>(null);
   const fileMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Apply theme class based on setting
+  useEffect(() => {
+    const theme = settings?.theme || 'dark';
+    setIsLightMode(theme === 'light');
+    _isLightMode = theme === 'light'; // Update module-level variable for Diff2Html
+  }, [settings?.theme]);
 
   // Listen for diff view mode changes from menu
   useEffect(() => {
@@ -314,10 +324,10 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   }, [diffHtml]);
 
   const handleDiscardChunk = async (chunkIndex: number) => {
-    if (chunkIndex < 0 || chunkIndex >= diffHunks.length)
+    if (chunkIndex < 0 || chunkIndex >= diffChunks.length)
       return;
 
-    const chunk = diffHunks[chunkIndex];
+    const chunk = diffChunks[chunkIndex];
     const confirmed = await showConfirm(
       `Are you sure you want to discard this chunk? This cannot be undone.`
     );
@@ -351,10 +361,10 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
   };
 
   const handleStageChunk = async (chunkIndex: number) => {
-    if (chunkIndex < 0 || chunkIndex >= diffHunks.length)
+    if (chunkIndex < 0 || chunkIndex >= diffChunks.length)
       return;
 
-    const chunk = diffHunks[chunkIndex];
+    const chunk = diffChunks[chunkIndex];
 
     try {
       const tempDir = os.tmpdir();
@@ -417,12 +427,14 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
     setFileMenuOpen(false);
     try {
       if (isStaged) {
-        await gitAdapter.checkout(['HEAD', '--', file.path]);
+        await gitAdapter.raw(['checkout', 'HEAD', '--', file.path]);
       } else {
-        await gitAdapter.checkout(['--', file.path]);
+        await gitAdapter.raw(['checkout', '--', file.path]);
       }
       console.log(`Discarded changes to: ${file.path}`);
-      if (onRefresh) await onRefresh();
+      if (onRefresh) {
+        await onRefresh();
+      }
       await loadContent();
     } catch (error: any) {
       console.error('Error discarding file:', error);
@@ -532,23 +544,27 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
         }
         setDiffHtml('');
       } else {
-        const hunks = splitDiffIntoHunks(diffResult);
-        setDiffHunks(hunks);
+        const chunks = splitDiffIntoChunks(diffResult);
+        setDiffChunks(chunks);
+
+        const colorScheme = _isLightMode
+          ? Diff2HtmlTypes.ColorSchemeType.LIGHT
+          : Diff2HtmlTypes.ColorSchemeType.DARK;
 
         let html = '<div class="diff2html-diff">';
-        hunks.forEach((hunk, index) => {
-          let hunkHtml = Diff2Html.html(hunk.fullDiff, {
+        chunks.forEach((chunk, index) => {
+          let chunkHtml = Diff2Html.html(chunk.fullDiff, {
             drawFileList: false,
             outputFormat: diffViewMode,
             matching: 'lines',
             diffStyle: 'word',
             renderNothingWhenEmpty: false,
-            colorScheme: Diff2HtmlTypes.ColorSchemeType.DARK
+            colorScheme: colorScheme
           });
           if (index > 0) {
-            hunkHtml = hunkHtml.replace('<div class="d2h-file-header">', `<div class="d2h-file-header" style="display: none;">`);
+            chunkHtml = chunkHtml.replace('<div class="d2h-file-header">', `<div class="d2h-file-header" style="display: none;">`);
           }
-          html += `<div class="diff-chunk-wrapper" data-chunk-index="${index}">${hunkHtml}</div>`;
+          html += `<div class="diff-chunk-wrapper" data-chunk-index="${index}">${chunkHtml}</div>`;
         });
         html += '</div>';
 
@@ -567,7 +583,7 @@ function DiffViewer({ file, gitAdapter, isStaged, onRefresh, onError }: DiffView
 
   useEffect(() => {
     loadContent();
-  }, [file, gitAdapter, isStaged, diffViewMode]);
+  }, [file, gitAdapter, isStaged, diffViewMode, isLightMode]);
 
   // Also reload when file status changes (e.g., after merge resolution)
   useEffect(() => {

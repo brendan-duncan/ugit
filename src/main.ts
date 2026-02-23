@@ -125,9 +125,9 @@ function createWindow(): void {
 }
 
 function createMenu(): void {
-  // Get current diff view mode
+  // Get current settings
   const settingsManager = getSettingsManager();
-  const currentDiffViewMode = settingsManager.getSetting('diffViewMode') || 'line-by-line';
+  const currentTheme = settingsManager.getSetting('theme') || 'dark';
 
   // Build recent repos submenu
   const recentSubmenu = recentRepos.length > 0
@@ -195,6 +195,34 @@ function createMenu(): void {
     {
       label: 'View',
       submenu: [
+        {
+          label: 'Color Mode',
+          submenu: [
+            {
+              label: 'Dark',
+              type: 'radio',
+              checked: currentTheme === 'dark',
+              click: () => {
+                settingsManager.updateSetting('theme', 'dark');
+                if (mainWindow) {
+                  mainWindow.reload();
+                }
+              }
+            },
+            {
+              label: 'Light',
+              type: 'radio',
+              checked: currentTheme === 'light',
+              click: () => {
+                settingsManager.updateSetting('theme', 'light');
+                if (mainWindow) {
+                  mainWindow.reload();
+                }
+              }
+            }
+          ]
+        },
+        { type: 'separator' },
         {
           label: 'Clear All Caches',
           click: () => {

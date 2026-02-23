@@ -101,7 +101,6 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   const handleOpenRemoteUrl = () => {
     if (originUrl) {
       const httpsUrl = convertGitSshToHttps(originUrl) + `/commits/${currentBranch}`;
-      console.log('!!!! OPEN', httpsUrl);
       shell.openExternal(httpsUrl);
     }
   };

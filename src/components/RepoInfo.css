@@ -1,7 +1,7 @@
 .repo-info {
   padding: 16px;
-  border-bottom: 1px solid #3d3d3d;
-  background-color: #272745;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
   user-select: auto;
 }
 
@@ -13,13 +13,13 @@
 }
 
 .repo-name {
-  color: #ffffff;
+  color: var(--text-highlight);
   font-size: 1.1rem;
   font-weight: 600;
 }
 
 .menu-button {
-  color: #cccccc;
+  color: var(--text-primary);
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
@@ -34,14 +34,13 @@
 }
 
 .menu-button:hover {
-  background-color: #2d2d2d;
-  color: #ffffff;
+  background-color: var(--border-color);
+  color: var(--text-highlight);
 }
 
 .repo-local {
-  color: #cccccc;
+  color: var(--text-primary);
   font-size: 0.9rem;
-  /*margin-bottom: 8px;*/
 }
 
 .repo-local strong {
@@ -49,9 +48,8 @@
 }
 
 .repo-origin {
-  color: #cccccc;
+  color: var(--text-primary);
   font-size: 0.9rem;
-  /*margin-bottom: 4px;*/
 }
 
 .repo-origin strong {
@@ -59,7 +57,7 @@
 }
 
 .repo-branch {
-  color: #cccccc;
+  color: var(--text-primary);
   font-size: 0.9rem;
   margin-bottom: 8px;
 }
@@ -77,14 +75,15 @@
   cursor: pointer;
   transition: all 0.2s;
   font-size: 0.9rem;
-  border: 1px solid #3d3d3d;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-weight: bold;
-  color: #fff;
+  color: var(--text-highlight);
+  background-color: var(--bg-tertiary);
 }
 
 .changes-icon {
@@ -94,31 +93,31 @@
 }
 
 .modified-count {
-  color: #f0f0f0;
+  color: var(--text-highlight);
   font-weight: bold;
   margin-left: 6px;
 }
 
 .local-changes-item:hover {
-  background-color: #2d2d2d;
-  border-color: #264f78;
+  background-color: var(--border-color);
+  border-color: var(--accent-color);
 }
 
 .local-changes-item.selected {
-  background-color: #264f78;
-  color: #f0f0f0;
-  border-color: #264f78;
+  background-color: var(--accent-color);
+  color: #ffffff;
+  border-color: var(--accent-color);
 }
 
 .cache-indicator {
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
   font-size: 0.85rem;
 }
 
 .context-menu {
-  background-color: #252526;
-  border: 1px solid #454545;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   min-width: 180px;
@@ -131,7 +130,7 @@
 
 .context-menu-item {
   padding: 6px 16px;
-  color: #cccccc;
+  color: var(--text-primary);
   cursor: pointer;
   user-select: none;
   transition: background-color 0.1s;
@@ -141,5 +140,6 @@
 }
 
 .context-menu-item:hover {
-  background-color: #2a2d2e;
+  background-color: var(--accent-color);
+  color: #ffffff;
 }
