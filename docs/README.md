@@ -158,6 +158,7 @@ UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It pro
 
 ### View Menu
 
+- **Color Mode** — Change the interface to the Dark or Light color mode
 - **Clear All Caches** — Delete all caches used for repository viewing
 - **Toggle Developmer Tools** — Show/hide the developer tools window
 
