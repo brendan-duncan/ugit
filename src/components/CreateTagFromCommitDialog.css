@@ -1,8 +1,8 @@
 .dialog-textarea {
   width: 100%;
-  background-color: #3c3c3c;
+  background-color: var(--bg-secondary);
   border: 1px solid #5d5d5d;
-  color: #cccccc;
+  color: var(--text-secondary);
   padding: 8px 12px;
   border-radius: 3px;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
