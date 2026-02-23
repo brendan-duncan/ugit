@@ -157,7 +157,7 @@
   padding: 8px 16px;
   background-color: var(--border-color);
   border: 1px solid #4ec9b0;
-  color: #cccccc;
+  color: var(--text-primary);
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
