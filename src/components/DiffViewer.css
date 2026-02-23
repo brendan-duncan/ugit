@@ -114,23 +114,6 @@
   visibility: visible;
 }
 
-.diff-viewer-file-menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  color: #cccccc;
-  font-size: 13px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.diff-viewer-file-menu-item:hover {
-  background-color: #094771;
-}
-
 .diff-viewer-file-menu-separator {
   height: 1px;
   background-color: var(--border-color);
