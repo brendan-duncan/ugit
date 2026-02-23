@@ -77,7 +77,7 @@ function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, com
           </div>
           <div className="commit-info">
             <div className="commit-hash">{commitHash}</div>
-            <div className="commit-message">{commitMessage}</div>
+            <div className="create-branch-commit-message">{commitMessage}</div>
           </div>
 
           <div className="dialog-field">

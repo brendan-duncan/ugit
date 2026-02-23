@@ -15,6 +15,11 @@
   --scrollbar-track: #1e1e1e;
   --scrollbar-thumb: #3d3d3d;
   --scrollbar-thumb-hover: #4d4d4d;
+
+  --current-branch-bg: #425042;
+  --current-branch-color: #cccccc;
+
+  --commit-info-label-color: #4ec9b0;
 }
 
 .light-theme {
@@ -33,6 +38,11 @@
   --scrollbar-track: #f3f3f3;
   --scrollbar-thumb: #c1c1c1;
   --scrollbar-thumb-hover: #a8a8a8;
+
+  --current-branch-bg: #2e7d32;
+  --current-branch-color: #fff;
+
+  --commit-info-label-color: #2e7c6c;
 }
 
 * {

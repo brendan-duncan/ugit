@@ -86,6 +86,10 @@
   background-color: var(--bg-tertiary);
 }
 
+.local-changes-item:hover {
+  filter: brightness(150%);
+}
+
 .changes-icon {
   font-size: 16px;
   line-height: 16px;

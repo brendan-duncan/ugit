@@ -136,7 +136,7 @@
 }
 
 .remote-branch-item:hover {
-  background-color: #2d2d2d;
+  filter: brightness(75%);
   border-color: var(--border-color);
 }
 
