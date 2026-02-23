@@ -1,4 +1,4 @@
-.dialog-overlay {
+/*.dialog-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -133,15 +133,15 @@
   border: 1px solid #4ec9b0;
 }
 
-.dialog-button-primary:hover:not(:disabled) {
+.clone-dialog-button-primary:hover:not(:disabled) {
   background-color: #5fd9c0;
 }
 
-.dialog-button-primary:active:not(:disabled) {
+.clone-dialog-button-primary:active:not(:disabled) {
   background-color: #3eb9a0;
-}
+}*/
 
-.dialog-button-browse {
+.clone-dialog-button-browse {
   background-color: #3d3d3d;
   color: #cccccc;
   border: 1px solid #3d3d3d;
@@ -149,6 +149,6 @@
   min-width: 80px;
 }
 
-.dialog-button-browse:hover:not(:disabled) {
+.clone-dialog-button-browse:hover:not(:disabled) {
   background-color: #4d4d4d;
 }
