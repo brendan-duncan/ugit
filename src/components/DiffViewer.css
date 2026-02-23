@@ -618,12 +618,12 @@
 }
 
 .diff-conflict-source:hover {
-  background-color: #363636;
+  background-color: var(--bg-tertiary);
 }
 
 .diff-conflict-source.selected {
   border-color: #0e639c;
-  background-color: #1a3a52;
+  background-color: var(--bg-secondary);
 }
 
 .diff-conflict-source-icon {

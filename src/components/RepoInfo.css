@@ -44,7 +44,7 @@
 }
 
 .repo-local strong {
-  color: #26e1da;
+  color: var(--repo-info-local-color);
 }
 
 .repo-origin {
@@ -53,7 +53,7 @@
 }
 
 .repo-origin strong {
-  color: #48dd2f;
+  color: var(--repo-info-origin-color);
 }
 
 .repo-branch {
@@ -63,7 +63,7 @@
 }
 
 .repo-branch strong {
-  color: #ffab40;
+  color: var(--repo-info-branch-color);
 }
 
 .local-changes-section {

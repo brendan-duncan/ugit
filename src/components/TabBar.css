@@ -59,12 +59,12 @@
 }
 
 .tab-close:hover {
-  color: #ffffff;
+  color: var(--text-highlight);
 }
 
 .version-info {
   margin-left: auto;
   padding: 8px 12px;
-  color: #aaa;
+  color: var(--text-primary);
   font-size: 12px;
 }

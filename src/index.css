@@ -7,6 +7,7 @@
   --text-primary: #cccccc;
   --text-secondary: #888888;
   --text-highlight: #ffffff;
+  --text-selected: #fff;
   --accent-color: #0078d4;
   --accent-hover: #106ebe;
   --danger-color: #f14c4c;
@@ -20,9 +21,13 @@
   --splitter-line: #1e1e1e;
 
   --current-branch-bg: #425042;
-  --current-branch-color: #cccccc;
+  --current-branch-color: #fff;
 
   --commit-info-label-color: #4ec9b0;
+
+  --repo-info-local-color: #26e1da;
+  --repo-info-origin-color: #48dd2f;
+  --repo-info-branch-color: #ffab40;
 }
 
 .light-theme {
@@ -32,6 +37,7 @@
   --border-color: #d4d4d4;
   --text-primary: #333333;
   --text-secondary: #666666;
+  --text-selected: #fff;
   --text-highlight: #000000;
   --accent-color: #0078d4;
   --accent-hover: #106ebe;
@@ -49,6 +55,9 @@
   --current-branch-color: #fff;
 
   --commit-info-label-color: #2e7c6c;
+  --repo-info-local-color: #1e79a4;
+  --repo-info-origin-color: #34a521;
+  --repo-info-branch-color: #c4822b;
 }
 
 * {

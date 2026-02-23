@@ -79,7 +79,7 @@
   display: flex;
   gap: 12px;
   padding: 4px 8px;
-  background-color: #252526;
+  background-color: var(--bg-tertiary);
   border-radius: 3px;
   align-items: center;
   cursor: pointer;
@@ -88,11 +88,11 @@
 }
 
 .commit-file-item:hover {
-  background-color: #2d2d2d;
+  filter: brightness(1.1);
 }
 
 .commit-file-item.expanded {
-  background-color: #2a2a2a;
+  background-color: var(--bg-secondary);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }

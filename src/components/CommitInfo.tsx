@@ -141,6 +141,7 @@ function CommitInfo({ commit, files, loadingFiles = false, gitAdapter }: CommitI
                               file={{ path: file.path, diff, status: file.status }}
                               gitAdapter={gitAdapter}
                               isStaged={false}
+                              showChunkControls={false}
                             />
                           </div>
                         ) : (
