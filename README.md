@@ -6,11 +6,14 @@
 
 UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It provides a visual interface for managing Git repositories, handling common Git operations like staging, committing, branching, and syncing with remotes.
 
+### [Install](https://github.com/brendan-duncan/ugit/releases/latest)
+### [Documentation](https://brendan-duncan.github.io/ugit)
+
+----
+
 <a href="docs/images/ugit.png">
 <img src="docs/images/ugit.png" style="width:800px; display:block; margin: 0 auto;">
 </a>
-
-## [Documentation](https://brendan-duncan.github.io/ugit)
 
 ## Building From Source
 
