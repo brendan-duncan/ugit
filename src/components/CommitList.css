@@ -142,7 +142,7 @@
 }
 
 .commit-item.not-on-origin.selected .commit-message {
-  color: #ffffff;
+  color: var(--text-secondary);
 }
 
 /* Context Menu Styles */
