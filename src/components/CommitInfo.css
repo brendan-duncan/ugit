@@ -38,14 +38,14 @@
 }
 
 .commit-info-label {
-  color: #4ec9b0;
+  color: var(--commit-info-label-color);
   font-weight: 500;
   min-width: 80px;
   flex-shrink: 0;
 }
 
 .commit-info-value {
-  color: #cccccc;
+  color: var(--text-primary);
   word-break: break-word;
 }
 
