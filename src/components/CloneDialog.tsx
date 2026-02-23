@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ipcRenderer } from 'electron';
-import './CloneDialog.css';
+import './Dialog.css';
 
 const PARENT_FOLDER_KEY = 'ugit-clone-parent-folder';
 
