@@ -56,7 +56,8 @@
 .commit-body {
   margin: 0;
   padding: 8px;
-  background-color: #252526;
+  /*background-color: #252526;*/
+  background-color: var(--bg-secondary);
   border-radius: 3px;
   border-left: 3px solid #4ec9b0;
   white-space: pre-wrap;

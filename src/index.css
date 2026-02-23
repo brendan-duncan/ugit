@@ -16,6 +16,9 @@
   --scrollbar-thumb: #3d3d3d;
   --scrollbar-thumb-hover: #4d4d4d;
 
+  --splitter-color: #2d2d2d;
+  --splitter-line: #1e1e1e;
+
   --current-branch-bg: #425042;
   --current-branch-color: #cccccc;
 
@@ -38,6 +41,9 @@
   --scrollbar-track: #f3f3f3;
   --scrollbar-thumb: #c1c1c1;
   --scrollbar-thumb-hover: #a8a8a8;
+
+  --splitter-color: #eee;
+  --splitter-line: #d5d5d5;
 
   --current-branch-bg: #2e7d32;
   --current-branch-color: #fff;
