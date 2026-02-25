@@ -67,6 +67,20 @@ function LocalChangesDialog({ onClose, onProceed, targetBranch }: LocalChangesDi
               <input
                 type="radio"
                 name="local-changes-option"
+                value="branch-stash"
+                checked={selectedOption === 'branch-stash'}
+                onChange={(e) => handleOptionChange(e.target.value)}
+                className="dialog-radio"
+              />
+              <span>Branch Stash - Store changes in a branch-specific stash and auto-reapply when returning</span>
+            </label>
+          </div>
+
+          <div className="dialog-field">
+            <label className="dialog-radio-label">
+              <input
+                type="radio"
+                name="local-changes-option"
                 value="stash-and-reapply"
                 checked={selectedOption === 'stash-and-reapply'}
                 onChange={(e) => handleOptionChange(e.target.value)}
