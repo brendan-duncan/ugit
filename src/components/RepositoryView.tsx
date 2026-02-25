@@ -935,6 +935,50 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       await git.checkoutBranch(branchName);
       console.log('Branch switch completed successfully');
 
+      // Check if there's a branch stash for this branch
+      const branchStashMessage = `branch-stash-${branchName}`;
+      try {
+        const stashList = await git.stashList();
+        const branchStash = stashList.all.find((stash, index) => {
+          const match = stash.message.includes(branchStashMessage);
+          if (match) {
+            stash.index = index; // Store the index for later use
+          }
+          return match;
+        });
+
+        if (branchStash) {
+          console.log(`Found branch stash for ${branchName}, applying it...`);
+          setBusyMessage(`Applying branch stash`);
+
+          // Apply the stash
+          await git.raw(['stash', 'apply', `stash@{${branchStash.index}}`]);
+          console.log('Branch stash applied successfully');
+
+          // Delete the stash after successful application
+          try {
+            await git.raw(['stash', 'drop', `stash@{${branchStash.index}}`]);
+            console.log('Branch stash removed successfully');
+
+            // Refresh stash list after dropping
+            const updatedStashList = await git.stashList();
+            setStashes(updatedStashList.all);
+          } catch (dropError) {
+            console.warn('Failed to remove branch stash after successful apply:', dropError.message);
+          }
+
+          // Refresh file status after applying stash
+          await refreshFileStatus(false);
+        } else {
+          // No branch stash found, still need to refresh stash list in case one was created earlier
+          const updatedStashList = await git.stashList();
+          setStashes(updatedStashList.all);
+        }
+      } catch (stashError) {
+        console.warn('Error checking/applying branch stash:', stashError.message);
+        // Don't fail the branch switch if stash operations fail
+      }
+
       // Refresh all data after branch switch
       //await loadRepoData(true);
     } catch (error) {
@@ -1031,6 +1075,22 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           }
 
           // Switch branches
+          await performBranchSwitch(branchName, true);
+          break;
+
+        case 'branch-stash':
+          // Create a branch-specific stash
+          const stashMessage = `branch-stash-${currentBranch}`;
+          console.log(`Creating branch stash: ${stashMessage}`);
+          setBusyMessage(`git stash push -m "${stashMessage}"`);
+          await git.stashPush(stashMessage);
+
+          // Refresh stash list
+          const updatedStashList = await git.stashList();
+          setStashes(updatedStashList.all);
+          console.log('Stash list after creating branch stash:', updatedStashList.all);
+
+          // Switch to the target branch
           await performBranchSwitch(branchName, true);
           break;
 

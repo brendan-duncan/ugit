@@ -12,16 +12,18 @@ interface TreeNodeProps {
   onBranchSelect: (branchName: string) => void;
   selectedItem: SelectedItem | null;
   onContextMenu: (e: React.MouseEvent, branchName: string) => void;
+  branchesWithStash: Set<string>;
 }
 
 function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
-      onBranchSelect, selectedItem, onContextMenu }: TreeNodeProps) {
+      onBranchSelect, selectedItem, onContextMenu, branchesWithStash }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
   const isCurrent = node.fullPath === currentBranch;
   const isPulling = node.fullPath === pullingBranch;
   const isSelected = selectedItem && selectedItem.type === 'branch' && selectedItem.branchName === node.fullPath;
   const status = branchStatus && branchStatus[node.fullPath];
+  const hasStash = branchesWithStash.has(node.fullPath);
 
   const handleToggle = () => {
     if (hasChildren) {
@@ -78,6 +80,12 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
 
         <span className="tree-node-name">{node.name}</span>
 
+        {!hasChildren && hasStash && (
+          <span className="tree-node-stash-icon" title="Branch has stashed changes">
+            📦
+          </span>
+        )}
+
         {!hasChildren && isPulling && (
           <span className="tree-node-pulling">
             <span className="pulling-spinner"></span>
@@ -114,12 +122,18 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
               onBranchSelect={onBranchSelect}
               selectedItem={selectedItem}
               onContextMenu={onContextMenu}
+              branchesWithStash={branchesWithStash}
             />
           ))}
         </div>
       )}
     </div>
   );
+}
+
+interface StashInfo {
+  message: string;
+  hash?: string;
 }
 
 interface BranchTreeProps {
@@ -133,12 +147,31 @@ interface BranchTreeProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onContextMenu?: (action: string, branchName: string, currentBranch: string) => void;
+  stashes: Array<StashInfo>;
 }
 
 function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem,
-      collapsed, onToggleCollapse, onContextMenu }: BranchTreeProps) {
+      collapsed, onToggleCollapse, onContextMenu, stashes }: BranchTreeProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Create a set of branches that have branch stashes
+  const branchesWithStash = new Set<string>();
+  if (stashes && stashes.length > 0) {
+    console.log('Processing stashes for branch icons:', stashes);
+    stashes.forEach(stash => {
+      // Extract branch name from stash message: "branch-stash-{branchName}"
+      // Git prepends "On {branch}: " or "WIP on {branch}: " to stash messages
+      const match = stash.message.match(/branch-stash-(.+?)(?:\s|$)/);
+      console.log(`Checking stash message: "${stash.message}", match:`, match);
+      if (match && match[1]) {
+        const branchName = match[1];
+        console.log(`Found branch stash for branch: ${branchName}`);
+        branchesWithStash.add(branchName);
+      }
+    });
+    console.log('Branches with stash:', Array.from(branchesWithStash));
+  }
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -275,6 +308,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               onBranchSelect={onBranchSelect}
               selectedItem={selectedItem}
               onContextMenu={handleContextMenu}
+              branchesWithStash={branchesWithStash}
             />
           ))}
         </div>

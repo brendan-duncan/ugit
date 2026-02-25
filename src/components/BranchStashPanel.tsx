@@ -46,6 +46,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           collapsed={branchesCollapsed}
           onToggleCollapse={() => setBranchesCollapsed(!branchesCollapsed)}
           onContextMenu={onBranchContextMenu}
+          stashes={stashes}
         />
       </div>
       {!branchesCollapsed && !remotesCollapsed && (
