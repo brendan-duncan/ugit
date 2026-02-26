@@ -3,7 +3,7 @@ import { DropdownMenu, DropdownItem, DropdownSeparator, DropdownSubmenu } from '
 import EditOriginDialog from './EditOriginDialog';
 import GitAdapter from '../git/GitAdapter';
 import { useAlert } from '../contexts/AlertContext';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings } from '../contexts/SettingsContext';
 import { convertGitSshToHttps } from '../utils/utils';
 import { exec } from 'child_process';
 import { shell, clipboard, ipcRenderer } from 'electron';

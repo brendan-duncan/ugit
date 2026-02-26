@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FileDiff } from './types';
 import { GitAdapter } from '../git/GitAdapter';
+import { useSettings } from '../contexts/SettingsContext';
+import { useAlert } from '../contexts/AlertContext';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -18,8 +20,7 @@ import os from 'os';
 import path from 'path';
 import 'diff2html/bundles/css/diff2html.min.css';
 import './DiffViewer.css';
-import { useSettings } from '../hooks/useSettings';
-import { useAlert } from '../contexts/AlertContext';
+
 import { ipcRenderer } from 'electron';
 
 // Helper function to check if file is an image
@@ -158,13 +159,17 @@ function DifferenceImageViewer({ originalSrc, modifiedSrc }: DifferenceImageView
       setDimensions({ width, height });
 
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) {
+        return;
+      }
 
       canvas.width = width;
       canvas.height = height;
 
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {
+        return;
+      }
 
       ctx.drawImage(originalImg, 0, 0);
       const originalData = ctx.getImageData(0, 0, width, height);

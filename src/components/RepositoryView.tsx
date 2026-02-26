@@ -27,7 +27,7 @@ import cacheManager from '../utils/cacheManager';
 import { GitAdapter, Commit, StashInfo, FileStatus } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo } from './types';
 import { ipcRenderer } from 'electron';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import './RepositoryView.css';
 

@@ -283,8 +283,8 @@
 
 .diff-file-content-display .cm-content {
   padding: 16px;
-  background: var(--bg-primary);
-  color: #cccccc;
+  /*background: var(--bg-primary);
+  color: #cccccc;*/
 }
 
 /* Ensure CodeMirror doesn't overflow in flex layout */
