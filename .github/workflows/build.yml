@@ -72,15 +72,16 @@ jobs:
       - name: Update release notes and publish
         run: |
           VERSION=${{ github.ref_name }}
+          VERSION_NUM=${VERSION#v}
           
           cat > /tmp/release-notes.md << EOF
           # $VERSION
           
           ## Downloads
           
-          - **Windows**: [ugit-Setup-$VERSION.exe](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-Setup-$VERSION.exe)
-          - **macOS**: [ugit-$VERSION.dmg](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION.dmg)
-          - **Linux**: [ugit-$VERSION.AppImage](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION.AppImage)
+          - **Windows**: [ugit-Setup-$VERSION.exe](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-Setup-$VERSION_NUM.exe)
+          - **macOS**: [ugit-$VERSION.dmg](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION_NUM.dmg)
+          - **Linux**: [ugit-$VERSION.AppImage](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION_NUM.AppImage)
           EOF
           
           gh release edit $VERSION --notes-file /tmp/release-notes.md --draft=false --latest
