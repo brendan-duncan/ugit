@@ -89,15 +89,15 @@
 }
 
 .tree-node-content.current:hover {
-  background-color: var(--accent-hover);
+  background-color: var(--bg-tertiary);
 }
 
 .tree-node-content.branch-selected {
-  background-color: var(--accent-color);
+  background-color: var(--accent-hover);
 }
 
 .tree-node-content.branch-selected:hover {
-  background-color: var(--accent-hover);
+  background-color: var(--bg-tertiary);
 }
 
 .tree-node-content.switchable {
@@ -189,7 +189,7 @@
 }
 
 .status-behind {
-  color: #f48771;
+  color: var(--current-branch-behind-color);
 }
 
 .loading {

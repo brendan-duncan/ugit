@@ -38,6 +38,7 @@
   padding: 2px 8px;
   border-radius: 3px;
   transition: background-color 0.1s;
+  font-weight: bold;
 }
 
 .header-menu-button:hover {
