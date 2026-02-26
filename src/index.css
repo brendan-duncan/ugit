@@ -22,6 +22,7 @@
 
   --current-branch-bg: #425042;
   --current-branch-color: #fff;
+  --current-branch-behind-color: #f48771;
 
   --commit-info-label-color: #4ec9b0;
 
@@ -51,8 +52,9 @@
   --splitter-color: #eee;
   --splitter-line: #d5d5d5;
 
-  --current-branch-bg: #2e7d32;
-  --current-branch-color: #fff;
+  --current-branch-bg: #cfe8d0;
+  --current-branch-color: #000;
+  --current-branch-behind-color: #ac5e4e;
 
   --commit-info-label-color: #2e7c6c;
   --repo-info-local-color: #1e79a4;
