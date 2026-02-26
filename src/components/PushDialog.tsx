@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './PushDialog.css';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface PushDialogProps {
   onClose: () => void;

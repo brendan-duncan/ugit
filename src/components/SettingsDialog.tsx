@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import './Dialog.css';
 import './SettingsDialog.css';

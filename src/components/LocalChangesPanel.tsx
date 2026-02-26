@@ -7,7 +7,7 @@ import StashConflictDialog from './StashConflictDialog';
 import { GitAdapter } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import { useAlert } from '../contexts/AlertContext';
-import { useSettings } from '../hooks/useSettings';
+import { useSettings } from '../contexts/SettingsContext';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
