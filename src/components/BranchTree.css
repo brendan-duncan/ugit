@@ -89,7 +89,7 @@
 }
 
 .tree-node-content.current:hover {
-  filter: brightness(150%);
+  background-color: var(--accent-hover);
 }
 
 .tree-node-content.branch-selected {

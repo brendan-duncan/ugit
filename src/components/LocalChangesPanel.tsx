@@ -149,8 +149,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
     }
   };
 
-  const handleSelectFile = (file: string, status: string) => {
-    setSelectedFile({ file, status });
+  const handleSelectFile = (file: FileInfo, listType: string) => {
+    setSelectedFile({ file, listType });
   };
 
   const handleCommit = async () => {
