@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import RepoInfo from './RepoInfo';
 import BranchStashPanel from './BranchStashPanel';
 import ErrorDialog from './ErrorDialog';
@@ -22,21 +22,14 @@ import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
 import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import AmendCommitDialog from './AmendCommitDialog';
 import PullRequestDialog from './PullRequestDialog';
-import GitFactory from '../git/GitFactory';
-import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit, StashInfo, FileStatus } from "../git/GitAdapter"
-import { RunningCommand, RemoteInfo, FileInfo } from './types';
-import { ipcRenderer } from 'electron';
+import { useGitAdapter, useRepositoryData } from '../hooks/useGit';
+import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
+import cacheManager from '../utils/cacheManager';
+import { GitAdapter, Commit } from "../git/GitAdapter"
+import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
-
-type BranchStatus = {
-  [branchName: string]: {
-    ahead: number;
-    behind: number;
-  };
-};
 
 interface RepositoryViewProps {
   repoPath: string;
@@ -45,651 +38,233 @@ interface RepositoryViewProps {
 
 function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
-  const [commandState, setCommandState] = useState<RunningCommand[]>([]);
-  const [branches, setBranches] = useState<string[]>([]);
-  const [currentBranch, setCurrentBranch] = useState<string>('');
-  const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
-  const [branchStatus, setBranchStatus] = useState<BranchStatus>({});
-  const [originUrl, setOriginUrl] = useState('');
-  const [stashes, setStashes] = useState<StashInfo[]>([]);
-  const [modifiedCount, setModifiedCount] = useState<number>(0);
-  const [unstagedFiles, setUnstagedFiles] = useState<FileInfo[]>([]);
-  const [stagedFiles, setStagedFiles] = useState<FileInfo[]>([]);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [lastContentPanel, setLastContentPanel] = useState(''); // Will be set based on current branch
-  const [loading, setLoading] = useState(false);
+  const { settings, getSetting } = useSettings();
+
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+  const [lastContentPanel, setLastContentPanel] = useState<string>('local-changes');
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  const [usingCache, setUsingCache] = useState<boolean>(false);
   const [branchesHeight, setBranchesHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(30);
-  const [showPullDialog, setShowPullDialog] = useState(false);
-  const [showPushDialog, setShowPushDialog] = useState<string|null>(null);
-  const [showStashDialog, setShowStashDialog] = useState(false);
-  const [showResetDialog, setShowResetDialog] = useState(false);
-  const [showCleanWorkingDirectoryDialog, setShowCleanWorkingDirectoryDialog] = useState(false);
-  const [showErrorDialog, setShowErrorDialog] = useState(false);
-  const [showLocalChangesDialog, setShowLocalChangesDialog] = useState(false);
-  const [pendingBranchSwitch, setPendingBranchSwitch] = useState(null);
-  const [pullingBranch, setPullingBranch] = useState(null);
-  const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
-  const [newBranchFrom, setNewBranchFrom] = useState<string | null>(null);
-  const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
-  const [branchToDelete, setBranchToDelete] = useState(null);
-  const [showRenameBranchDialog, setShowRenameBranchDialog] = useState(false);
-  const [branchToRename, setBranchToRename] = useState(null);
-  const [showMergeBranchDialog, setShowMergeBranchDialog] = useState(false);
-  const [mergeSourceBranch, setMergeSourceBranch] = useState(null);
-  const [showRebaseBranchDialog, setShowRebaseBranchDialog] = useState(false);
-  const [rebaseSourceBranch, setRebaseSourceBranch] = useState(null);
-  const [showApplyStashDialog, setShowApplyStashDialog] = useState(false);
-  const [stashToApply, setStashToApply] = useState(null);
-  const [showRenameStashDialog, setShowRenameStashDialog] = useState(false);
-  const [stashToRename, setStashToRename] = useState(null);
-  const [showDeleteStashDialog, setShowDeleteStashDialog] = useState(false);
-  const [stashToDelete, setStashToDelete] = useState(null);
-  const [showCreateBranchFromCommitDialog, setShowCreateBranchFromCommitDialog] = useState(false);
-  const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
-  const [showAmendCommitDialog, setShowAmendCommitDialog] = useState(false);
-  const [commitForDialog, setCommitForDialog] = useState(null);
-  const [showPullRequestDialog, setShowPullRequestDialog] = useState(false);
-  const [pullRequestUrl, setPullRequestUrl] = useState<string>('');
-  const [pullRequestBranch, setPullRequestBranch] = useState<string>('');
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [busyMessage, setBusyMessage] = useState<string>('');
-  const activeSplitter = useRef(null);
-  const gitAdapter = useRef<GitAdapter | null>(null);
-  const branchCommitsCache = useRef(new Map()); // Cache commits per branch
-  const { settings, getSetting, updateSetting } = useSettings();
+  const [error, setError] = useState<string | null>(null);
 
-  let runningCommands = null;
-
-  // Helper function to update branch commits cache
-  const updateBranchCache = (branchName: string, commits: Commit[]) => {
-    branchCommitsCache.current.set(branchName, commits);
-
-    // Persist to cache manager (merge with existing)
-    const cacheData = cacheManager.loadCache(repoPath) || {};
-    cacheData.branchCommits = {
-      ...cacheData.branchCommits,
-      [branchName]: commits
-    };
-    cacheManager.saveCache(repoPath, cacheData);
-  };
-
-  // Helper function to clear branch commits cache
-  const clearBranchCache = (branchName: string | null = null) => {
-    if (branchName) {
-      branchCommitsCache.current.delete(branchName);
-
-      // Remove from persistent cache
-      const cacheData = cacheManager.loadCache(repoPath) || {};
-      if (cacheData.branchCommits) {
-        delete cacheData.branchCommits[branchName];
-        cacheManager.saveCache(repoPath, cacheData);
-      }
-    } else {
-      branchCommitsCache.current.clear();
-
-      // Clear all from persistent cache
-      const cacheData = cacheManager.loadCache(repoPath) || {};
-      delete cacheData.branchCommits;
-      cacheManager.saveCache(repoPath, cacheData);
-    }
-  };
-
-  // Helper function to update onOrigin status for all cached commits
-  const updateCachedCommitsOriginStatus = async () => {
-    const git = gitAdapter.current;
-    if (!git)
-      return;
-
-    const cachedBranches = Array.from(branchCommitsCache.current.keys());
-    if (cachedBranches.length === 0)
-      return;
-
-    console.log(`Updating onOrigin status for ${cachedBranches.length} cached branches...`);
-
-    let totalCommitsChecked = 0;
-
-    // Update onOrigin status for each cached branch
-    for (const branchName of cachedBranches) {
-      try {
-        // Skip remote branches - they're always on origin
-        if (branchName.startsWith('origin/')) {
-          continue;
-        }
-
-        const commits = branchCommitsCache.current.get(branchName);
-        if (!commits || commits.length === 0) {
-          continue;
-        }
-
-        // Only check commits where onOrigin is currently false
-        // Commits already on origin will remain on origin
-        const commitsToCheck = commits.filter(commit => commit.onOrigin === false);
-
-        if (commitsToCheck.length === 0) {
-          console.log(`Branch ${branchName}: All commits already on origin, skipping`);
-          continue;
-        }
-
-        console.log(`Branch ${branchName}: Checking ${commitsToCheck.length} commits not yet on origin`);
-
-        // Check onOrigin status for commits that aren't on origin yet
-        for (const commit of commitsToCheck) {
-          try {
-            const unpushedCommits = await git.raw(['branch', '-r', `--contains`, `${commit.hash}`]);
-            commit.onOrigin = unpushedCommits.trim().length !== 0;
-            totalCommitsChecked++;
-          } catch (error) {
-            // If remote branch doesn't exist, commit is not on origin
-            commit.onOrigin = false;
-          }
-        }
-
-        // Update cache with new onOrigin values
-        updateBranchCache(branchName, commits);
-      } catch (error) {
-        console.warn(`Failed to update onOrigin status for branch ${branchName}:`, error);
-      }
-    }
-
-    console.log(`Finished updating onOrigin status for cached branches (checked ${totalCommitsChecked} commits)`);
-  };
-
-  // Helper function to load branch commits from persistent cache
-  const loadBranchCommitsFromCache = () => {
-    const cacheData = cacheManager.loadCache(repoPath);
-    if (cacheData && cacheData.branchCommits) {
-      // Load into memory cache
-      Object.entries(cacheData.branchCommits).forEach(([branchName, commits]) => {
-        branchCommitsCache.current.set(branchName, commits);
-      });
-      return cacheData.branchCommits;
-    }
-    return {};
-  };
-
-  const cacheInitialized = useRef(false);
+  const activeSplitter = useRef<number | string | null>(null);
   const currentBranchLoadId = useRef(0);
 
-  const getFileStatusType = (fileStatus: FileStatus) => {
-    const code = fileStatus.index || fileStatus.working_dir;
-    switch (code) {
-      case ' ': return 'unmodified';
-      case 'M': return 'modified';
-      case 'A': return 'created';
-      case 'D': return 'deleted';
-      case 'R': return 'renamed';
-      case '?': return 'created';
-      case 'U': return 'conflict';
-      case 'AA': return 'conflict';
-      case 'DD': return 'conflict';
-      case 'UU': return 'conflict';
-      case 'AU': return 'conflict';
-      case 'UA': return 'conflict';
-      case 'DU': return 'conflict';
-      case 'UD': return 'conflict';
-      default: return 'modified';
-    }
-  };
-
-  // Initialize git adapter and load repository data
-  useEffect(() => {
-    const initRepository = async () => {
-      if (!gitAdapter.current) {
-        const backend = await ipcRenderer.invoke('get-git-backend');
-        gitAdapter.current = await GitFactory.createAdapter(repoPath, backend);
-        // Wait for adapter to be fully initialized before loading data
-        if (gitAdapter.current) {
-          await gitAdapter.current.open();
-        }
-
-        gitAdapter.current.commandStateCallback = (isStarting, id, command, time) => {
-          setCommandState(prev => {
-            const newState = isStarting
-              ? [...prev, { id, command, time }]
-              : prev.filter(cmd => cmd.id !== id);
-            runningCommands = newState;
-            return newState;
-          });
-        };
-      }
-
-      // Initialize cache manager with user data path
-      const initCache = async () => {
-        if (!cacheInitialized.current) {
-          const userDataPath = await ipcRenderer.invoke('get-user-data-path');
-          cacheManager.setCacheDir(userDataPath);
-          cacheInitialized.current = true;
-
-          // Initialize branch commits cache from persistent cache
-          loadBranchCommitsFromCache();
-
-          // Load repository data after adapter is ready
-          loadRepoData(false);
-        }
-      };
-      initCache();
-    };
-
-    initRepository();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repoPath]); // Load repo when path changes
-
-
-  // Add event listener for branch status refresh
-  useEffect(() => {
-    const handleBranchStatusRefresh = () => {
-      refreshBranchStatus();
-    };
-    window.addEventListener('refresh-branch-status', handleBranchStatusRefresh);
-
-    // Cleanup event listener on unmount
-    return () => {
-      window.removeEventListener('refresh-branch-status', handleBranchStatusRefresh);
-    };
+  const handleGitError = useCallback((err: Error) => {
+    setError(err.message);
   }, []);
 
-  const loadRepoData = async (isRefresh = false) => {
-    if (loading || refreshing) {
-      return;
-    }
+  const {
+    gitAdapter,
+    isLoading: gitLoading,
+    error: gitError,
+    commandState,
+    refresh: refreshGit
+  } = useGitAdapter({ repoPath, onError: handleGitError });
 
-    const cacheLoadTime = performance.now();
+  const {
+    currentBranch,
+    setCurrentBranch,
+    originUrl,
+    setOriginUrl,
+    unstagedFiles,
+    setUnstagedFiles,
+    stagedFiles,
+    setStagedFiles,
+    modifiedCount,
+    setModifiedCount,
+    branches,
+    remotes,
+    branchStatus,
+    stashes,
+    loading: repoLoading,
+    usingCache,
+    error: repoError,
+    setError: setRepoError,
+    branchCommitsCache,
+    loadRepoData,
+    updateBranchCache,
+    clearBranchCache,
+    getFileStatusType
+  } = useRepositoryData(repoPath, gitAdapter);
 
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+  const {
+    dialogStates,
+    pendingState,
+    showPullDialog,
+    hidePullDialog,
+    showPushDialog,
+    hidePushDialog,
+    showStashDialog,
+    hideStashDialog,
+    showResetDialog,
+    hideResetDialog,
+    showCleanWorkingDirectoryDialog,
+    hideCleanWorkingDirectoryDialog,
+    showErrorDialog,
+    hideErrorDialog,
+    showLocalChangesDialog,
+    hideLocalChangesDialog,
+    showCreateBranchDialog,
+    hideCreateBranchDialog,
+    showDeleteBranchDialog,
+    hideDeleteBranchDialog,
+    showRenameBranchDialog,
+    hideRenameBranchDialog,
+    showMergeBranchDialog,
+    hideMergeBranchDialog,
+    showRebaseBranchDialog,
+    hideRebaseBranchDialog,
+    showApplyStashDialog,
+    hideApplyStashDialog,
+    showRenameStashDialog,
+    hideRenameStashDialog,
+    showDeleteStashDialog,
+    hideDeleteStashDialog,
+    showCreateBranchFromCommitDialog,
+    hideCreateBranchFromCommitDialog,
+    showCreateTagFromCommitDialog,
+    hideCreateTagFromCommitDialog,
+    showAmendCommitDialog,
+    hideAmendCommitDialog,
+    showPullRequestDialog,
+    hidePullRequestDialog,
+  } = useRepositoryViewDialogs();
 
-    try {
-      // Wait for cache to be initialized
-      while (!cacheInitialized.current) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-
-      // Load from cache first on initial load
-      if (!isRefresh) {
-        const cachedData = cacheManager.loadCache(repoPath);
-        if (cachedData) {
-          // Apply cached data immediately
-          setCurrentBranch(cachedData.currentBranch || '');
-          setOriginUrl(cachedData.originUrl || '');
-          setUnstagedFiles(cachedData.unstagedFiles || []);
-          setStagedFiles(cachedData.stagedFiles || []);
-          setModifiedCount(cachedData.modifiedCount || 0);
-          setBranches(cachedData.branches || []);
-          setRemotes(cachedData.remotes || []);
-          setBranchStatus(cachedData.branchStatus || {});
-          setStashes(cachedData.stashes || []);
-          setUsingCache(true);
-
-          // Always select local changes
-          if (selectedItem == null) {
-            setLastContentPanel('local-changes');
-            setSelectedItem({ type: 'local-changes' });
-          }
-
-          setLoading(false);
-          console.log(`Loaded repository data from cache in ${(performance.now() - cacheLoadTime).toFixed(2)} ms`);
-          return;
-        }
-      }
-
-      setError(null);
-      setUsingCache(false);
-
-      // Ensure git adapter is available
-      if (!gitAdapter.current) {
-        console.error('Git adapter not available in loadRepoData');
-        return;
-      }
-
-      const git = gitAdapter.current;
-
-      // Don't clear branch cache on refresh - we'll update onOrigin status instead
-
-      // Get current branch and modified files
-      const status = await git.status();
-      setCurrentBranch(status.current);
-
-      // Get origin URL
-      const url = await git.getOriginUrl();
-      setOriginUrl(url);
-
-      // Parse files using status.files array for accurate staging info
-      const unstaged = [];
-      const staged = [];
-
-      status.files.forEach(file => {
-        // Check if file has unstaged changes (working_dir is not empty/space)
-        if (file.working_dir && file.working_dir !== ' ') {
-          unstaged.push({
-            path: file.path,
-            status: getFileStatusType(file)
-          });
-        } else if (file.index && file.index !== ' ' && file.index !== '?') {
-          // Check if file has staged changes (index is not empty/space)
-          staged.push({
-            path: file.path,
-            status: getFileStatusType(file)
-          });
-        }
-      });
-
-      setUnstagedFiles(unstaged);
-      setStagedFiles(staged);
-
-      // Count total modified files (unique paths)
-      const allPaths = new Set([...unstaged.map(f => f.path), ...staged.map(f => f.path)]);
-      setModifiedCount(allPaths.size);
-
-      // Get all local branches
-      const branchSummary = await git.branchLocal();
-      const branchNames = branchSummary.all;
-      setBranches(branchNames);
-
-      // Get remotes
-      let remotesList = null;
-      try {
-        const remotesOutput = await git.raw(['remote', '-v']);
-        remotesList = remotesOutput
-          .split('\n')
-          .filter(line => line.trim())
-          .map(line => {
-            const match = line.match(/^([^\s]+)\s+([^\s]+)(?:\s+\(fetch\))?$/);
-            return match ? { name: match[1], url: match[2] } : null;
-          })
-          .filter(Boolean);
-
-        setRemotes(remotesList);
-        console.log(`Loaded ${remotesList.length} remotes`);
-      } catch (error) {
-        console.warn('Failed to load remotes:', error);
-        setRemotes([]);
-        remotesList = [];
-      }
-
-      // Get ahead/behind status for each branch (parallel)
-      const statusPromises = branchNames.map(async (branchName) => {
-        // Check if branch has a remote tracking branch
-        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-
-        if (ahead > 0 || behind > 0) {
-          return { branchName, ahead, behind };
-        } else {
-          // Branch is in sync or isn't tracked, don't include in status
-          return null;
-        }
-      });
-
-      const statusResults = await Promise.all(statusPromises);
-      const statusMap: BranchStatus = {};
-      statusResults.forEach(result => {
-        if (result) {
-          statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
-        }
-      });
-      setBranchStatus(statusMap);
-
-      // Get stashes
-      const stashList = await git.stashList();
-      setStashes(stashList.all);
-
-      // Always select local changes
-      if (selectedItem == null) {
-        setLastContentPanel('local-changes');
-        setSelectedItem({ type: 'local-changes' });
-      }
-
-      // Save to cache (excluding lastContentPanel to avoid persistence)
-      const cacheData = {
-        currentBranch: status.current,
-        originUrl: url,
-        unstagedFiles: unstaged,
-        stagedFiles: staged,
-        modifiedCount: allPaths.size,
-        branches: branchNames,
-        remotes: remotesList,
-        branchStatus: statusMap,
-        stashes: stashList.all,
-        branchCommits: {}
-      };
-
-      // Include all branch commits from memory cache
-      const currentBranchCommits = {};
-      branchCommitsCache.current.forEach((commits, branchName) => {
-        currentBranchCommits[branchName] = commits;
-      });
-      cacheData.branchCommits = currentBranchCommits;
-
-      cacheManager.saveCache(repoPath, cacheData);
-
-      // Update onOrigin status for all cached branches after refresh
-      if (isRefresh) {
-        await updateCachedCommitsOriginStatus();
-      }
-
-      // If a branch view is currently open and this is a refresh, reload that branch
-      if (isRefresh && selectedItem) {
-        try {
-          if (selectedItem.type === 'branch' && selectedItem.branchName) {
-            console.log(`Refreshing branch view for: ${selectedItem.branchName}`);
-            await handleBranchSelect(selectedItem.branchName);
-          } else if (selectedItem.type === 'remote-branch' && selectedItem.fullName) {
-            console.log(`Refreshing remote branch view for: ${selectedItem.fullName}`);
-            await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
-          }
-        } catch (branchRefreshErr) {
-          console.error('Error refreshing branch view:', branchRefreshErr);
-          // Don't fail the entire refresh if branch refresh fails
-        }
-      }
-
-    } catch (err) {
-      console.error('Error loading repo data:', err);
-      setError(err.message);
-    }
-
-    if (isRefresh) {
-      setRefreshing(false);
-    } else {
-      setLoading(false);
-    }
-
-    console.log(`Finished loading repository data in ${(performance.now() - cacheLoadTime).toFixed(2)} ms`);
-  };
-
-  // Periodic background check for local changes
-  useEffect(() => {
-    // Don't start checking until initial load is complete or settings are not loaded
-    if (loading || !settings)
-      return;
-
-    let refreshFileStatusId = null;
-    // Only run if this tab is active
-    if (isActiveTab) {
-      // Get refresh time from settings, default to 5 seconds if not available
-      const refreshTime = getSetting('localFileRefreshTime') || 5;
-
-      refreshFileStatusId = setInterval(async () => {
-        await refreshFileStatus(true);
-      }, refreshTime * 1000);
-
-      refreshFileStatus(true);
-    }
-
-    // Clean up interval on unmount or when dependencies change
-    return () => {
-      if (refreshFileStatusId !== null) {
-        clearInterval(refreshFileStatusId);
-      }
-    };
-  }, [loading, isActiveTab, settings]); // Re-run if loading state, active tab, or settings change
-
+  const loading = gitLoading || repoLoading;
   
-  const refreshFileStatus = async (noLock: boolean) => {
-    // Ensure git adapter is available before attempting to use it
-    if (!gitAdapter.current || runningCommands?.length > 0) {
-      return;
-    }
+  const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
-    try {
-      const git = gitAdapter.current;
+  const setErrorWithDialog = useCallback((err: string) => {
+    setError(err);
+    showErrorDialog();
+  }, [showErrorDialog]);
 
-      // Get current branch and modified files
-      const status = await git.status(undefined, noLock, true);
-      setCurrentBranch(status.current);
+  const updateCachedCommitsOriginStatus = useCallback(async () => {
+    const git = gitAdapter;
+    if (!git) return;
 
-      // Update branch status if ahead/behind information is available
-      if (status.ahead !== undefined && status.behind !== undefined) {
-        if (status.ahead > 0 || status.behind > 0) {
-          setBranchStatus(prev => ({
-            ...prev,
-            [status.current]: { ahead: status.ahead, behind: status.behind }
-          }));
-        } else {
-          // Branch is in sync, remove from status
-          setBranchStatus(prev => {
-            const newStatus = { ...prev };
-            delete newStatus[status.current];
-            return newStatus;
-          });
+    const cachedBranches = Array.from(branchCommitsCache.current.keys());
+    if (cachedBranches.length === 0) return;
+
+    for (const branchName of cachedBranches) {
+      if (branchName.startsWith('origin/')) continue;
+
+      const commits = branchCommitsCache.current.get(branchName);
+      if (!commits || commits.length === 0) continue;
+
+      const commitsToCheck = commits.filter(commit => commit.onOrigin === false);
+      if (commitsToCheck.length === 0) continue;
+
+      for (const commit of commitsToCheck) {
+        try {
+          const unpushedCommits = await git.raw(['branch', '-r', `--contains`, `${commit.hash}`]);
+          commit.onOrigin = unpushedCommits.trim().length !== 0;
+        } catch {
+          commit.onOrigin = false;
         }
       }
 
-      // Parse files using status.files array for accurate staging info
-      const unstaged: Array<FileInfo> = [];
-      const staged: Array<FileInfo> = [];
+      updateBranchCache(branchName, commits);
+    }
+  }, [gitAdapter, branchCommitsCache, updateBranchCache]);
+
+  const refreshFileStatus = useCallback(async (noLock: boolean) => {
+    if (!gitAdapter || !currentBranch) return;
+
+    try {
+      const status = await gitAdapter.status(undefined, noLock, true);
+      setCurrentBranch(status.current || '');
+
+      const unstaged: FileInfo[] = [];
+      const staged: FileInfo[] = [];
 
       status.files.forEach(file => {
-        const getStatusType = (code: string): string => {
-          switch (code) {
-            case 'M': return 'modified';
-            case 'A': return 'created';
-            case 'D': return 'deleted';
-            case 'R': return 'renamed';
-            case '?': return 'created';
-            case 'U': return 'conflict';
-            case 'AA': return 'conflict';
-            case 'DD': return 'conflict';
-            case 'UU': return 'conflict';
-            case 'AU': return 'conflict';
-            case 'UA': return 'conflict';
-            case 'DU': return 'conflict';
-            case 'UD': return 'conflict';
-            default: return 'modified';
-          }
-        };
-
-        // Check if file has unstaged changes (working_dir is not empty/space)
         if (file.working_dir && file.working_dir !== ' ') {
-          unstaged.push({
-            path: file.path,
-            status: getStatusType(file.working_dir)
-          });
+          unstaged.push({ path: file.path, status: getFileStatusType(file.working_dir) });
         } else if (file.index && file.index !== ' ' && file.index !== '?') {
-          // Check if file has staged changes (index is not empty/space)
-          staged.push({
-            path: file.path,
-            status: getStatusType(file.index)
-          });
+          staged.push({ path: file.path, status: getFileStatusType(file.index) });
         }
       });
 
+      // Update state to refresh the UI
       setUnstagedFiles(unstaged);
       setStagedFiles(staged);
 
-      // Count total modified files (unique paths)
       const allPaths = new Set([...unstaged.map(f => f.path), ...staged.map(f => f.path)]);
       setModifiedCount(allPaths.size);
-
-      // Update persistent cache with file status data
-      try {
-        const cacheData = cacheManager.loadCache(repoPath) || {};
-        cacheData.currentBranch = status.current;
-        cacheData.unstagedFiles = unstaged;
-        cacheData.stagedFiles = staged;
-        cacheData.modifiedCount = allPaths.size;
-
-        // Update branch status if ahead/behind information is available
-        if (status.ahead !== undefined && status.behind !== undefined) {
-          if (!cacheData.branchStatus) {
-            cacheData.branchStatus = {};
-          }
-
-          if (status.ahead > 0 || status.behind > 0) {
-            cacheData.branchStatus[status.current] = { ahead: status.ahead, behind: status.behind };
-          } else {
-            // Branch is in sync, remove from status
-            delete cacheData.branchStatus[status.current];
-          }
+      
+      const cacheData = cacheManager.loadCache(repoPath) || {};
+      cacheData.currentBranch = status.current;
+      cacheData.unstagedFiles = unstaged;
+      cacheData.stagedFiles = staged;
+      cacheData.modifiedCount = allPaths.size;
+      if (status.ahead !== undefined && status.behind !== undefined) {
+        if (!cacheData.branchStatus) cacheData.branchStatus = {};
+        if (status.ahead > 0 || status.behind > 0) {
+          cacheData.branchStatus[status.current!] = { ahead: status.ahead, behind: status.behind };
+        } else {
+          delete cacheData.branchStatus[status.current!];
         }
-
-        cacheManager.saveCache(repoPath, cacheData);
-      } catch (cacheErr) {
-        console.warn('Failed to update file status cache:', cacheErr);
       }
+      cacheManager.saveCache(repoPath, cacheData);
     } catch (err) {
       console.error('Error refreshing file status:', err);
     }
-  };
+  }, [gitAdapter, currentBranch, repoPath, getFileStatusType, setCurrentBranch, setUnstagedFiles, setStagedFiles, setModifiedCount]);
 
-  const refreshBranchStatus = async () => {
-    // Ensure git adapter is available before attempting to use it
-    if (!gitAdapter.current) {
-      return;
-    }
+  const refreshBranchStatus = useCallback(async () => {
+    if (!gitAdapter) return;
 
     try {
-      const git = gitAdapter.current;
-
-      // Get all local branches
-      const branchSummary = await git.branchLocal();
-      const branchNames = branchSummary.all;
-
-      // Get ahead/behind status for each branch (parallel)
-      const statusPromises = branchNames.map(async (branchName) => {
-        // Check if branch has a remote tracking branch
-        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-
-        if (ahead > 0 || behind > 0) {
-          return { branchName, ahead, behind };
-        } else {
-          // Branch is in sync or isn't tracked, don't include in status
-          return null;
-        }
+      const branchSummary = await gitAdapter.branchLocal();
+      const statusPromises = branchSummary.all.map(async (branchName) => {
+        const { ahead, behind } = await gitAdapter.getAheadBehind(branchName, `origin/${branchName}`);
+        return (ahead > 0 || behind > 0) ? { branchName, ahead, behind } : null;
       });
 
       const statusResults = await Promise.all(statusPromises);
-      const statusMap = {};
+      const statusMap: { [key: string]: { ahead: number; behind: number } } = {};
       statusResults.forEach(result => {
-        if (result) {
-          statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
-        }
+        if (result) statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
       });
-      setBranchStatus(statusMap);
     } catch (error) {
       console.error('Error refreshing branch status:', error);
     }
-  };
+  }, [gitAdapter]);
 
-  const handleRefreshClick = async () => {
-    // Clear branch cache so tags are reloaded
+  useEffect(() => {
+    if (loading || !settings || !isActiveTab) return;
+
+    const refreshTime = getSetting('localFileRefreshTime') || 5;
+    const intervalId = setInterval(() => refreshFileStatus(true), refreshTime * 1000);
+    refreshFileStatus(true);
+
+    return () => clearInterval(intervalId);
+  }, [loading, isActiveTab, settings, getSetting, refreshFileStatus]);
+
+  useEffect(() => {
+    const handleBranchStatusRefresh = () => refreshBranchStatus();
+    window.addEventListener('refresh-branch-status', handleBranchStatusRefresh);
+    return () => window.removeEventListener('refresh-branch-status', handleBranchStatusRefresh);
+  }, [refreshBranchStatus]);
+
+  useEffect(() => {
+    if (!loading && selectedItem == null) {
+      setLastContentPanel('local-changes');
+      setSelectedItem({ type: 'local-changes' });
+    }
+  }, [loading, selectedItem]);
+
+  const handleRefreshClick = useCallback(async () => {
     clearBranchCache();
-    
-    // Fetch tags from remote first
     try {
-      const git = gitAdapter.current;
-      if (git) {
+      if (gitAdapter) {
         setIsBusy(true);
         setBusyMessage('git fetch --tags');
-        await git.raw(['fetch', '--tags']);
-        console.log('Fetched tags from remote');
+        await gitAdapter.raw(['fetch', '--tags']);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
@@ -697,653 +272,185 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       setIsBusy(false);
       setBusyMessage('');
     }
-    
     await loadRepoData(true);
-  };
+  }, [gitAdapter, clearBranchCache, loadRepoData]);
 
-  const handleMouseDown = (splitterIndex) => {
-    activeSplitter.current = splitterIndex;
-  };
+  const handleFetchClick = useCallback(async () => {
+    if (!gitAdapter) return;
 
-  const handleMouseUp = () => {
-    activeSplitter.current = null;
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (activeSplitter.current === null)
-      return;
-
-    const container = e.currentTarget;
-    const rect = container.getBoundingClientRect();
-
-    if (activeSplitter.current === 'horizontal') {
-      // Horizontal splitter - adjusts left/right panels
-      const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
-      if (mouseX >= 20 && mouseX <= 50) {
-        setLeftWidth(mouseX);
-      }
-    } else {
-      // Vertical splitter in branch-stash panel
-      const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
-
-      if (activeSplitter.current === 1) {
-        // Branches/Remotes splitter
-        if (mouseY >= 20 && mouseY <= 80) {
-          setBranchesHeight(mouseY);
-        }
-      } else if (activeSplitter.current === 2) {
-        // Remotes/Stashes splitter
-        if (mouseY >= 20 && mouseY <= 80) {
-          setBranchesHeight(mouseY);
-        }
-      }
-    }
-  };
-
-  const handleFetchClick = async () => {
     try {
       setIsBusy(true);
-      setBusyMessage(`git fetch origin`);
-      const git = gitAdapter.current;
-
-      console.log('Fetching from origin...');
-      await git.fetch('origin');
-      console.log('Fetch completed successfully');
-
-      // Update onOrigin status for cached commits after fetch
-      setBusyMessage(`Updating branch status...`);
+      setBusyMessage('git fetch origin');
+      await gitAdapter.fetch('origin');
+      setBusyMessage('Updating branch status...');
       await updateCachedCommitsOriginStatus();
-
-      // Refresh branch status after fetch (parallel, update UI incrementally)
-      branches.forEach(async (branchName) => {
-        const { ahead, behind } = await git.getAheadBehind(branchName, `origin/${branchName}`);
-        if (ahead > 0 || behind > 0) {
-          setBranchStatus(prev => ({
-            ...prev,
-            [branchName]: { ahead, behind }
-          }));
-        } else if (ahead < 0 || behind < 0) {
-          // Branch doesn't have a remote tracking branch
-          // Remove status for this branch
-          setBranchStatus(prev => {
-            const newStatus = { ...prev };
-            delete newStatus[branchName];
-            return newStatus;
-          });
-        } else {
-          // Remove status if branch is now in sync
-          setBranchStatus(prev => {
-            const newStatus = { ...prev };
-            delete newStatus[branchName];
-            return newStatus;
-          });
-        }
-      });
-
     } catch (error) {
       console.error('Error during fetch:', error);
-      setError(`Fetch failed: ${error.message}`);
+      setError(`Fetch failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, updateCachedCommitsOriginStatus]);
 
-  const handlePullClick = () => {
-    setShowPullDialog(true);
-  };
-
-  const handlePushClick = () => {
-    setShowPushDialog(currentBranch);
-  };
-
-  const handlePull = async (branch, stashAndReapply) => {
-    setShowPullDialog(false);
-    setPullingBranch(branch);
+  const handlePull = useCallback(async (branch: string, stashAndReapply: boolean) => {
+    hidePullDialog();
+    if (!gitAdapter) return;
 
     try {
       setIsBusy(true);
-      const git = gitAdapter.current;
-      let stashCreated = false;
-      let stashMessage = '';
-
-      // Stash local changes if requested
-      if (stashAndReapply && (unstagedFiles.length > 0 || stagedFiles.length > 0)) {
-        setBusyMessage(`git stash push`);
-        stashMessage = `Auto-stash before pull at ${new Date().toISOString()}`;
-        await git.stashPush(stashMessage);
-        stashCreated = true;
-        console.log('Created stash before pull');
+      
+      if (stashAndReapply && hasLocalChanges) {
+        setBusyMessage('git stash push');
+        await gitAdapter.stashPush(`Auto-stash before pull at ${new Date().toISOString()}`);
       }
 
-      // Perform git pull
       setBusyMessage(`git pull origin ${branch}`);
-      console.log(`Pulling from origin/${branch}...`);
-      await git.pull('origin', branch);
-      console.log('Pull completed successfully');
-
-      // Clear branch cache since pull may have added new commits
+      await gitAdapter.pull('origin', branch);
       clearBranchCache(branch);
-
-      // Pull may have added new commits, so refresh repo data
-      // The onOrigin status will be updated during loadRepoData refresh
       await loadRepoData(true);
-
     } catch (error) {
       console.error('Error during pull:', error);
-      setError(`Pull failed: ${error.message}`);
+      setError(`Pull failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
-      setPullingBranch(null);
     }
-  };
+  }, [gitAdapter, hidePullDialog, hasLocalChanges, clearBranchCache, loadRepoData]);
 
-  const handlePush = async (branch, remoteBranch, pushAllTags) => {
-    setShowPushDialog(null);
+  const handlePush = useCallback(async (branch: string, remoteBranch: string, pushAllTags: boolean) => {
+    hidePushDialog();
+    if (!gitAdapter) return;
 
     try {
       setIsBusy(true);
-      const git = gitAdapter.current;
+      setBusyMessage(pushAllTags 
+        ? `git push origin ${branch}:${remoteBranch} --tags`
+        : `git push origin ${branch}:${remoteBranch}`
+      );
+      
+      const pushOutput = pushAllTags
+        ? await gitAdapter.push('origin', `${branch}:${remoteBranch}`, ['--tags'])
+        : await gitAdapter.push('origin', `${branch}:${remoteBranch}`);
 
-      console.log(`Pushing ${branch} to origin/${remoteBranch}...`);
-
-      let pushOutput = '';
-      if (pushAllTags) {
-        setBusyMessage(`git push origin ${branch}:${remoteBranch} --tags`);
-        pushOutput = await git.push('origin', `${branch}:${remoteBranch}`, ['--tags']);
-        console.log('Push with tags completed successfully');
-      } else {
-        setBusyMessage(`git push origin ${branch}:${remoteBranch}`);
-        pushOutput = await git.push('origin', `${branch}:${remoteBranch}`);
-        console.log('Push completed successfully');
-      }
-
-      // Check for pull request URL in output
-      // The URL can appear in the format: "remote:      https://github.com/.../pull/new/branch-name"
       const prUrlMatch = pushOutput.match(/https?:\/\/[^\s\)]+\/pull\/new\/[^\s\)]+/);
       if (prUrlMatch) {
-        const url = prUrlMatch[0];
-        console.log('Found PR URL:', url);
-        setPullRequestUrl(url);
-        setPullRequestBranch(branch);
-        setShowPullRequestDialog(true);
+        showPullRequestDialog(prUrlMatch[0], branch);
       }
 
-      // Push updates remote state, so refresh repo data
-      // The onOrigin status will be updated during loadRepoData refresh
       await loadRepoData(true);
-
-    } catch (error) {
-      console.error('Error during push:', error);
-
-      // Check for PR URL in error message (some git servers put it in stderr)
-      let foundPrUrl = false;
-      if (error.message) {
-        const prUrlMatch = error.message.match(/https?:\/\/[^\s\)]+\/pull\/new\/[^\s\)]+/);
-        if (prUrlMatch) {
-          const url = prUrlMatch[0];
-          console.log('Found PR URL in error:', url);
-          setPullRequestUrl(url);
-          setPullRequestBranch(branch);
-          setShowPullRequestDialog(true);
-          foundPrUrl = true;
-        }
-      }
-
-      // Only show error if we didn't find a PR URL (some servers return PR URL with non-zero exit)
-      if (!foundPrUrl) {
+    } catch (error: any) {
+      const prUrlMatch = error.message?.match(/https?:\/\/[^\s\)]+\/pull\/new\/[^\s\)]+/);
+      if (prUrlMatch) {
+        showPullRequestDialog(prUrlMatch[0], branch);
+      } else {
         setError(`Push failed: ${error.message}`);
       }
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, hidePushDialog, loadRepoData, showPullRequestDialog]);
 
-  const handleCancelOperation = () => {
-    // TODO: Implement actual git operation cancellation in GitAdapter
-    // For now, this just dismisses the busy overlay
-    console.log('Cancelling git operation...');
-    setIsBusy(false);
-    setBusyMessage('');
-  };
-
-  const handleBranchSwitch = async (branchName: string) => {
-    // Check if there are local changes
+  const handleBranchSwitch = useCallback(async (branchName: string) => {
     if (hasLocalChanges) {
-      setPendingBranchSwitch(branchName);
-      setShowLocalChangesDialog(true);
+      showLocalChangesDialog(branchName);
       return;
     }
-
-    // No local changes, proceed with branch switch
     await performBranchSwitch(branchName);
-  };
+  }, [hasLocalChanges, showLocalChangesDialog]);
 
-  const performBranchSwitch = async (branchName: string, skipBusyManagement = false) => {
+  const performBranchSwitch = useCallback(async (branchName: string, skipBusyManagement = false) => {
+    if (!gitAdapter) return;
+
     try {
       if (!skipBusyManagement) {
         setIsBusy(true);
         setBusyMessage(`git checkout ${branchName}`);
-      } else {
-        setBusyMessage(`git checkout ${branchName}`);
       }
-      const git = gitAdapter.current;
+      
+      await gitAdapter.checkoutBranch(branchName);
 
-      console.log(`Switching to branch: ${branchName}`);
-      await git.checkoutBranch(branchName);
-      console.log('Branch switch completed successfully');
-
-      // Check if there's a branch stash for this branch
       const branchStashMessage = `branch-stash-${branchName}`;
-      try {
-        const stashList = await git.stashList();
-        const branchStash = stashList.all.find((stash, index) => {
-          const match = stash.message.includes(branchStashMessage);
-          if (match) {
-            stash.index = index; // Store the index for later use
-          }
-          return match;
-        });
-
-        if (branchStash) {
-          console.log(`Found branch stash for ${branchName}, applying it...`);
-          setBusyMessage(`Applying branch stash`);
-
-          // Apply the stash
-          await git.raw(['stash', 'apply', `stash@{${branchStash.index}}`]);
-          console.log('Branch stash applied successfully');
-
-          // Delete the stash after successful application
-          try {
-            await git.raw(['stash', 'drop', `stash@{${branchStash.index}}`]);
-            console.log('Branch stash removed successfully');
-
-            // Refresh stash list after dropping
-            const updatedStashList = await git.stashList();
-            setStashes(updatedStashList.all);
-          } catch (dropError) {
-            console.warn('Failed to remove branch stash after successful apply:', dropError.message);
-          }
-
-          // Refresh file status after applying stash
-          await refreshFileStatus(false);
-        } else {
-          // No branch stash found, still need to refresh stash list in case one was created earlier
-          const updatedStashList = await git.stashList();
-          setStashes(updatedStashList.all);
+      const stashList = await gitAdapter.stashList();
+      const branchStash = stashList.all.find((stash, index) => {
+        if (stash.message.includes(branchStashMessage)) {
+          stash.index = index;
+          return true;
         }
-      } catch (stashError) {
-        console.warn('Error checking/applying branch stash:', stashError.message);
-        // Don't fail the branch switch if stash operations fail
-      }
+        return false;
+      });
 
-      // Refresh all data after branch switch
-      //await loadRepoData(true);
+      if (branchStash) {
+        setBusyMessage('Applying branch stash');
+        await gitAdapter.raw(['stash', 'apply', `stash@{${branchStash.index}}`]);
+        await gitAdapter.raw(['stash', 'drop', `stash@{${branchStash.index}}`]);
+        await refreshFileStatus(false);
+      }
     } catch (error) {
       console.error('Error switching branch:', error);
-      setError(`Branch switch failed: ${error.message}`);
+      setError(`Branch switch failed: ${(error as Error).message}`);
     } finally {
       if (!skipBusyManagement) {
         setIsBusy(false);
         setBusyMessage('');
       }
     }
-  };
+  }, [gitAdapter, refreshFileStatus]);
 
-  const handleLocalChangesDialog = async (option: string) => {
-    setShowLocalChangesDialog(false);
-
-    if (!pendingBranchSwitch) {
-      return;
-    }
-
-    const branchName = pendingBranchSwitch;
-    setPendingBranchSwitch(null);
+  const handleLocalChangesDialog = useCallback(async (option: string) => {
+    hideLocalChangesDialog();
+    const branchName = pendingState.pendingBranchSwitch;
+    if (!branchName || !gitAdapter) return;
 
     try {
-      const git = gitAdapter.current;
       setIsBusy(true);
 
       switch (option) {
         case 'leave-alone':
-          // Just switch branches, keep changes as they are
           await performBranchSwitch(branchName, true);
           break;
-
         case 'stash-and-reapply':
-          // Stash changes, switch branches, then reapply
-          setBusyMessage(`git stash push`);
-          console.log('Stashing changes before branch switch...');
-          await git.stashPush(`Auto-stash before switching to ${branchName}`);
-
-          // Switch branches
+          setBusyMessage('git stash push');
+          await gitAdapter.stashPush(`Auto-stash before switching to ${branchName}`);
           await performBranchSwitch(branchName, true);
-
-          // Try to reapply the stash without deleting it
           try {
-            setBusyMessage(`git stash apply`);
-            console.log('Reapplying stashed changes...');
-            await git.stashApply();
-            console.log('Stash reapplied successfully');
-
-            // If apply succeeded, then pop the stash to remove it
-            // Try to pop stash to remove it
-            try {
-              await git.stashPop();
-              console.log('Stash removed successfully');
-            } catch (popError) {
-              console.warn('Failed to remove stash after successful apply:', popError.message);
-              setError(`Stash reapplied but could not be removed: ${popError.message}`);
-            }
-
-            // Refresh Local Changes panel after stash reapplication
-            await refreshFileStatus(false);
-          } catch (stashError) {
-            console.warn('Could not reapply stash automatically:', stashError.message);
-            setError(`Branch switched but stash could not be reapplied: ${stashError.message}`);
-            console.info('The stash has been preserved and can be applied manually.');
-
-            // Still refresh file status even if stash failed
-            await refreshFileStatus(false);
+            await gitAdapter.stashPop();
+          } catch (err) {
+            setError(`Stash reapplied but could not be removed: ${(err as Error).message}`);
           }
-
-          // Refresh all data after stash operations
-          //await loadRepoData(true);
+          await refreshFileStatus(false);
           break;
-
         case 'discard':
-          // Discard all local changes
-          console.log('Discarding local changes...');
-
-          // Discard staged changes
           if (stagedFiles.length > 0) {
-            setBusyMessage(`git reset (${stagedFiles.length} files)`);
-            const stagedPaths = stagedFiles.map(f => f.path);
-            if (stagedPaths.length === 1) {
-              await git.reset(stagedPaths[0]);
-            } else {
-              await git.reset(stagedPaths);
-            }
+            setBusyMessage(`git reset`);
+            await gitAdapter.reset(stagedFiles.map(f => f.path));
           }
-
-          // Discard unstaged changes
           if (unstagedFiles.length > 0) {
-            setBusyMessage(`git checkout (${unstagedFiles.length} files)`);
-            await git.discard(unstagedFiles.map(f => f.path));
+            setBusyMessage(`git checkout`);
+            await gitAdapter.discard(unstagedFiles.map(f => f.path));
           }
-
-          // Switch branches
           await performBranchSwitch(branchName, true);
           break;
-
         case 'branch-stash':
-          // Create a branch-specific stash
           const stashMessage = `branch-stash-${currentBranch}`;
-          console.log(`Creating branch stash: ${stashMessage}`);
           setBusyMessage(`git stash push -m "${stashMessage}"`);
-          await git.stashPush(stashMessage);
-
-          // Refresh stash list
-          const updatedStashList = await git.stashList();
-          setStashes(updatedStashList.all);
-          console.log('Stash list after creating branch stash:', updatedStashList.all);
-
-          // Switch to the target branch
+          await gitAdapter.stashPush(stashMessage);
           await performBranchSwitch(branchName, true);
           break;
-
-        default:
-          // Cancel, do nothing
-          return;
       }
     } catch (error) {
       console.error('Error handling local changes:', error);
-      setError(`Failed to handle local changes: ${error.message}`);
+      setError(`Failed to handle local changes: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, hideLocalChangesDialog, pendingState.pendingBranchSwitch, performBranchSwitch, 
+      refreshFileStatus, stagedFiles, unstagedFiles, currentBranch]);
 
-  const handleGitGC = async () => {
-    console.log('git GC');
-    setIsBusy(true);
-    setBusyMessage('git gc');
-    const git = gitAdapter.current;
-    await git.raw(['gc']);
-    setIsBusy(false);
-    setBusyMessage('');
-  };
-
-  const handleOriginChanged = async () => {
-    try {
-      const git = gitAdapter.current;
-      const url = await git.getOriginUrl();
-      setOriginUrl(url);
-      console.log('Origin URL refreshed:', url);
-    } catch (error) {
-      console.error('Error refreshing origin URL:', error);
-      setOriginUrl('');
-    }
-  };
-
-  const handleDeleteBranchDialog = async ({ deleteRemote }) => {
-    setShowDeleteBranchDialog(false);
-
-    if (!branchToDelete) {
-      return;
-    }
-
-    const branchName = branchToDelete;
-    setBranchToDelete(null);
-
-    try {
-      setIsBusy(true);
-      const git = gitAdapter.current;
-
-      // Check if trying to delete the current branch
-      if (branchName === currentBranch) {
-        setError('Cannot delete the currently active branch');
-        return;
-      }
-
-      // Delete local branch
-      setBusyMessage(`git branch -D ${branchName}`);
-      console.log(`Deleting local branch: ${branchName}`);
-      await git.raw(['branch', '-D', branchName]);
-
-      // Delete remote branch if requested
-      if (deleteRemote) {
-        try {
-          setBusyMessage(`git push origin --delete ${branchName}`);
-          console.log(`Deleting remote branch: origin/${branchName}`);
-          await git.raw(['push', 'origin', '--delete', branchName]);
-        } catch (remoteError) {
-          console.warn(`Failed to delete remote branch origin/${branchName}:`, remoteError);
-          // Continue with local deletion success, but warn about remote
-          setError(`Local branch deleted successfully, but failed to delete remote branch: ${remoteError.message}`);
-          // Still refresh the data to show the local deletion
-          await loadRepoData(true);
-          return;
-        }
-      }
-
-      console.log(`Branch ${branchName} deleted successfully`);
-
-      // Refresh repository data to show updated branch list
-      await loadRepoData(true);
-
-    } catch (error) {
-      console.error('Error deleting branch:', error);
-      setError(`Failed to delete branch '${branchName}': ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-    }
-  };
-
-  const handleRenameBranchDialog = async (newName: string) => {
-    setShowRenameBranchDialog(false);
-
-    if (!branchToRename) {
-      return;
-    }
-
-    const oldName = branchToRename;
-    setBranchToRename(null);
-
-    try {
-      setIsBusy(true);
-      setBusyMessage(`git branch -m ${oldName} ${newName}`);
-      const git = gitAdapter.current;
-
-      console.log(`Renaming branch '${oldName}' to '${newName}'`);
-      await git.raw(['branch', '-m', oldName, newName]);
-
-      // Update selected item if it was the renamed branch
-      if (selectedItem?.type === 'branch' && selectedItem.branchName === oldName) {
-        setSelectedItem({
-          ...selectedItem,
-          branchName: newName
-        });
-      }
-
-      // Update current branch if it was the renamed branch
-      if (currentBranch === oldName) {
-        setCurrentBranch(newName);
-      }
-
-      console.log(`Branch renamed successfully from '${oldName}' to '${newName}'`);
-
-      // Clear branch commits cache since branch operations may affect commits
-      if (branchCommitsCache.current.has(oldName)) {
-        branchCommitsCache.current.delete(oldName);
-      }
-
-      // Refresh repository data to show updated branch list
-      await loadRepoData(true);
-
-    } catch (error) {
-      console.error('Error renaming branch:', error);
-      setError(`Failed to rename branch '${oldName}' to '${newName}': ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-    }
-  };
-
-  const handleMergeBranchDialog = async ({ sourceBranch, targetBranch, mergeOption, flag }: { sourceBranch: string; targetBranch: string; mergeOption: string; flag?: string }) => {
-    setShowMergeBranchDialog(false);
-
-    if (!sourceBranch || !targetBranch) {
-      return;
-    }
-
-    setMergeSourceBranch(null);
-
-    try {
-      setIsBusy(true);
-      const git = gitAdapter.current;
-
-      console.log(`Merging '${sourceBranch}' into '${targetBranch}' with option: ${mergeOption}`);
-
-      // Build merge command
-      const mergeArgs = ['merge'];
-      if (flag) {
-        mergeArgs.push(flag);
-      }
-      mergeArgs.push(sourceBranch);
-
-      // Perform the merge
-      setBusyMessage(`git merge ${flag ? flag + ' ' : ''}${sourceBranch}`);
-      await git.raw(mergeArgs);
-
-      console.log(`Merge completed successfully: '${sourceBranch}' into '${targetBranch}'`);
-
-      // Clear branch commits cache since merge affects commits
-      clearBranchCache();
-
-      // Refresh repository data to show updated state
-      await loadRepoData(true);
-
-      // If we're on the target branch, refresh the commits view
-      if (selectedItem?.type === 'branch' && selectedItem.branchName === targetBranch) {
-        await handleBranchSelect(targetBranch);
-
-        // Auto stage merge result if --no-commit was used and there are changes to stage
-        // and the file status is not conflicted.
-        const git = gitAdapter.current;
-        const status = await git.status();
-        if (status.files.length > 0) {
-          await git.add(status.files.filter(file => getFileStatusType(file) !== 'conflict').map(file => file.path));
-        }
-      }
-
-    } catch (error) {
-      console.error('Error merging branch:', error);
-      setError(`Failed to merge '${sourceBranch}' into '${targetBranch}': ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-    }
-  };
-
-  const handleRebaseBranchDialog = async ({ sourceBranch, targetBranch }: { sourceBranch: string; targetBranch: string }) => {
-    setShowRebaseBranchDialog(false);
-
-    if (!sourceBranch || !targetBranch) {
-      return;
-    }
-
-    setRebaseSourceBranch(null);
-
-    try {
-      setIsBusy(true);
-      const git = gitAdapter.current;
-
-      console.log(`Rebasing '${sourceBranch}' onto '${targetBranch}'`);
-
-      setBusyMessage(`git rebase ${targetBranch}`);
-      await git.rebase(targetBranch);
-
-      console.log(`Rebase completed successfully: '${sourceBranch}' onto '${targetBranch}'`);
-
-      clearBranchCache();
-
-      await loadRepoData(true);
-
-      if (selectedItem?.type === 'branch' && selectedItem.branchName === sourceBranch) {
-        await handleBranchSelect(sourceBranch);
-      }
-
-    } catch (error) {
-      console.error('Error rebasing branch:', error);
-      setError(`Failed to rebase '${sourceBranch}' onto '${targetBranch}': ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-    }
-  };
-
-  const handleItemSelect = (item: any) => {
-    // If switching away from a branch or remote branch, cancel any pending loads
-    if (item.type !== 'branch' && item.type !== 'remote-branch') {
-      currentBranchLoadId.current += 1;
-    }
-    setSelectedItem(item);
-
-    // Update content panel type when selecting content panel items (no persistence)
-    if (item.type === 'local-changes' || item.type === 'branch' || item.type === 'stash' || item.type === 'remote-branch') {
-      setLastContentPanel(item.type);
-    }
-  };
-
-  const handleBranchSelect = async (branchName: string) => {
-    // Check cache first
+  const handleBranchSelect = useCallback(async (branchName: string) => {
     if (branchCommitsCache.current.has(branchName)) {
-      console.log(`Loading commits for ${branchName} from cache`);
       setSelectedItem({
         type: 'branch',
         branchName,
@@ -1353,544 +460,368 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
     }
 
-    // Increment load ID to cancel any pending requests
     currentBranchLoadId.current += 1;
     const thisLoadId = currentBranchLoadId.current;
 
+    if (!gitAdapter) return;
+
+    setSelectedItem({ type: 'branch', branchName, commits: [], loading: true });
+
     try {
-      const git = gitAdapter.current;
-
-      // Set loading state immediately
-      setSelectedItem({
-        type: 'branch',
-        branchName,
-        commits: [],
-        loading: true
-      });
-
-      console.log(`Loading commits for branch: ${branchName}`);
-      const maxCommits = 100;
-      const commits = await git.log(branchName, maxCommits);
-
-      // Cache the commits for this branch
+      const commits = await gitAdapter.log(branchName, 100);
       updateBranchCache(branchName, commits);
 
-      // Only update state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
-        setSelectedItem({
-          type: 'branch',
-          branchName,
-          commits,
-          loading: false
-        });
+        setSelectedItem({ type: 'branch', branchName, commits, loading: false });
       }
     } catch (error) {
       console.error('Error loading branch commits:', error);
-
-      // Only update error state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
-        setError(`Failed to load commits: ${error.message}`);
-        setSelectedItem({
-          type: 'branch',
-          branchName,
-          commits: [],
-          loading: false
-        });
+        setError(`Failed to load commits: ${(error as Error).message}`);
+        setSelectedItem({ type: 'branch', branchName, commits: [], loading: false });
       }
     }
-  };
+  }, [gitAdapter, branchCommitsCache, updateBranchCache]);
 
-
-
-  const handleStashClick = () => {
-    setShowStashDialog(true);
-  };
-
-  const handleStash = async (message: string, stageNewFiles: boolean) => {
-    setShowStashDialog(false);
+  const handleCreateBranch = useCallback(async (branchName: string, checkoutAfterCreate: boolean) => {
+    if (!gitAdapter) return;
 
     try {
       setIsBusy(true);
-      const git = gitAdapter.current;
+      setBusyMessage(`git branch ${branchName}`);
+      await gitAdapter.createBranch(branchName);
 
-      // If stageNewFiles is checked, stage all new (untracked) files
-      if (stageNewFiles) {
-        // Find files that are new (created) and unstaged
-        const newFiles = unstagedFiles.filter(file => file.status === 'created');
-
-        if (newFiles.length > 0) {
-          setBusyMessage(`git add (${newFiles.length} files)`);
-          console.log(`Staging ${newFiles.length} new files before stash...`);
-          await git.add(newFiles.map(f => f.path));
-        }
+      if (checkoutAfterCreate) {
+        setBusyMessage(`git checkout ${branchName}`);
+        await gitAdapter.checkoutBranch(branchName);
+        await handleBranchSelect(branchName);
       }
 
-      // Create stash with optional message
-      const stashMessage = message || `Stash created at ${new Date().toISOString()}`;
-      setBusyMessage(`git stash push`);
-      console.log(`Creating stash: ${stashMessage}`);
-      await git.stashPush(stashMessage);
-      console.log('Stash created successfully');
-
-      // Refresh file status and stashes
-      await refreshFileStatus(false);
-      const stashList = await git.stashList();
-      setStashes(stashList.all);
-
+      await loadRepoData(true);
     } catch (error) {
-      console.error('Error creating stash:', error);
-      setError(`Stash failed: ${error.message}`);
+      console.error('Error creating branch:', error);
+      setError(`Branch creation failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, handleBranchSelect, loadRepoData]);
 
-  const handleResetToOrigin = async () => {
-    setShowResetDialog(false);
+  const handleDeleteBranchDialog = useCallback(async ({ deleteRemote }: { deleteRemote: boolean }) => {
+    hideDeleteBranchDialog();
+    const branchName = pendingState.branchToDelete;
+    if (!branchName || !gitAdapter) return;
+
+    try {
+      setIsBusy(true);
+      
+      if (branchName === currentBranch) {
+        setError('Cannot delete the currently active branch');
+        return;
+      }
+
+      setBusyMessage(`git branch -D ${branchName}`);
+      await gitAdapter.raw(['branch', '-D', branchName]);
+
+      if (deleteRemote) {
+        setBusyMessage(`git push origin --delete ${branchName}`);
+        await gitAdapter.raw(['push', 'origin', '--delete', branchName]);
+      }
+
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error deleting branch:', error);
+      setError(`Failed to delete branch: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideDeleteBranchDialog, pendingState.branchToDelete, currentBranch, loadRepoData]);
+
+  const handleRenameBranchDialog = useCallback(async (newName: string) => {
+    hideRenameBranchDialog();
+    const oldName = pendingState.branchToRename;
+    if (!oldName || !gitAdapter) return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git branch -m ${oldName} ${newName}`);
+      await gitAdapter.raw(['branch', '-m', oldName, newName]);
+
+      if (selectedItem?.type === 'branch' && selectedItem.branchName === oldName) {
+        setSelectedItem({ ...selectedItem, branchName: newName });
+      }
+
+      if (currentBranch === oldName) {
+        setCurrentBranch(newName);
+      }
+
+      branchCommitsCache.current.delete(oldName);
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error renaming branch:', error);
+      setError(`Failed to rename branch: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideRenameBranchDialog, pendingState.branchToRename, selectedItem, currentBranch, loadRepoData, setCurrentBranch]);
+
+  const handleMergeBranchDialog = useCallback(async ({ sourceBranch, targetBranch, flag }: { sourceBranch: string; targetBranch: string; flag?: string }) => {
+    hideMergeBranchDialog();
+    if (!gitAdapter || !sourceBranch || !targetBranch) return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git merge ${flag || ''} ${sourceBranch}`);
+      await gitAdapter.raw(['merge', ...(flag ? [flag] : []), sourceBranch]);
+      clearBranchCache();
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error merging branch:', error);
+      setError(`Failed to merge: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideMergeBranchDialog, clearBranchCache, loadRepoData]);
+
+  const handleRebaseBranchDialog = useCallback(async ({ sourceBranch, targetBranch }: { sourceBranch: string; targetBranch: string }) => {
+    hideRebaseBranchDialog();
+    if (!gitAdapter || !sourceBranch || !targetBranch) return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git rebase ${targetBranch}`);
+      await gitAdapter.rebase(targetBranch);
+      clearBranchCache();
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error rebasing branch:', error);
+      setError(`Failed to rebase: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideRebaseBranchDialog, clearBranchCache, loadRepoData]);
+
+  const handleStash = useCallback(async (message: string, stageNewFiles: boolean) => {
+    hideStashDialog();
+    if (!gitAdapter) return;
+
+    try {
+      setIsBusy(true);
+
+      if (stageNewFiles) {
+        const newFiles = unstagedFiles.filter(f => f.status === 'created');
+        if (newFiles.length > 0) {
+          setBusyMessage('git add');
+          await gitAdapter.add(newFiles.map(f => f.path));
+        }
+      }
+
+      setBusyMessage('git stash push');
+      await gitAdapter.stashPush(message || `Stash created at ${new Date().toISOString()}`);
+      await refreshFileStatus(false);
+    } catch (error) {
+      console.error('Error creating stash:', error);
+      setError(`Stash failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideStashDialog, unstagedFiles, refreshFileStatus]);
+
+  const handleResetToOrigin = useCallback(async () => {
+    hideResetDialog();
+    if (!gitAdapter) return;
 
     try {
       setIsBusy(true);
       setBusyMessage(`git reset --hard origin/${currentBranch}`);
-      const git = gitAdapter.current;
-
-      console.log(`Resetting ${currentBranch} to origin...`);
-      await git.resetToOrigin(currentBranch);
-      console.log('Reset to origin completed successfully');
-
-      // Clear branch commits cache since reset changes commits
+      await gitAdapter.resetToOrigin(currentBranch);
       clearBranchCache();
-
-      // Refresh all data after reset
       await loadRepoData(true);
     } catch (error) {
       console.error('Error resetting to origin:', error);
-      setError(`Reset to origin failed: ${error.message}`);
+      setError(`Reset to origin failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, hideResetDialog, currentBranch, clearBranchCache, loadRepoData]);
 
-  const handleCleanWorkingDirectory = async () => {
-    setShowCleanWorkingDirectoryDialog(false);
+  const handleCleanWorkingDirectory = useCallback(async () => {
+    hideCleanWorkingDirectoryDialog();
+    if (!gitAdapter) return;
 
     try {
       setIsBusy(true);
-      setBusyMessage(`git clean -fdx`);
-      const git = gitAdapter.current;
-
-      console.log('Cleaning working directory...');
-      await git.raw(['clean', '-fdx']);
-      console.log('Working directory cleaned successfully');
-
-      // Refresh all data after cleaning
+      setBusyMessage('git clean -fdx');
+      await gitAdapter.raw(['clean', '-fdx']);
       await loadRepoData(true);
     } catch (error) {
       console.error('Error cleaning working directory:', error);
-      setError(`Clean working directory failed: ${error.message}`);
+      setError(`Clean working directory failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, hideCleanWorkingDirectoryDialog, loadRepoData]);
 
-  const handleDiscardAllChanges = async () => {
-    if (modifiedCount === 0) {
-      return;
-    }
+  const handleDiscardAllChanges = useCallback(async () => {
+    if (modifiedCount === 0 || !gitAdapter) return;
 
-    const confirmed = await showConfirm(
-      `Are you sure you want to discard all ${modifiedCount} local changes? This cannot be undone.`
-    );
-
-    if (!confirmed) {
-      return;
-    }
+    const confirmed = await showConfirm(`Are you sure you want to discard all ${modifiedCount} local changes?`);
+    if (!confirmed) return;
 
     try {
       setIsBusy(true);
-      const git = gitAdapter.current;
 
-      // Discard staged changes
       if (stagedFiles.length > 0) {
-        setBusyMessage(`git reset (${stagedFiles.length} files)`);
-        const stagedPaths = stagedFiles.map(f => f.path);
-        if (stagedPaths.length === 1) {
-          await git.reset(stagedPaths[0]);
-        } else {
-          await git.reset(stagedPaths);
-        }
-        console.log(`Reset ${stagedFiles.length} staged files`);
+        setBusyMessage('git reset');
+        await gitAdapter.reset(stagedFiles.map(f => f.path));
       }
 
-      // Discard unstaged changes
       if (unstagedFiles.length > 0) {
-        setBusyMessage(`git checkout (${unstagedFiles.length} files)`);
-        await git.discard(unstagedFiles.map(f => f.path));
-        console.log(`Discarded changes for ${unstagedFiles.length} files`);
+        setBusyMessage('git checkout');
+        await gitAdapter.discard(unstagedFiles.map(f => f.path));
       }
 
       await loadRepoData(true);
     } catch (error) {
       console.error('Error discarding changes:', error);
-      setError(`Discard changes failed: ${error.message}`);
+      setError(`Discard changes failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, modifiedCount, stagedFiles, unstagedFiles, showConfirm, loadRepoData]);
 
-  const handleCreateBranch = async (branchName: string, checkoutAfterCreate: boolean) => {
-    try {
-      setIsBusy(true);
-      setBusyMessage(`git branch ${branchName}`);
-      const git = gitAdapter.current;
-
-      await git.createBranch(branchName);
-
-      // Get current branch before creating new one
-      const previousBranch = gitAdapter.current.currentBranch || currentBranch;
-
-      if (checkoutAfterCreate && previousBranch && previousBranch !== branchName) {
-        setBusyMessage(`git checkout ${branchName}`);
-        await git.checkoutBranch(branchName);
-
-        // Select the newly checked out branch to update the branch view
-        await handleBranchSelect(branchName);
-      }
-
-      // Refresh all data after branch operations
-      await loadRepoData(true);
-    } catch (error) {
-      console.error('Error creating branch:', error);
-      setError(`Branch creation failed: ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
+  const handleItemSelect = useCallback((item: SelectedItem) => {
+    if (item.type !== 'branch' && item.type !== 'remote-branch') {
+      currentBranchLoadId.current += 1;
     }
-  };
-
-  const handleCreateBranchFromCommit = async (branchName, checkoutAfterCreate) => {
-    if (!commitForDialog)
-      return;
-
-    try {
-      setIsBusy(true);
-      setBusyMessage(`git checkout -b ${branchName} ${commitForDialog.hash.substring(0, 7)}`);
-      const git = gitAdapter.current;
-      await git.raw(['checkout', '-b', branchName, commitForDialog.hash]);
-      console.log(`Created branch '${branchName}' from commit ${commitForDialog.hash.substring(0, 7)}`);
-
-      if (checkoutAfterCreate) {
-        // Select newly checked out branch to update branch view
-        await handleBranchSelect(branchName);
-      }
-
-      // Refresh all data after branch operations
-      await loadRepoData(true);
-    } catch (error) {
-      console.error('Error creating branch from commit:', error);
-      setError(`Branch creation failed: ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-      setShowCreateBranchFromCommitDialog(false);
-      setCommitForDialog(null);
+    setSelectedItem(item);
+    if (['local-changes', 'branch', 'stash', 'remote-branch'].includes(item.type)) {
+      setLastContentPanel(item.type);
     }
-  };
+  }, []);
 
-  const handleCreateTagFromCommit = async (tagName, tagMessage) => {
-    if (!commitForDialog)
-      return;
-
-    try {
-      setIsBusy(true);
-      const git = gitAdapter.current;
-
-      // Create tag with optional message
-      if (tagMessage) {
-        setBusyMessage(`git tag -a ${tagName} -m "${tagMessage}" ${commitForDialog.hash.substring(0, 7)}`);
-        await git.raw(['tag', '-a', tagName, '-m', tagMessage, commitForDialog.hash]);
-      } else {
-        setBusyMessage(`git tag ${tagName} ${commitForDialog.hash.substring(0, 7)}`);
-        await git.raw(['tag', tagName, commitForDialog.hash]);
-      }
-
-      console.log(`Created tag '${tagName}' on commit ${commitForDialog.hash.substring(0, 7)}`);
-
-      // Clear all branch caches since tags can be on any branch
-      clearBranchCache();
-
-      // Refresh all data to show new tag
-      await loadRepoData(true);
-
-      // If viewing a branch, reload it to show the new tag
-      if (selectedItem?.type === 'branch' && selectedItem.branchName) {
-        await handleBranchSelect(selectedItem.branchName);
-      } else if (selectedItem?.type === 'remote-branch' && selectedItem.fullName) {
-        await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
-      }
-    } catch (error) {
-      console.error('Error creating tag from commit:', error);
-      setError(`Tag creation failed: ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-      setShowCreateTagFromCommitDialog(false);
-      setCommitForDialog(null);
-    }
-  };
-
-  const handleAmendCommit = async (newMessage: string) => {
-    if (!commitForDialog)
-      return;
-
-    try {
-      setIsBusy(true);
-      setBusyMessage(`git commit --amend -m "${newMessage.replace(/"/g, '\\"')}"`);
-
-      const git = gitAdapter.current;
-      await git.raw(['commit', '--amend', '-m', newMessage]);
-      console.log(`Amended commit message for ${commitForDialog.hash.substring(0, 7)}`);
-
-      clearBranchCache();
-      await loadRepoData(true);
-
-      if (selectedItem?.type === 'branch' && selectedItem.branchName) {
-        await handleBranchSelect(selectedItem.branchName);
-      } else if (selectedItem?.type === 'remote-branch' && selectedItem.fullName) {
-        await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
-      }
-    } catch (error) {
-      console.error('Error amending commit:', error);
-      setError(`Failed to amend commit: ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-      setShowAmendCommitDialog(false);
-      setCommitForDialog(null);
-    }
-  };
-
-  const handleBranchContextMenu = async (action: string, branchName: string, currentBranch: string) => {
-    console.log('Branch context menu action:', action, 'on branch:', branchName);
-
+  const handleBranchContextMenu = useCallback(async (action: string, branchName: string) => {
     switch (action) {
       case 'checkout':
         handleBranchSwitch(branchName);
         break;
       case 'pull':
         if (branchName === currentBranch) {
-          handlePullClick();
+          showPullDialog();
         } else {
-          handleFetchClick();
+          await handleFetchClick();
         }
         break;
       case 'push-to-origin':
-        setShowPushDialog(branchName);
-        break;
       case 'push-branch':
-        setShowPushDialog(branchName);
+        showPushDialog(branchName);
         break;
       case 'merge-into-active':
-        setMergeSourceBranch(branchName);
-        setShowMergeBranchDialog(true);
+        showMergeBranchDialog(branchName);
         break;
       case 'rebase-active-onto-branch':
-        setRebaseSourceBranch(currentBranch);
-        setShowRebaseBranchDialog(true);
+        showRebaseBranchDialog(currentBranch);
         break;
       case 'new-branch':
-        setNewBranchFrom(branchName);
-        setShowCreateBranchDialog(true);
+        showCreateBranchDialog(branchName);
         break;
       case 'new-tag':
-        try {
-          const git = gitAdapter.current;
-          const commits = await git.log(branchName, 1);
-          if (commits && commits.length > 0) {
-            setCommitForDialog(commits[0]);
-            setShowCreateTagFromCommitDialog(true);
-          } else {
-            showAlert(`No commits found on branch '${branchName}'`);
+        if (gitAdapter) {
+          const commits = await gitAdapter.log(branchName, 1);
+          if (commits?.[0]) {
+            showCreateTagFromCommitDialog(commits[0]);
           }
-        } catch (error) {
-          console.error('Error getting branch log:', error);
-          showAlert(`Failed to get commits from branch '${branchName}': ${error.message}`);
         }
         break;
       case 'rename':
-        setBranchToRename(branchName);
-        setShowRenameBranchDialog(true);
+        showRenameBranchDialog(branchName);
         break;
       case 'delete':
-        setBranchToDelete(branchName);
-        setShowDeleteBranchDialog(true);
+        showDeleteBranchDialog(branchName);
         break;
       case 'copy-branch-name':
-        // Copy branch name to clipboard
-        navigator.clipboard.writeText(branchName).then(() => {
-          console.log(`Branch name copied to clipboard: ${branchName}`);
-        }).catch(err => {
-          console.error('Failed to copy branch name:', err);
-        });
+        navigator.clipboard.writeText(branchName);
         break;
-      default:
-        showAlert(`Unknown context menu action: ${action}`);
     }
-  };
+  }, [gitAdapter, currentBranch, handleBranchSwitch, handleFetchClick, showPullDialog, 
+      showPushDialog, showMergeBranchDialog, showRebaseBranchDialog, showCreateBranchDialog,
+      showCreateTagFromCommitDialog, showRenameBranchDialog, showDeleteBranchDialog]);
 
-  const handleStashContextMenu = (action: string, stash: any, stashIndex: number): void => {
-    console.log('Stash context menu action:', action, 'on stash:', stash);
-
+  const handleStashContextMenu = useCallback((action: string, stash: any, stashIndex: number) => {
     switch (action) {
       case 'apply':
-        setStashToApply({ ...stash, index: stashIndex });
-        setShowApplyStashDialog(true);
+        showApplyStashDialog({ message: stash.message, index: stashIndex });
         break;
       case 'rename':
-        setStashToRename({ ...stash, index: stashIndex });
-        setShowRenameStashDialog(true);
+        showRenameStashDialog({ message: stash.message, index: stashIndex });
         break;
       case 'delete':
-        setStashToDelete({ ...stash, index: stashIndex });
-        setShowDeleteStashDialog(true);
+        showDeleteStashDialog({ message: stash.message, index: stashIndex });
         break;
-      default:
-        showAlert(`Unknown stash context menu action: ${action}`);
     }
-  };
+  }, [showApplyStashDialog, showRenameStashDialog, showDeleteStashDialog]);
 
-  const handleApplyStashDialog = async ({ stashIndex, deleteAfterApplying }) => {
-    setShowApplyStashDialog(false);
-
-    if (stashToApply === null) {
-      return;
-    }
-
-    const stash = stashToApply;
-    setStashToApply(null);
+  const handleApplyStashDialog = useCallback(async ({ stashIndex, deleteAfterApplying }: { stashIndex: number; deleteAfterApplying: boolean }) => {
+    hideApplyStashDialog();
+    if (!gitAdapter) return;
 
     try {
-      const git = gitAdapter.current;
-
-      console.log(`Applying stash: ${stash.message} (index: ${stashIndex})`);
-
-      // Apply the stash
-      await git.raw(['stash', 'apply', `stash@{${stashIndex}}`]);
-
-      console.log(`Stash applied successfully: ${stash.message}`);
-
-      // Only delete the stash if it was requested and there were no errors
+      await gitAdapter.raw(['stash', 'apply', `stash@{${stashIndex}}`]);
       if (deleteAfterApplying) {
-        try {
-          console.log(`Deleting stash after successful apply: ${stash.message}`);
-          await git.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
-          console.log(`Stash deleted successfully after apply: ${stash.message}`);
-        } catch (dropError) {
-          console.warn(`Failed to delete stash after apply: ${dropError.message}`);
-          setError(`Stash applied successfully, but failed to delete it: ${dropError.message}`);
-        }
+        await gitAdapter.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
       }
-
-      // Refresh the file statuses to show applied changes
       await refreshFileStatus(false);
-
-      // Refresh repository data to show updated stash list
       await loadRepoData(true);
-
     } catch (error) {
       console.error('Error applying stash:', error);
-      setError(`Failed to apply stash '${stash.message}': ${error.message}`);
+      setError(`Failed to apply stash: ${(error as Error).message}`);
     }
-  };
+  }, [gitAdapter, hideApplyStashDialog, refreshFileStatus, loadRepoData]);
 
-  const handleRenameStashDialog = async (newName) => {
-    setShowRenameStashDialog(false);
-
-    if (!stashToRename) {
-      return;
-    }
-
-    const stash = stashToRename;
-    setStashToRename(null);
+  const handleRenameStashDialog = useCallback(async (newName: string) => {
+    hideRenameStashDialog();
+    const stash = pendingState.stashToRename;
+    if (!stash || !gitAdapter) return;
 
     try {
-      const git = gitAdapter.current;
-
       const currentMessage = stash.message;
       const currentName = currentMessage.replace(/^On [^:]+:\s*/, '');
-      const currentPrfix = currentMessage.substring(0, currentMessage.indexOf(currentName));
-      newName = currentPrfix + newName;
+      const prefix = currentMessage.substring(0, currentMessage.indexOf(currentName));
+      const finalName = prefix + newName;
 
-      console.log(`Renaming stash: "${stash.message}" to "${newName}"`);
-
-      // Rename the stash using git stash drop and git stash store
-      // First, get the current stash content
-      const stashContent = await git.raw(['show', `stash@{${stash.index}}`]);
-
-      // Drop the old stash
-      await git.raw(['stash', 'drop', `stash@{${stash.index}}`]);
-
-      // Create a new stash with the new name
-      await git.raw(['stash', 'store', '-m', newName, stashContent]);
-
-      console.log(`Stash renamed successfully from "${stash.message}" to "${newName}"`);
-
-      // Refresh repository data to show updated stash list
+      const stashContent = await gitAdapter.raw(['show', `stash@{${stash.index}}`]);
+      await gitAdapter.raw(['stash', 'drop', `stash@{${stash.index}}`]);
+      await gitAdapter.raw(['stash', 'store', '-m', finalName, stashContent]);
       await loadRepoData(true);
-
     } catch (error) {
       console.error('Error renaming stash:', error);
-      setError(`Failed to rename stash from '${stash.message}' to '${newName}': ${error.message}`);
+      setError(`Failed to rename stash: ${(error as Error).message}`);
     }
-};
+  }, [gitAdapter, hideRenameStashDialog, pendingState.stashToRename, loadRepoData]);
 
-  const handleDeleteStashDialog = async (stashIndex) => {
-    setShowDeleteStashDialog(false);
-
-    if (stashToDelete === null) {
-      return;
-    }
-
-    const stash = stashToDelete;
-    setStashToDelete(null);
+  const handleDeleteStashDialog = useCallback(async (stashIndex: number) => {
+    hideDeleteStashDialog();
+    if (!gitAdapter) return;
 
     try {
-      const git = gitAdapter.current;
-
-      console.log(`Deleting stash: ${stash.message} (index: ${stashIndex})`);
-
-      // Delete the stash
-      await git.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
-
-      console.log(`Stash deleted successfully: ${stash.message}`);
-
-      // Refresh repository data to show updated stash list
+      await gitAdapter.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
       await loadRepoData(true);
-
     } catch (error) {
       console.error('Error deleting stash:', error);
-      setError(`Failed to delete stash '${stash.message}': ${error.message}`);
+      setError(`Failed to delete stash: ${(error as Error).message}`);
     }
-};
+  }, [gitAdapter, hideDeleteStashDialog, loadRepoData]);
 
-  const handleRemoteBranchSelect = (remoteBranchInfo: any) => {
-    console.log('Remote branch selected:', remoteBranchInfo);
-
-    if (remoteBranchInfo.type === 'remote-branch' && remoteBranchInfo.fullName) {
-      // Load commits for the remote branch
-      loadRemoteBranchCommits(remoteBranchInfo.remoteName, remoteBranchInfo.branchName, remoteBranchInfo.fullName);
-    } else {
-      setSelectedItem(remoteBranchInfo);
-    }
-  };
-
-  const loadRemoteBranchCommits = async (remoteName: string, branchName: string, fullName: string) => {
-    // Check cache first
+  const loadRemoteBranchCommits = useCallback(async (remoteName: string, branchName: string, fullName: string) => {
     if (branchCommitsCache.current.has(fullName)) {
-      console.log(`Loading commits for ${fullName} from cache`);
       setSelectedItem({
         type: 'remote-branch',
         remoteName,
@@ -1902,527 +833,315 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
     }
 
-    // Increment load ID to cancel any pending requests
+    if (!gitAdapter) return;
+
     currentBranchLoadId.current += 1;
     const thisLoadId = currentBranchLoadId.current;
 
+    setSelectedItem({ type: 'remote-branch', remoteName, branchName, fullName, commits: [], loading: true });
+
     try {
-      const git = gitAdapter.current;
-
-      // Set loading state immediately
-      setSelectedItem({
-        type: 'remote-branch',
-        remoteName,
-        branchName,
-        fullName,
-        commits: [],
-        loading: true
-      });
-
-      console.log(`Loading commits for remote branch: ${fullName}`);
-      const maxCommits = 100;
-      const commits = await git.log(fullName, maxCommits);
-
-      // Cache commits for this remote branch
+      const commits = await gitAdapter.log(fullName, 100);
       updateBranchCache(fullName, commits);
 
-      // Only update state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
-        setSelectedItem({
-          type: 'remote-branch',
-          remoteName,
-          branchName,
-          fullName,
-          commits,
-          loading: false
-        });
+        setSelectedItem({ type: 'remote-branch', remoteName, branchName, fullName, commits, loading: false });
       }
     } catch (error) {
       console.error('Error loading remote branch commits:', error);
-
-      // Only update error state if this request is still current
       if (thisLoadId === currentBranchLoadId.current) {
-        setError(`Failed to load commits: ${error.message}`);
-        setSelectedItem({
-          type: 'remote-branch',
-          remoteName,
-          branchName,
-          fullName,
-          commits: [],
-          loading: false
-        });
+        setError(`Failed to load commits: ${(error as Error).message}`);
+        setSelectedItem({ type: 'remote-branch', remoteName, branchName, fullName, commits: [], loading: false });
       }
     }
-  };
+  }, [gitAdapter, branchCommitsCache, updateBranchCache]);
 
-  const handleRemoteAdded = () => {
-    // Refresh repository data to show the new remote
-    loadRepoData(true);
-  };
-
-  const handleDeleteRemoteBranch = async (remoteName: string, branchName: string) => {
-    const confirmed = await showConfirm(
-      `Are you sure you want to delete remote branch '${remoteName}/${branchName}'? This cannot be undone.`
-    );
-
-    if (!confirmed) {
-      return;
+  const handleRemoteBranchSelect = useCallback((info: any) => {
+    if (info.type === 'remote-branch' && info.fullName) {
+      loadRemoteBranchCommits(info.remoteName, info.branchName, info.fullName);
+    } else {
+      setSelectedItem(info);
     }
+  }, [loadRemoteBranchCommits]);
+
+  const handleDeleteRemoteBranch = useCallback(async (remoteName: string, branchName: string) => {
+    const confirmed = await showConfirm(`Delete remote branch '${remoteName}/${branchName}'?`);
+    if (!confirmed || !gitAdapter) return;
 
     try {
       setIsBusy(true);
-      const git = gitAdapter.current;
-
-      console.log(`Deleting remote branch: ${remoteName}/${branchName}`);
       setBusyMessage(`git push ${remoteName} --delete ${branchName}`);
-      await git.raw(['push', remoteName, '--delete', branchName]);
-
-      console.log(`Remote branch ${remoteName}/${branchName} deleted successfully`);
-
-      // Refresh repository data to show updated remote branches
+      await gitAdapter.raw(['push', remoteName, '--delete', branchName]);
       await loadRepoData(true);
     } catch (error) {
       console.error('Error deleting remote branch:', error);
-      setError(`Failed to delete remote branch '${remoteName}/${branchName}': ${error.message}`);
+      setError(`Failed to delete remote branch: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, showConfirm, loadRepoData]);
 
-  const handleCheckoutRemoteBranch = async (remoteName: string, branchName: string) => {
+  const handleCheckoutRemoteBranch = useCallback(async (remoteName: string, branchName: string) => {
+    if (!gitAdapter) return;
+
     try {
       setIsBusy(true);
-      const git = gitAdapter.current;
-
-      console.log(`Checking out remote branch: ${remoteName}/${branchName}`);
       setBusyMessage(`git checkout -b ${branchName} ${remoteName}/${branchName}`);
-      await git.raw(['checkout', '-b', branchName, `${remoteName}/${branchName}`]);
-
-      console.log(`Checked out remote branch as local branch: ${branchName}`);
-
-      // Refresh repository data to show updated branches
+      await gitAdapter.raw(['checkout', '-b', branchName, `${remoteName}/${branchName}`]);
       await loadRepoData(true);
     } catch (error) {
       console.error('Error checking out remote branch:', error);
-      setError(`Failed to checkout remote branch '${remoteName}/${branchName}': ${error.message}`);
+      setError(`Failed to checkout remote branch: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  };
+  }, [gitAdapter, loadRepoData]);
 
-  const handlePullRemoteBranch = async (remoteName: string, branchName: string) => {
-    try {
-      setIsBusy(true);
-      const git = gitAdapter.current;
-
-      console.log(`Pulling from remote branch: ${remoteName}/${branchName} into ${currentBranch}`);
-      setBusyMessage(`git pull ${remoteName} ${branchName}`);
-      await git.pull(remoteName, branchName);
-
-      console.log(`Pull completed successfully from ${remoteName}/${branchName}`);
-
-      // Clear branch cache since pull may have added new commits
-      clearBranchCache(currentBranch);
-
-      // Refresh repository data
-      await loadRepoData(true);
-    } catch (error) {
-      console.error('Error pulling remote branch:', error);
-      setError(`Failed to pull '${remoteName}/${branchName}': ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-    }
-  };
-
-  const handleCreateTagFromRemoteBranch = async (remoteName: string, branchName: string) => {
-    try {
-      setIsBusy(true);
-      const git = gitAdapter.current;
-
-      console.log(`Creating tag from remote branch: ${remoteName}/${branchName}`);
-
-      // Fetch the latest to ensure we have the remote refs
-      setBusyMessage(`git fetch ${remoteName}`);
-      await git.fetch(remoteName);
-
-      // Get the commit hash that the remote branch points to
-      const refSpec = `${remoteName}/${branchName}`;
-      const result = await git.raw(['rev-parse', refSpec]);
-      const commitHash = result.trim();
-
-      if (!commitHash) {
-        throw new Error(`Could not find commit hash for ${refSpec}`);
-      }
-
-      // Get commit info
-      const logResult = await git.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', commitHash]);
-      const [hash, author, email, date, message] = logResult.trim().split('|');
-
-      const commitInfo: Commit = {
-        hash,
-        author_name: author,
-        author_email: email,
-        date,
-        message,
-        body: '',
-        onOrigin: true,
-        tags: []
-      };
-
-      setCommitForDialog(commitInfo);
-      setShowCreateTagFromCommitDialog(true);
-
-    } catch (error) {
-      console.error('Error creating tag from remote branch:', error);
-      setError(`Failed to create tag from '${remoteName}/${branchName}': ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-    }
-  };
-
-  const handleCreateBranchFromRemoteBranch = async (remoteName: string, branchName: string) => {
-    try {
-      setIsBusy(true);
-      const git = gitAdapter.current;
-
-      console.log(`Creating branch from remote branch: ${remoteName}/${branchName}`);
-
-      // Fetch the latest to ensure we have the remote refs
-      setBusyMessage(`git fetch ${remoteName}`);
-      await git.fetch(remoteName);
-
-      // Get the commit hash that the remote branch points to
-      const refSpec = `${remoteName}/${branchName}`;
-      const result = await git.raw(['rev-parse', refSpec]);
-      const commitHash = result.trim();
-
-      if (!commitHash) {
-        throw new Error(`Could not find commit hash for ${refSpec}`);
-      }
-
-      // Get commit info
-      const logResult = await git.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', commitHash]);
-      const [hash, author, email, date, message] = logResult.trim().split('|');
-
-      const commitInfo: Commit = {
-        hash,
-        author_name: author,
-        author_email: email,
-        date,
-        message,
-        body: '',
-        onOrigin: true,
-        tags: []
-      };
-
-      setCommitForDialog(commitInfo);
-      setShowCreateBranchFromCommitDialog(true);
-
-    } catch (error) {
-      console.error('Error creating branch from remote branch:', error);
-      setError(`Failed to create branch from '${remoteName}/${branchName}': ${error.message}`);
-    } finally {
-      setIsBusy(false);
-      setBusyMessage('');
-    }
-  };
-
-  const handleRemoteBranchContextMenu = async (action: string, remoteName: string, branchName: string, fullName: string): Promise<void> => {
-    console.log('Remote branch context menu action:', action, 'on branch:', fullName);
-
+  const handleRemoteBranchContextMenu = useCallback(async (action: string, remoteName: string, branchName: string, fullName: string) => {
     switch (action) {
       case 'checkout':
         await handleCheckoutRemoteBranch(remoteName, branchName);
         break;
-      case 'pull':
-        await handlePullRemoteBranch(remoteName, branchName);
-        break;
       case 'merge':
-        setMergeSourceBranch(fullName);
-        setShowMergeBranchDialog(true);
+        showMergeBranchDialog(fullName);
         break;
       case 'new-branch':
-        await handleCreateBranchFromRemoteBranch(remoteName, branchName);
+        const refSpec = `${remoteName}/${branchName}`;
+        if (gitAdapter) {
+          const result = await gitAdapter.raw(['rev-parse', refSpec]);
+          const hash = result.trim();
+          const logResult = await gitAdapter.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', hash]);
+          const [h, author, email, date, message] = logResult.trim().split('|');
+          showCreateBranchFromCommitDialog({ hash: h, author_name: author, author_email: email, date, message, body: '', onOrigin: true, tags: [] });
+        }
         break;
       case 'new-tag':
-        await handleCreateTagFromRemoteBranch(remoteName, branchName);
+        if (gitAdapter) {
+          await gitAdapter.fetch(remoteName);
+          const result = await gitAdapter.raw(['rev-parse', `${remoteName}/${branchName}`]);
+          const logResult = await gitAdapter.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', result.trim()]);
+          const [h, author, email, date, message] = logResult.trim().split('|');
+          showCreateTagFromCommitDialog({ hash: h, author_name: author, author_email: email, date, message, body: '', onOrigin: true, tags: [] });
+        }
         break;
       case 'delete':
         handleDeleteRemoteBranch(remoteName, branchName);
         break;
       case 'copy-name':
-        // Copy remote branch name to clipboard
-        navigator.clipboard.writeText(fullName).then(() => {
-          console.log(`Remote branch name copied to clipboard: ${fullName}`);
-        }).catch(err => {
-          console.error('Failed to copy remote branch name:', err);
-        });
+        navigator.clipboard.writeText(fullName);
         break;
-      default:
-        showAlert(`Unknown remote branch context menu action: ${action}`);
     }
-  };
+  }, [gitAdapter, handleCheckoutRemoteBranch, showMergeBranchDialog, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, handleDeleteRemoteBranch]);
 
-  const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
-
-  const handleCommitContextMenu = async (action: string, commit: Commit, currentBranch: string, tagName?: string) => {
-    console.log('Commit context menu action:', action, 'on commit:', commit.hash, tagName ? `tag: ${tagName}` : '');
+  const handleCreateBranchFromCommit = useCallback(async (branchName: string, checkoutAfterCreate: boolean) => {
+    const commit = pendingState.commitForDialog;
+    hideCreateBranchFromCommitDialog();
+    if (!commit || !gitAdapter) return;
 
     try {
-      const git = gitAdapter.current;
+      setIsBusy(true);
+      setBusyMessage(`git checkout -b ${branchName} ${commit.hash}`);
+      await gitAdapter.raw(['checkout', '-b', branchName, commit.hash]);
+      
+      if (checkoutAfterCreate) {
+        await handleBranchSelect(branchName);
+      }
+      
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error creating branch from commit:', error);
+      setError(`Branch creation failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideCreateBranchFromCommitDialog, pendingState.commitForDialog, handleBranchSelect, loadRepoData]);
 
-      switch (action) {
-        case 'new-branch':
-          setCommitForDialog(commit);
-          setShowCreateBranchFromCommitDialog(true);
-          break;
+  const handleCreateTagFromCommit = useCallback(async (tagName: string, tagMessage: string) => {
+    const commit = pendingState.commitForDialog;
+    hideCreateTagFromCommitDialog();
+    if (!commit || !gitAdapter) return;
 
-        case 'new-tag':
-          setCommitForDialog(commit);
-          setShowCreateTagFromCommitDialog(true);
-          break;
+    try {
+      setIsBusy(true);
+      setBusyMessage(tagMessage ? `git tag -a ${tagName} -m "${tagMessage}"` : `git tag ${tagName}`);
+      
+      if (tagMessage) {
+        await gitAdapter.raw(['tag', '-a', tagName, '-m', tagMessage, commit.hash]);
+      } else {
+        await gitAdapter.raw(['tag', tagName, commit.hash]);
+      }
 
-        case 'show-tag-details':
-          if (tagName) {
-            try {
-              // Get tag details (annotated tags have extra info)
-              const tagInfo = await git.raw(['show', tagName]);
-              showAlert(`Tag: ${tagName}\n\n${tagInfo}`, 'Tag details');
-            } catch (error) {
-              console.error('Error getting tag details:', error);
-              setError('Failed to get tag details: ' + error.message);
-            }
-          }
-          break;
+      clearBranchCache();
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error creating tag from commit:', error);
+      setError(`Tag creation failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideCreateTagFromCommitDialog, pendingState.commitForDialog, clearBranchCache, loadRepoData]);
 
-        case 'copy-tag-name':
-          if (tagName) {
-            try {
-              await navigator.clipboard.writeText(tagName);
-              console.log(`Copied tag name to clipboard: ${tagName}`);
-            } catch (error) {
-              console.error('Failed to copy tag name:', error);
-              showAlert('Failed to copy tag name to clipboard', 'Error');
-            }
-          }
-          break;
+  const handleAmendCommit = useCallback(async (newMessage: string) => {
+    const commit = pendingState.commitForDialog;
+    hideAmendCommitDialog();
+    if (!commit || !gitAdapter) return;
 
-        case 'delete-tag':
-          if (tagName) {
-            const confirmed = await showConfirm(
-              `Are you sure you want to delete tag '${tagName}'?\n\nThis will delete the tag locally. You can also delete it from the remote if it exists there.`
-            );
-            if (confirmed) {
-              try {
-                setIsBusy(true);
-                setBusyMessage(`git tag -d ${tagName}`);
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git commit --amend -m "${newMessage.replace(/"/g, '\\"')}"`);
+      await gitAdapter.raw(['commit', '--amend', '-m', newMessage]);
+      clearBranchCache();
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error amending commit:', error);
+      setError(`Failed to amend commit: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideAmendCommitDialog, pendingState.commitForDialog, clearBranchCache, loadRepoData]);
 
-                // Delete tag locally
-                await git.raw(['tag', '-d', tagName]);
-                console.log(`Deleted local tag '${tagName}'`);
+  const handleCommitContextMenu = useCallback(async (action: string, commit: Commit, _currentBranch: string, tagName?: string) => {
+    if (!gitAdapter) return;
 
-                // Ask if they want to delete from remote too
-                const deleteFromRemote = await showConfirm(
-                  `Tag '${tagName}' deleted locally.\n\nDo you also want to delete it from origin?`
-                );
-
-                if (deleteFromRemote) {
-                  try {
-                    setBusyMessage(`git push origin :refs/tags/${tagName}`);
-                    await git.raw(['push', 'origin', `:refs/tags/${tagName}`]);
-                    console.log(`Deleted tag '${tagName}' from origin`);
-                  } catch (error) {
-                    console.error('Error deleting tag from remote:', error);
-                    setError('Failed to delete tag from remote: ' + error.message);
-                  }
-                }
-
-                // Clear caches and refresh
-                clearBranchCache();
-                await loadRepoData(true);
-
-                // Reload current branch view if open
-                if (selectedItem?.type === 'branch' && selectedItem.branchName) {
-                  await handleBranchSelect(selectedItem.branchName);
-                } else if (selectedItem?.type === 'remote-branch' && selectedItem.fullName) {
-                  await loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName);
-                }
-              } catch (error) {
-                console.error('Error deleting tag:', error);
-                setError('Failed to delete tag: ' + error.message);
-              } finally {
-                setIsBusy(false);
-                setBusyMessage('');
-              }
-            }
-          }
-          break;
-
-        case 'push-tag':
-          if (tagName) {
-            const confirmed = await showConfirm(
-              `Are you sure you want to push tag '${tagName}' to origin?`
-            );
-            if (confirmed) {
-              try {
-                setIsBusy(true);
-                setBusyMessage(`git push origin ${tagName}`);
-                await git.raw(['push', 'origin', tagName]);
-                console.log(`Pushed tag '${tagName}' to origin`);
-              } catch (error) {
-                console.error('Error pushing tag:', error);
-                setError('Failed to push tag: ' + error.message);
-              } finally {
-                setIsBusy(false);
-                setBusyMessage('');
-              }
-            }
-          }
-          break;
-
-        case 'rebase-to-here':
-          if (currentBranch) {
-            const confirmed = await showConfirm(
-              `Are you sure you want to rebase '${currentBranch}' onto commit ${commit.hash.substring(0, 7)}?\n\nThis will rewrite the history of '${currentBranch}'.`
-            );
-            if (confirmed) {
-              await git.raw(['rebase', '--interactive', '--onto', commit.hash, `$(git merge-base ${currentBranch} ${commit.hash})`, currentBranch]);
-              console.log(`Rebased '${currentBranch}' onto commit ${commit.hash.substring(0, 7)}`);
-              clearBranchCache(); // Rebase changes commit history
-              await loadRepoData(true);
-            }
-          } else {
-            setError('No current branch found for rebase');
-          }
-          break;
-
-        case 'reset-to-here':
-          if (currentBranch) {
-            const confirmed = await showConfirm(
-              `Are you sure you want to reset '${currentBranch}' to commit ${commit.hash.substring(0, 7)}?\n\nThis will discard all commits after this point.`
-            );
-            if (confirmed) {
-              await git.raw(['reset', '--hard', commit.hash]);
-              console.log(`Reset '${currentBranch}' to commit ${commit.hash.substring(0, 7)}`);
-              clearBranchCache(); // Reset changes commit history
-              await loadRepoData(true);
-            }
-          } else {
-            setError('No current branch found for reset');
-          }
-          break;
-
-        case 'amend-commit':
-          setCommitForDialog(commit);
-          setShowAmendCommitDialog(true);
-          break;
-
-        case 'checkout-commit':
-          const confirmed = await showConfirm(
-            `Are you sure you want to checkout commit ${commit.hash.substring(0, 7)}?\n\nThis will put you in a 'detached HEAD' state.`
-          );
+    switch (action) {
+      case 'new-branch':
+        showCreateBranchFromCommitDialog(commit);
+        break;
+      case 'new-tag':
+        showCreateTagFromCommitDialog(commit);
+        break;
+      case 'show-tag-details':
+        if (tagName) {
+          const tagInfo = await gitAdapter.raw(['show', tagName]);
+          showAlert(`Tag: ${tagName}\n\n${tagInfo}`, 'Tag details');
+        }
+        break;
+      case 'copy-tag-name':
+        if (tagName) navigator.clipboard.writeText(tagName);
+        break;
+      case 'delete-tag':
+        if (tagName) {
+          const confirmed = await showConfirm(`Delete tag '${tagName}'?`);
           if (confirmed) {
-            await git.checkoutBranch(commit.hash);
-            console.log(`Checked out commit ${commit.hash.substring(0, 7)}`);
+            await gitAdapter.raw(['tag', '-d', tagName]);
+            clearBranchCache();
             await loadRepoData(true);
           }
-          break;
-
-        case 'cherry-pick':
-          if (currentBranch) {
-            const confirmed = await showConfirm(
-              `Are you sure you want to cherry-pick commit ${commit.hash.substring(0, 7)} onto '${currentBranch}'?`
-            );
-            if (confirmed) {
-              await git.raw(['cherry-pick', commit.hash]);
-              console.log(`Cherry-picked commit ${commit.hash.substring(0, 7)} onto '${currentBranch}'`);
-              clearBranchCache(); // Cherry-pick adds a new commit
-              await loadRepoData(true);
-            }
-          } else {
-            setError('No current branch found for cherry-pick');
-          }
-          break;
-
-        case 'revert-commit':
-          if (currentBranch) {
-            const confirmed = await showConfirm(
-              `Are you sure you want to revert commit ${commit.hash.substring(0, 7)} on '${currentBranch}'?`
-            );
-            if (confirmed) {
-              await git.raw(['revert', commit.hash]);
-              console.log(`Reverted commit ${commit.hash.substring(0, 7)} on '${currentBranch}'`);
-              clearBranchCache(); // Revert adds a new commit
-              await loadRepoData(true);
-            }
-          } else {
-            setError('No current branch found for revert');
-          }
-          break;
-
-        case 'save-patch':
-          try {
-            const patchContent = await git.raw(['format-patch', '-1', commit.hash]);
-            const blob = new Blob([patchContent], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${commit.hash.substring(0, 7)}.patch`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            console.log(`Saved patch for commit ${commit.hash.substring(0, 7)}`);
-          } catch (error) {
-            console.error('Error creating patch:', error);
-            setError('Failed to create patch: ' + error.message);
-          }
-          break;
-
-        case 'copy-sha':
-          try {
-            await navigator.clipboard.writeText(commit.hash);
-            console.log(`Copied commit SHA to clipboard: ${commit.hash}`);
-          } catch (error) {
-            console.error('Failed to copy SHA:', error);
-            showAlert('Failed to copy SHA to clipboard', 'Error');
-          }
-          break;
-
-        case 'copy-info':
-          try {
-            const commitInfo = `Commit: ${commit.hash.substring(0, 7)} (${commit.hash})\nAuthor: ${commit.author_name}\nDate: ${commit.date}\n\n${commit.message}`;
-            await navigator.clipboard.writeText(commitInfo);
-            console.log(`Copied commit info to clipboard: ${commit.hash.substring(0, 7)}`);
-          } catch (error) {
-            console.error('Failed to copy commit info:', error);
-            showAlert('Failed to copy commit info to clipboard', 'Error');
-          }
-          break;
-
-        default:
-          showAlert(`Unknown context menu action: ${action}`);
-      }
-    } catch (error) {
-      console.error(`Error handling commit context menu action '${action}':`, error);
-      setError(`Error: ${error.message}`);
+        }
+        break;
+      case 'push-tag':
+        if (tagName) {
+          await gitAdapter.raw(['push', 'origin', tagName]);
+        }
+        break;
+      case 'checkout-commit':
+        if (await showConfirm(`Checkout commit ${commit.hash.substring(0, 7)}?`)) {
+          await gitAdapter.checkoutBranch(commit.hash);
+          await loadRepoData(true);
+        }
+        break;
+      case 'cherry-pick':
+        if (await showConfirm(`Cherry-pick ${commit.hash.substring(0, 7)}?`)) {
+          await gitAdapter.raw(['cherry-pick', commit.hash]);
+          clearBranchCache();
+          await loadRepoData(true);
+        }
+        break;
+      case 'revert-commit':
+        if (await showConfirm(`Revert ${commit.hash.substring(0, 7)}?`)) {
+          await gitAdapter.raw(['revert', commit.hash]);
+          clearBranchCache();
+          await loadRepoData(true);
+        }
+        break;
+      case 'reset-to-here':
+        if (await showConfirm(`Reset to ${commit.hash.substring(0, 7)}?`)) {
+          await gitAdapter.raw(['reset', '--hard', commit.hash]);
+          clearBranchCache();
+          await loadRepoData(true);
+        }
+        break;
+      case 'amend-commit':
+        showAmendCommitDialog(commit);
+        break;
+      case 'copy-sha':
+        navigator.clipboard.writeText(commit.hash);
+        break;
+      case 'copy-info':
+        const info = `Commit: ${commit.hash.substring(0, 7)}\nAuthor: ${commit.author_name}\nDate: ${commit.date}\n\n${commit.message}`;
+        navigator.clipboard.writeText(info);
+        break;
+      case 'save-patch':
+        const patchContent = await gitAdapter.raw(['format-patch', '-1', commit.hash]);
+        const blob = new Blob([patchContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${commit.hash.substring(0, 7)}.patch`;
+        a.click();
+        URL.revokeObjectURL(url);
+        break;
     }
-  };
+  }, [gitAdapter, showAlert, showConfirm, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, showAmendCommitDialog, clearBranchCache, loadRepoData]);
+
+  const handleMouseDown = useCallback((splitterIndex: number | string) => {
+    activeSplitter.current = splitterIndex;
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    activeSplitter.current = null;
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (activeSplitter.current === null) return;
+
+    const container = e.currentTarget;
+    const rect = container.getBoundingClientRect();
+
+    if (activeSplitter.current === 'horizontal') {
+      const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
+      if (mouseX >= 20 && mouseX <= 50) {
+        setLeftWidth(mouseX);
+      }
+    } else {
+      const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
+      if (mouseY >= 20 && mouseY <= 80) {
+        setBranchesHeight(mouseY);
+      }
+    }
+  }, []);
+
+  const handleCancelOperation = useCallback(() => {
+    console.log('Cancelling git operation...');
+    setIsBusy(false);
+    setBusyMessage('');
+  }, []);
 
   return (
     <div className="repository-view">
-      <Toolbar runningCommands={commandState} onRefresh={handleRefreshClick} onFetch={handleFetchClick} onPull={handlePullClick} onPush={handlePushClick} onStash={hasLocalChanges ? handleStashClick : null} onCreateBranch={() => setShowCreateBranchDialog(true)} refreshing={refreshing} currentBranch={currentBranch} branchStatus={branchStatus} />
+      <Toolbar 
+        runningCommands={commandState} 
+        onRefresh={handleRefreshClick} 
+        onFetch={handleFetchClick} 
+        onPull={() => showPullDialog()} 
+        onPush={() => showPushDialog(currentBranch)} 
+        onStash={hasLocalChanges ? () => showStashDialog() : null} 
+        onCreateBranch={() => showCreateBranchDialog()} 
+        refreshing={refreshing} 
+        currentBranch={currentBranch} 
+        branchStatus={branchStatus} 
+      />
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {/* Busy indicator overlay */}
         {isBusy && (
           <div className="repo-busy-overlay">
             <div className="repo-busy-spinner"></div>
@@ -2433,31 +1152,28 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           </div>
         )}
         {loading && <div className="loading">Loading repository...</div>}
-        {error && !showErrorDialog && (
+        {error && dialogStates.showErrorDialog && (
           <ErrorDialog
             error={error}
-            onClose={() => {
-              setError(null);
-              setShowErrorDialog(false);
-            }}
+            onClose={() => { setError(null); hideErrorDialog(); }}
           />
         )}
         {!loading && !error && (
           <>
             <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
               <RepoInfo
-                gitAdapter={gitAdapter.current}
+                gitAdapter={gitAdapter}
                 currentBranch={currentBranch}
                 originUrl={originUrl}
                 modifiedCount={modifiedCount}
                 selectedItem={selectedItem}
                 onSelectItem={handleItemSelect}
                 usingCache={usingCache}
-                onResetToOrigin={() => setShowResetDialog(true)}
-                onCleanWorkingDirectory={() => setShowCleanWorkingDirectoryDialog(true)}
-                onGitGC={handleGitGC}
-                onOriginChanged={handleOriginChanged}
-                onStashChanges={hasLocalChanges ? handleStashClick : undefined}
+                onResetToOrigin={() => showResetDialog()}
+                onCleanWorkingDirectory={() => showCleanWorkingDirectoryDialog()}
+                onGitGC={async () => { if (gitAdapter) await gitAdapter.raw(['gc']); }}
+                onOriginChanged={async () => { if (gitAdapter) setOriginUrl(await gitAdapter.getOriginUrl()); }}
+                onStashChanges={hasLocalChanges ? () => showStashDialog() : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
                 onRefresh={() => loadRepoData(true)}
                 onError={setError}
@@ -2468,10 +1184,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                   currentBranch={currentBranch}
                   branchStatus={branchStatus}
                   onBranchSwitch={handleBranchSwitch}
-                  pullingBranch={pullingBranch}
+                  pullingBranch={pendingState.pullingBranch}
                   onBranchSelect={handleBranchSelect}
                   stashes={stashes}
-                  onSelectStash={(stash) => handleItemSelect(stash)}
+                  onSelectStash={(stash) => handleItemSelect({ type: 'stash', ...stash })}
                   selectedItem={selectedItem}
                   onMouseDown={handleMouseDown}
                   onBranchContextMenu={handleBranchContextMenu}
@@ -2479,8 +1195,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                   remotes={remotes}
                   onSelectRemoteBranch={handleRemoteBranchSelect}
                   onRemoteBranchAction={handleRemoteBranchContextMenu}
-                  onRemoteAdded={handleRemoteAdded}
-                  gitAdapter={gitAdapter.current}
+                  onRemoteAdded={() => loadRepoData(true)}
+                  gitAdapter={gitAdapter}
                 />
               </div>
             </div>
@@ -2495,216 +1211,156 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 selectedItem={selectedItem || { type: lastContentPanel }}
                 unstagedFiles={unstagedFiles}
                 stagedFiles={stagedFiles}
-                gitAdapter={gitAdapter.current}
+                gitAdapter={gitAdapter}
                 onRefresh={() => refreshFileStatus(false)}
-                onBranchStatusRefresh={() => refreshBranchStatus()}
+                onBranchStatusRefresh={refreshBranchStatus}
                 onContextMenu={handleCommitContextMenu}
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}
                 onError={setError}
                 onBusyChange={setIsBusy}
                 onBusyMessageChange={setBusyMessage}
-                onCommitCreated={() => {
-                  // Clear cache for current branch after commit
-                  if (currentBranch) {
-                    clearBranchCache(currentBranch);
-                  }
-                }}
+                onCommitCreated={() => clearBranchCache(currentBranch)}
               />
             </div>
           </>
         )}
       </div>
-      {showPullDialog && (
+
+      {dialogStates.showPullDialog && (
         <PullDialog
-          onClose={() => setShowPullDialog(false)}
+          onClose={hidePullDialog}
           onPull={handlePull}
           branches={branches}
           currentBranch={currentBranch}
         />
       )}
-      {showPushDialog && (
+      {dialogStates.showPushDialog && (
         <PushDialog
-          onClose={() => setShowPushDialog(null)}
+          onClose={hidePushDialog}
           onPush={handlePush}
           branches={branches}
-          currentBranch={showPushDialog}
+          currentBranch={dialogStates.showPushDialog}
         />
       )}
-      {showStashDialog && (
+      {dialogStates.showStashDialog && (
         <StashDialog
-          onClose={() => setShowStashDialog(false)}
+          onClose={hideStashDialog}
           onStash={handleStash}
         />
       )}
-      {showResetDialog && (
+      {dialogStates.showResetDialog && (
         <ResetToOriginDialog
-          onClose={() => setShowResetDialog(false)}
+          onClose={hideResetDialog}
           onReset={handleResetToOrigin}
         />
       )}
-      {showLocalChangesDialog && (
+      {dialogStates.showLocalChangesDialog && (
         <LocalChangesDialog
-          onClose={() => {
-            setShowLocalChangesDialog(false);
-            setPendingBranchSwitch(null);
-          }}
+          onClose={hideLocalChangesDialog}
           onProceed={handleLocalChangesDialog}
-          targetBranch={pendingBranchSwitch}
+          targetBranch={pendingState.pendingBranchSwitch}
         />
       )}
-      {showCreateBranchDialog && (
+      {dialogStates.showCreateBranchDialog && (
         <CreateBranchDialog
-          onClose={() => {
-            setShowCreateBranchDialog(false);
-            setNewBranchFrom(null);
-          }}
+          onClose={hideCreateBranchDialog}
           onCreateBranch={handleCreateBranch}
-          currentBranch={newBranchFrom || currentBranch}
-          gitAdapter={gitAdapter.current}
+          currentBranch={pendingState.newBranchFrom || currentBranch}
+          gitAdapter={gitAdapter}
           branches={branches}
         />
       )}
-      {showCreateBranchFromCommitDialog && (
+      {dialogStates.showCreateBranchFromCommitDialog && (
         <CreateBranchFromCommitDialog
-          onClose={() => {
-            setShowCreateBranchFromCommitDialog(false);
-            setCommitForDialog(null);
-          }}
+          onClose={hideCreateBranchFromCommitDialog}
           onCreateBranch={handleCreateBranchFromCommit}
-          commitHash={commitForDialog ? commitForDialog.hash : ''}
-          commitMessage={commitForDialog ? commitForDialog.message : ''}
+          commitHash={pendingState.commitForDialog?.hash || ''}
+          commitMessage={pendingState.commitForDialog?.message || ''}
         />
       )}
-      {showCreateTagFromCommitDialog && (
+      {dialogStates.showCreateTagFromCommitDialog && (
         <CreateTagFromCommitDialog
-          onClose={() => {
-            setShowCreateTagFromCommitDialog(false);
-            setCommitForDialog(null);
-          }}
+          onClose={hideCreateTagFromCommitDialog}
           onCreateTag={handleCreateTagFromCommit}
-          commitHash={commitForDialog ? commitForDialog.hash : ''}
-          commitMessage={commitForDialog ? commitForDialog.message : ''}
+          commitHash={pendingState.commitForDialog?.hash || ''}
+          commitMessage={pendingState.commitForDialog?.message || ''}
         />
       )}
-      {showAmendCommitDialog && (
+      {dialogStates.showAmendCommitDialog && (
         <AmendCommitDialog
-          onClose={() => {
-            setShowAmendCommitDialog(false);
-            setCommitForDialog(null);
-          }}
+          onClose={hideAmendCommitDialog}
           onAmend={handleAmendCommit}
-          commitMessage={commitForDialog ? commitForDialog.message : ''}
+          commitMessage={pendingState.commitForDialog?.message || ''}
         />
       )}
-      {showDeleteBranchDialog && (
+      {dialogStates.showDeleteBranchDialog && (
         <DeleteBranchDialog
-          onClose={() => {
-            setShowDeleteBranchDialog(false);
-            setBranchToDelete(null);
-          }}
+          onClose={hideDeleteBranchDialog}
           onConfirm={handleDeleteBranchDialog}
-          branchName={branchToDelete}
+          branchName={pendingState.branchToDelete}
         />
       )}
-      {showRenameBranchDialog && (
+      {dialogStates.showRenameBranchDialog && (
         <RenameBranchDialog
-          onClose={() => {
-            setShowRenameBranchDialog(false);
-            setBranchToRename(null);
-          }}
+          onClose={hideRenameBranchDialog}
           onRename={handleRenameBranchDialog}
-          currentBranchName={branchToRename}
+          currentBranchName={pendingState.branchToRename}
         />
       )}
-      {showMergeBranchDialog && (
+      {dialogStates.showMergeBranchDialog && (
         <MergeBranchDialog
-          onClose={() => {
-            setShowMergeBranchDialog(false);
-            setMergeSourceBranch(null);
-          }}
+          onClose={hideMergeBranchDialog}
           onMerge={handleMergeBranchDialog}
-          sourceBranch={mergeSourceBranch}
+          sourceBranch={pendingState.mergeSourceBranch}
           targetBranch={currentBranch}
-          gitAdapter={gitAdapter.current}
+          gitAdapter={gitAdapter}
         />
       )}
-      {showRebaseBranchDialog && (
+      {dialogStates.showRebaseBranchDialog && (
         <RebaseBranchDialog
-          onClose={() => {
-            setShowRebaseBranchDialog(false);
-            setRebaseSourceBranch(null);
-          }}
+          onClose={hideRebaseBranchDialog}
           onRebase={handleRebaseBranchDialog}
-          sourceBranch={rebaseSourceBranch}
+          sourceBranch={pendingState.rebaseSourceBranch}
           targetBranch={currentBranch}
-          gitAdapter={gitAdapter.current}
+          gitAdapter={gitAdapter}
         />
       )}
-      {showApplyStashDialog && (
+      {dialogStates.showApplyStashDialog && (
         <ApplyStashDialog
-          onClose={() => {
-            setShowApplyStashDialog(false);
-            setStashToApply(null);
-          }}
+          onClose={hideApplyStashDialog}
           onApply={handleApplyStashDialog}
-          stashMessage={stashToApply?.message || ''}
-          stashIndex={stashToApply?.index || 0}
+          stashMessage={pendingState.stashToApply?.message || ''}
+          stashIndex={pendingState.stashToApply?.index || 0}
         />
       )}
-      {showRenameStashDialog && (
+      {dialogStates.showRenameStashDialog && (
         <RenameStashDialog
-          onClose={() => {
-            setShowRenameStashDialog(false);
-            setStashToRename(null);
-          }}
+          onClose={hideRenameStashDialog}
           onRename={handleRenameStashDialog}
-          currentStashName={stashToRename?.message.replace(/^On [^:]+:\s*/, '') || ''}
-          stashIndex={stashToRename?.index || 0}
+          currentStashName={pendingState.stashToRename?.message.replace(/^On [^:]+:\s*/, '') || ''}
+          stashIndex={pendingState.stashToRename?.index || 0}
         />
       )}
-      {showDeleteStashDialog && (
+      {dialogStates.showDeleteStashDialog && (
         <DeleteStashDialog
-          onClose={() => {
-            setShowDeleteStashDialog(false);
-            setStashToDelete(null);
-          }}
+          onClose={hideDeleteStashDialog}
           onDelete={handleDeleteStashDialog}
-          stashMessage={stashToDelete?.message || ''}
-          stashIndex={stashToDelete?.index || 0}
+          stashMessage={pendingState.stashToDelete?.message || ''}
+          stashIndex={pendingState.stashToDelete?.index || 0}
         />
       )}
-      {showPushDialog && (
-        <PushDialog
-          onClose={() => setShowPushDialog(null)}
-          onPush={handlePush}
-          branches={branches}
-          currentBranch={showPushDialog}
-        />
-      )}
-      {showStashDialog && (
-        <StashDialog
-          onClose={() => setShowStashDialog(false)}
-          onStash={handleStash}
-        />
-      )}
-      {showResetDialog && (
-        <ResetToOriginDialog
-          onClose={() => setShowResetDialog(false)}
-          onReset={handleResetToOrigin}
-        />
-      )}
-      {showCleanWorkingDirectoryDialog && (
+      {dialogStates.showCleanWorkingDirectoryDialog && (
         <CleanWorkingDirectoryDialog
-          onClose={() => setShowCleanWorkingDirectoryDialog(false)}
+          onClose={hideCleanWorkingDirectoryDialog}
           onClean={handleCleanWorkingDirectory}
         />
       )}
-      {showPullRequestDialog && (
+      {dialogStates.showPullRequestDialog && (
         <PullRequestDialog
-          prUrl={pullRequestUrl}
-          branchName={pullRequestBranch}
-          onClose={() => setShowPullRequestDialog(false)}
+          prUrl={pendingState.pullRequestUrl}
+          branchName={pendingState.pullRequestBranch}
+          onClose={hidePullRequestDialog}
         />
       )}
     </div>

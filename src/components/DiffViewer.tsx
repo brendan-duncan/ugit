@@ -674,6 +674,7 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
 
   return (
     <div className="diff-viewer">
+      {showChunkControls && (
       <div className="diff-viewer-header">
         <div className="diff-viewer-header-path">
           <span className="diff-viewer-file-icon">📄</span>
@@ -763,6 +764,7 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
           </div>
         </div>
       </div>
+      )}
       <div className="diff-content">
         {showConflictControls && (
           <div className="diff-conflict-controls">

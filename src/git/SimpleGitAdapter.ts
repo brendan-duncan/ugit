@@ -478,18 +478,33 @@ export class SimpleGitAdapter extends GitAdapter {
       // Get basic stash info using git show
       const showOutput = await this.git.show([stashRef]);
 
-      // Get list of files in stash
+      // Get list of files in stash with their status
       const stashShowOutput = await this.git.raw([
         'stash',
         'show',
-        '--name-only',
+        '--name-status',
         stashRef
       ]);
 
-      const files = stashShowOutput
+      const files: string[] = [];
+      const fileStatuses: { [filePath: string]: string } = {};
+      
+      stashShowOutput
         .trim()
         .split('\n')
-        .filter((file: string) => file.length > 0);
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          const parts = line.split('\t');
+          if (parts.length >= 2) {
+            const status = parts[0].trim();
+            const filePath = parts[1].trim();
+            files.push(filePath);
+            fileStatuses[filePath] = status;
+          } else if (parts.length === 1) {
+            files.push(parts[0]);
+            fileStatuses[parts[0]] = 'M';
+          }
+        });
 
       // Get diff for each file
       const fileDiffs: Map<string, string> = new Map();
@@ -499,6 +514,7 @@ export class SimpleGitAdapter extends GitAdapter {
         index: stashIndex,
         output: showOutput,
         files,
+        fileStatuses,
         fileDiffs,
         totalFiles: files.length,
         hash: '',
@@ -538,6 +554,7 @@ export class SimpleGitAdapter extends GitAdapter {
         index: stashIndex,
         output: '',
         files: [],
+        fileStatuses: {},
         fileDiffs: new Map<string, string>(),
         totalFiles: 0,
         hash: '',
@@ -553,10 +570,12 @@ export class SimpleGitAdapter extends GitAdapter {
   async getStashFileDiff(stashIndex: number, filePath: string): Promise<string> {   
     try {
       const stashRef = `stash@{${stashIndex}}`;
+      const parentRef = `stash@{${stashIndex}}^`;
       const startTime = performance.now();
-      const id = this._startCommand(`git diff "${stashRef}" -- "${filePath}"`, startTime);
+      const id = this._startCommand(`git diff "${parentRef}" "${stashRef}" -- "${filePath}"`, startTime);
       const diff = await this.git.raw([
         'diff',
+        parentRef,
         stashRef,
         '--',
         filePath

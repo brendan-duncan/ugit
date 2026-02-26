@@ -51,6 +51,7 @@
   font-size: 13px;
   margin-bottom: 8px;
   margin-left: 8px;
+  font-style: italic;
 }
 
 .stash-hash-text {
@@ -119,7 +120,7 @@
   border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 4px;
-  background-color: #252526;
+  background-color: var(--bg-secondary);
 }
 
 .stash-file-header {
@@ -132,35 +133,45 @@
 }
 
 .stash-file-header:hover {
-  background-color: #2d2d2d;
+  background-color: var(--accent-hover);
+}
+
+.stash-file-status {
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  width: 20px;
+  text-align: center;
 }
 
 .stash-file-name {
-  color: #cccccc;
+  color: var(--text-primary);
   font-weight: bold;
   flex: 1;
+  margin-left: 8px;
 }
 
 .stash-file-toggle {
-  color: #888888;
+  color: var(--text-secondary);
   font-size: 12px;
   transition: transform 0.2s;
 }
 
 .stash-file-diff {
   border-top: 1px solid var(--border-color);
-  background-color: #1e1e1e;
+  background-color: var(--bg-secondary);
 }
 
 .stash-no-files {
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
   text-align: center;
   padding: 20px;
 }
 
 .stash-loading {
-  color: #888888;
+  color: var(--text-secondary);
   font-style: italic;
   padding: 20px;
   text-align: center;

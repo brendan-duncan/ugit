@@ -58,6 +58,7 @@ export interface StashInfo {
   index: number;
   output: string;
   files: string[];
+  fileStatuses: { [filePath: string]: string };
   fileDiffs: Map<string, string>;
   totalFiles: number;
 

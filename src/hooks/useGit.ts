@@ -18,7 +18,7 @@ interface UseGitResult {
   refresh: () => Promise<void>;
 }
 
-export function useGit({ repoPath, onError }: UseGitOptions): UseGitResult {
+export function useGitAdapter({ repoPath, onError }: UseGitOptions): UseGitResult {
   const [gitAdapter, setGitAdapter] = useState<GitAdapter | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,8 +117,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
 
   const branchCommitsCache = useRef(new Map<string, Commit[]>());
 
-  const getFileStatusType = useCallback((fileStatus: FileStatus): string => {
-    const code = fileStatus.index || fileStatus.working_dir;
+  const getFileStatusType = useCallback((code: string): string => {
     switch (code) {
       case ' ': return 'unmodified';
       case 'M': return 'modified';
@@ -214,12 +213,12 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
         if (file.working_dir && file.working_dir !== ' ') {
           unstaged.push({
             path: file.path,
-            status: getFileStatusType(file)
+            status: getFileStatusType(file.working_dir)
           });
         } else if (file.index && file.index !== ' ' && file.index !== '?') {
           staged.push({
             path: file.path,
-            status: getFileStatusType(file)
+            status: getFileStatusType(file.index)
           });
         }
       });
@@ -306,8 +305,11 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     originUrl,
     setOriginUrl,
     unstagedFiles,
+    setUnstagedFiles,
     stagedFiles,
+    setStagedFiles,
     modifiedCount,
+    setModifiedCount,
     branches,
     remotes,
     branchStatus,

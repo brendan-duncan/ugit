@@ -103,7 +103,7 @@
 }
 
 .file-item.selected:hover {
-  background-color: var(--accent-color);
+  background-color: var(--bg-tertiary);
 }
 
 .file-item.conflict {
@@ -186,12 +186,12 @@
 }
 
 .folder-item.selected:hover {
-  background-color: var(--accent-color);
+  background-color: var(--bg-tertiary);
 }
 
 .context-menu {
-  background-color: #252526;
-  border: 1px solid #454545;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   min-width: 180px;
@@ -204,7 +204,7 @@
 
 .context-menu-item {
   padding: 6px 16px;
-  color: #cccccc;
+  color: var(--text-primary);
   cursor: pointer;
   user-select: none;
   transition: background-color 0.1s;
@@ -214,17 +214,17 @@
 }
 
 .context-menu-item:hover {
-  background-color: #2a2d2e;
+  background-color: var(--bg-tertiary);
 }
 
 .context-menu-separator {
   height: 1px;
-  background-color: #454545;
+  background-color: var(--border-color);
   margin: 4px 0;
 }
 
 .context-menu-hotkey {
-  color: #888888;
+  color: var(--text-secondary);
   font-size: 11px;
   font-style: italic;
   margin-left: 12px;
@@ -240,7 +240,7 @@
 }
 
 .context-menu-submenu-arrow {
-  color: #888888;
+  color: var(--text-secondary);
   font-size: 10px;
   margin-left: 8px;
   transition: transform 0.1s;
@@ -255,14 +255,14 @@
   position: absolute;
   left: 100%;
   top: 0;
-  background-color: #252526;
-  border: 1px solid #454545;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
   min-width: 200px;
   padding: 4px 0;
   z-index: 10001;
-  margin-left: 4px;
+  margin-left: 0px;
 }
 
 .context-menu-submenu-content .context-menu-item {
