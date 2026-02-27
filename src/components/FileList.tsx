@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { FileInfo } from './types';
 import './FileList.css';
 
@@ -57,6 +57,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
   const [contextMenu, setContextMenu] = useState(null);
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const lastMouseButton = useRef<number>(0);
   const isDraggingEnabled = useRef<boolean>(false);
   const lastSelectedItem = useRef(null);
@@ -84,49 +85,51 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     }
   }, [contextMenu, headerMenu]);
 
+  // Get all files under a folder path (recursively)
+  const getAllFilesInFolder = useCallback((folderPath: string) => {
+    return files.filter(file => file.path.startsWith(folderPath + '/'));
+  }, [files]);
+
   // Handle keyboard events for hotkeys
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Delete key for discard
-      if (e.key === 'Delete' && selectedItems.size > 0) {
-        // Get selected items with their details
-        const items = Array.from(selectedItems).map(path => {
-          // Check if it's a folder or file
-          const file = files.find(f => f.path === path);
-          if (file) {
-            return { type: 'file', path, file };
-          } else {
-            // It's a folder
-            const folderFiles = getAllFilesInFolder(path);
-            return { type: 'folder', path, files: folderFiles };
-          }
-        });
-
-        // Call discard action if context menu handler is available
-        if (onContextMenu && items.length > 0) {
-          onContextMenu('discard', items, Array.from(selectedItems)[0], repoPath, listType);
-        }
-      }
-    };
-
-    // Only add keyboard listener when component is focused
-    const element = document.querySelector('.file-list');
-    if (element) {
-      element.addEventListener('keydown', handleKeyDown);
-      return () => element.removeEventListener('keydown', handleKeyDown);
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Ctrl+A: Select all items in this FileList
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Select all files in this FileList
+      const allPaths = files.map(f => f.path);
+      setSelectedItems(new Set(allPaths));
+      return;
     }
-  }, [selectedItems, files, onContextMenu, repoPath, listType]);
+
+    // Delete key for discard
+    if (e.key === 'Delete' && selectedItems.size > 0) {
+      // Get selected items with their details
+      const items = Array.from(selectedItems).map(path => {
+        // Check if it's a folder or file
+        const file = files.find(f => f.path === path);
+        if (file) {
+          return { type: 'file', path, file };
+        } else {
+          // It's a folder
+          const folderFiles = getAllFilesInFolder(path);
+          return { type: 'folder', path, files: folderFiles };
+        }
+      });
+
+      // Call discard action if context menu handler is available
+      if (onContextMenu && items.length > 0) {
+        onContextMenu('discard', items, Array.from(selectedItems)[0], repoPath, listType);
+      }
+    }
+  }, [selectedItems, setSelectedItems, files, onContextMenu, repoPath, listType, getAllFilesInFolder]);
 
   const toggleFolder = (path: string) => {
     setExpandedFolders(prev => ({
       ...prev,
       [path]: !prev[path]
     }));
-  };
-
-  // Get all files under a folder path (recursively)
-  const getAllFilesInFolder = (folderPath) => {
-    return files.filter(file => file.path.startsWith(folderPath + '/'));
   };
 
   // Get all items (files and folders) in display order
@@ -482,7 +485,12 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
   };
 
   return (
-    <div className="file-list">
+    <div 
+      className="file-list" 
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      ref={containerRef}
+    >
       <div className="file-list-header">
         <h4>{title} ({files.length})</h4>
         {listType === 'unstaged' && (
