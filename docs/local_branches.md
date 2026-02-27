@@ -30,7 +30,17 @@ Double-click any branch to check it out and make it your current branch.
 1. Right-click on a branch
 2. Select **Checkout**
 
-> ℹ️ Uncommitted changes may prevent switching. Commit, stash, or discard changes first.
+
+### Uncomitted changes when switching branches
+
+If you have uncomitted changes when you switch branches, a dialog will give you options on what to do with those changes.
+
+![Uncommitted Changes](images/branch_change_local_changes.png)
+
+* **Leave Alone** | Do not do anything with the changes.
+* **Branch Stash** | Stash the local changes with the branch name. When you switch back to this branch, the stash will automatically be re-applied.
+* **Stash and Reapply** | Stash the local changes, and re-apply the stash on the new branch.
+* **Discard** | Discard any local changes before switching to the new branch.
 
 ---
 
