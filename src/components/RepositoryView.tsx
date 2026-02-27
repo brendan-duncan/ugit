@@ -978,6 +978,11 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
       clearBranchCache();
       await loadRepoData(true);
+
+      // Refresh the currently selected branch to show the new tag
+      if (selectedItem?.type === 'branch' && selectedItem.branchName) {
+        await handleBranchSelect(selectedItem.branchName);
+      }
     } catch (error) {
       console.error('Error creating tag from commit:', error);
       setError(`Tag creation failed: ${(error as Error).message}`);
@@ -985,7 +990,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideCreateTagFromCommitDialog, pendingState.commitForDialog, clearBranchCache, loadRepoData]);
+  }, [gitAdapter, hideCreateTagFromCommitDialog, pendingState.commitForDialog, clearBranchCache, loadRepoData, selectedItem, handleBranchSelect]);
 
   const handleAmendCommit = useCallback(async (newMessage: string) => {
     const commit = pendingState.commitForDialog;
@@ -1033,6 +1038,10 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             await gitAdapter.raw(['tag', '-d', tagName]);
             clearBranchCache();
             await loadRepoData(true);
+            // Refresh the currently selected branch to remove the deleted tag
+            if (selectedItem?.type === 'branch' && selectedItem.branchName) {
+              await handleBranchSelect(selectedItem.branchName);
+            }
           }
         }
         break;
@@ -1089,7 +1098,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         URL.revokeObjectURL(url);
         break;
     }
-  }, [gitAdapter, showAlert, showConfirm, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, showAmendCommitDialog, clearBranchCache, loadRepoData]);
+  }, [gitAdapter, showAlert, showConfirm, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, showAmendCommitDialog, clearBranchCache, loadRepoData, selectedItem, handleBranchSelect]);
 
   const handleMouseDown = useCallback((splitterIndex: number | string) => {
     activeSplitter.current = splitterIndex;
