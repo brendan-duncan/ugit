@@ -313,6 +313,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     branches,
     remotes,
     branchStatus,
+    setBranchStatus,
     stashes,
     loading,
     usingCache,

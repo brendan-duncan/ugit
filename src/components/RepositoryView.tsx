@@ -78,6 +78,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     branches,
     remotes,
     branchStatus,
+    setBranchStatus,
     stashes,
     loading: repoLoading,
     usingCache,
@@ -230,10 +231,11 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       statusResults.forEach(result => {
         if (result) statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
       });
+      setBranchStatus(statusMap);
     } catch (error) {
       console.error('Error refreshing branch status:', error);
     }
-  }, [gitAdapter]);
+  }, [gitAdapter, setBranchStatus]);
 
   useEffect(() => {
     if (loading || !settings || !isActiveTab) return;
