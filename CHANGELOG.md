@@ -1,3 +1,19 @@
+## [v0.1.9](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.10) (February 27, 2026)
+
+### New Features
+
+* Branch Stash. If you have local changes when switching branches, you can chose Branch Stash to stash the local changes.
+When you switch back to that branch, those changes will be automatically re-applied.
+
+### Bug Fixes
+
+* CTRL+A will no longer select all of the text in the window.
+
+### Improvements
+
+* Refactor the react code to improve performance.
+* CTRL+A in the Staged or Unstaged file list will select all files.
+
 ## [v0.1.9](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.9) (February 23, 2026)
 
 ### New Features
