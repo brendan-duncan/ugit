@@ -15,6 +15,20 @@ interface TreeNodeProps {
   branchesWithStash: Set<string>;
 }
 
+interface BranchTreeProps {
+  branches: Array<string>;
+  currentBranch: string;
+  branchStatus: Record<string, any>;
+  onBranchSwitch: (branchName: string) => void;
+  pullingBranch: string | null;
+  onBranchSelect: (branchName: string) => void;
+  selectedItem: SelectedItem | null;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onContextMenu: (action: string, branchName: string, currentBranch: string) => void;
+  stashes: Array<any>;
+}
+
 function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
       onBranchSelect, selectedItem, onContextMenu, branchesWithStash }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -131,25 +145,6 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   );
 }
 
-interface StashInfo {
-  message: string;
-  hash?: string;
-}
-
-interface BranchTreeProps {
-  branches: string[];
-  currentBranch: string;
-  branchStatus: Record<string, any>;
-  onBranchSwitch: (branchName: string) => void;
-  pullingBranch: string | null;
-  onBranchSelect: (branchName: string) => void;
-  selectedItem: SelectedItem | null;
-  collapsed: boolean;
-  onToggleCollapse: () => void;
-  onContextMenu?: (action: string, branchName: string, currentBranch: string) => void;
-  stashes: Array<StashInfo>;
-}
-
 function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem,
       collapsed, onToggleCollapse, onContextMenu, stashes }: BranchTreeProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
@@ -158,19 +153,15 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
   // Create a set of branches that have branch stashes
   const branchesWithStash = new Set<string>();
   if (stashes && stashes.length > 0) {
-    console.log('Processing stashes for branch icons:', stashes);
     stashes.forEach(stash => {
       // Extract branch name from stash message: "branch-stash-{branchName}"
       // Git prepends "On {branch}: " or "WIP on {branch}: " to stash messages
       const match = stash.message.match(/branch-stash-(.+?)(?:\s|$)/);
-      console.log(`Checking stash message: "${stash.message}", match:`, match);
       if (match && match[1]) {
         const branchName = match[1];
-        console.log(`Found branch stash for branch: ${branchName}`);
         branchesWithStash.add(branchName);
       }
     });
-    console.log('Branches with stash:', Array.from(branchesWithStash));
   }
 
   // Close context menu when clicking outside
@@ -317,4 +308,4 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
   );
 }
 
-export default BranchTree;
+export default React.memo(BranchTree);
