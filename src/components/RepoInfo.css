@@ -2,7 +2,7 @@
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
-  user-select: auto;
+  user-select: text;
 }
 
 .repo-header {
