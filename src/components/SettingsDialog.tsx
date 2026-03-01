@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import './Dialog.css';
@@ -28,6 +28,17 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       setExternalEditor(settings.externalEditor);
     }
   }, [settings]);
+
+  // Close dialog on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleSave = async () => {
     if (!settings)

@@ -29,6 +29,16 @@ function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMes
     }
   }, [tagName]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleCreate = async () => {
     if (isCreating || !tagName.trim() || tagExists)
       return;

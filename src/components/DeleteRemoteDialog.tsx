@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './Dialog.css';
 
 interface DeleteRemoteDialogProps {
@@ -9,6 +9,16 @@ interface DeleteRemoteDialogProps {
 }
 
 function DeleteRemoteDialog({ onClose, onDeleteRemote, remoteName, remoteUrl }: DeleteRemoteDialogProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleDelete = async (): Promise<void> => {
     if (onDeleteRemote) {
       await onDeleteRemote(remoteName);

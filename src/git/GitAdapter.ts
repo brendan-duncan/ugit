@@ -251,8 +251,9 @@ export abstract class GitAdapter {
    * Pull from remote branch
    * @param remote - Remote name (e.g., 'origin')
    * @param branch - Branch name
+   * @param rebase - Whether to use rebase instead of merge
    */
-  abstract pull(remote: string, branch: string): Promise<void>;
+  abstract pull(remote: string, branch: string, rebase?: boolean): Promise<void>;
 
   /**
    * Push to remote branch

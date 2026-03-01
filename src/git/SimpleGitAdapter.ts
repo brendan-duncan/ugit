@@ -255,11 +255,12 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
-  async pull(remote: string, branch: string): Promise<void> {
+  async pull(remote: string, branch: string, rebase?: boolean): Promise<void> {
     const startTime = performance.now();
-    const id = this._startCommand(`git pull ${remote} ${branch}`, startTime);
+    const options = rebase ? ['--rebase'] : [];
+    const id = this._startCommand(`git pull ${remote} ${branch}${rebase ? ' --rebase' : ''}`, startTime);
     try {
-      await this.git.pull(remote, branch);
+      await this.git.pull(remote, branch, options);
     } catch (error) {
       console.error(`Error pulling from ${remote}/${branch}:`, error);
     }

@@ -58,7 +58,6 @@
 }
 
 .dialog-field input {
-  flex: 1 auto;
   padding: 8px 12px;
   color: var(--text-primary);
   font-size: 0.9rem;

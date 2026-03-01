@@ -1,5 +1,13 @@
 ## [v0.1.11](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (XXX)
 
+### New Features
+
+* Add "Rebase instead of Merge" to Pull Dialog.
+
+### Improvements
+
+* Escape will now close dialogs.
+
 ### Bug Fixes
 
 * Creating a stash wasn't updating the Stashes list.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 
 interface StashDialogProps {
@@ -9,6 +9,16 @@ interface StashDialogProps {
 const StashDialog: React.FC<StashDialogProps> = ({ onClose, onStash }) => {
   const [message, setMessage] = useState<string>('');
   const [stageNewFiles, setStageNewFiles] = useState<boolean>(true);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleStash = (): void => {
     onStash(message, stageNewFiles);
