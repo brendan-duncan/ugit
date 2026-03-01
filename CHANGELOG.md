@@ -1,4 +1,10 @@
-## [v0.1.9](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.10) (February 27, 2026)
+## [v0.1.11](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (XXX)
+
+### Bug Fixes
+
+* Creating a stash wasn't updating the Stashes list.
+
+## [v0.1.10](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.10) (February 27, 2026)
 
 ### New Features
 

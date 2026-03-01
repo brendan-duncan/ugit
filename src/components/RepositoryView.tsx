@@ -86,6 +86,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     setError: setRepoError,
     branchCommitsCache,
     loadRepoData,
+    refreshStashes,
     updateBranchCache,
     clearBranchCache,
     getFileStatusType
@@ -422,6 +423,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
             setError(`Stash reapplied but could not be removed: ${(err as Error).message}`);
           }
           await refreshFileStatus(false);
+          await refreshStashes();
           break;
         case 'discard':
           if (stagedFiles.length > 0) {
@@ -439,6 +441,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           setBusyMessage(`git stash push -m "${stashMessage}"`);
           await gitAdapter.stashPush(stashMessage);
           await performBranchSwitch(branchName, true);
+          await refreshStashes();
           break;
       }
     } catch (error) {
@@ -449,7 +452,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       setBusyMessage('');
     }
   }, [gitAdapter, hideLocalChangesDialog, pendingState.pendingBranchSwitch, performBranchSwitch, 
-      refreshFileStatus, stagedFiles, unstagedFiles, currentBranch]);
+      refreshFileStatus, refreshStashes, stagedFiles, unstagedFiles, currentBranch]);
 
   const handleBranchSelect = useCallback(async (branchName: string) => {
     if (branchCommitsCache.current.has(branchName)) {
@@ -625,6 +628,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       setBusyMessage('git stash push');
       await gitAdapter.stashPush(message || `Stash created at ${new Date().toISOString()}`);
       await refreshFileStatus(false);
+      await refreshStashes();
     } catch (error) {
       console.error('Error creating stash:', error);
       setError(`Stash failed: ${(error as Error).message}`);
@@ -632,7 +636,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideStashDialog, unstagedFiles, refreshFileStatus]);
+  }, [gitAdapter, hideStashDialog, unstagedFiles, refreshFileStatus, refreshStashes]);
 
   const handleResetToOrigin = useCallback(async () => {
     hideResetDialog();
