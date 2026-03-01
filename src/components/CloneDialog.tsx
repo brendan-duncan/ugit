@@ -23,6 +23,16 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
     }
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   // Auto-fill URL from clipboard on mount
   useEffect(() => {
     const tryReadClipboard = async () => {

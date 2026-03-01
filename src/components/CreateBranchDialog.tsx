@@ -22,6 +22,16 @@ const CreateBranchDialog: React.FC<CreateBranchDialogProps> = ({ onClose, onCrea
   const [branchExists, setBranchExists] = useState<boolean>(false);
   const [existingBranchName, setExistingBranchName] = useState<string>('');
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   // Use an empty name by default
   useEffect(() => {
     setBranchName('');

@@ -296,7 +296,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   }, [gitAdapter, updateCachedCommitsOriginStatus]);
 
-  const handlePull = useCallback(async (branch: string, stashAndReapply: boolean) => {
+  const handlePull = useCallback(async (branch: string, stashAndReapply: boolean, rebase: boolean) => {
     hidePullDialog();
     if (!gitAdapter) return;
 
@@ -308,8 +308,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         await gitAdapter.stashPush(`Auto-stash before pull at ${new Date().toISOString()}`);
       }
 
-      setBusyMessage(`git pull origin ${branch}`);
-      await gitAdapter.pull('origin', branch);
+      setBusyMessage(`git pull origin ${branch}${rebase ? ' --rebase' : ''}`);
+      await gitAdapter.pull('origin', branch, rebase);
       clearBranchCache(branch);
       await loadRepoData(true);
     } catch (error) {

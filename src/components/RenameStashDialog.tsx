@@ -17,6 +17,16 @@ function RenameStashDialog({ onClose, onRename, currentStashName, stashIndex }: 
     setNewName(currentStashName);
   }, [currentStashName]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleRename = () => {
     if (newName.trim() && newName.trim() !== currentStashName.trim()) {
       onRename(newName.trim());

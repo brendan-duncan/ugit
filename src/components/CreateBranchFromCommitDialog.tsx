@@ -41,6 +41,16 @@ function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, com
     }
   }, [branchName]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleCreate = async () => {
     if (isCreating || !branchName.trim() || branchExists)
       return;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './Dialog.css';
 
 interface PullCommitDialogProps {
@@ -8,6 +8,16 @@ interface PullCommitDialogProps {
 }
 
 function PullCommitDialog({ onClose, onPullAndCommit, onCommitOnly }: PullCommitDialogProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handlePullAndCommit = async (): Promise<void> => {
     if (onPullAndCommit) {
       await onPullAndCommit();

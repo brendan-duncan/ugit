@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Dialog.css';
 import './PullDialog.css';
 
 interface PullDialogProps {
   onClose: () => void;
-  onPull: (branch: string, stashAndReapply: boolean) => void;
+  onPull: (branch: string, stashAndReapply: boolean, rebase: boolean) => void;
   branches: string[];
   currentBranch: string;
 }
@@ -12,9 +12,20 @@ interface PullDialogProps {
 const PullDialog: React.FC<PullDialogProps> = ({ onClose, onPull, branches, currentBranch }) => {
   const [selectedBranch, setSelectedBranch] = useState<string>(currentBranch || '');
   const [stashAndReapply, setStashAndReapply] = useState<boolean>(false);
+  const [rebase, setRebase] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handlePull = (): void => {
-    onPull(selectedBranch, stashAndReapply);
+    onPull(selectedBranch, stashAndReapply, rebase);
   };
 
   return (
@@ -50,6 +61,18 @@ const PullDialog: React.FC<PullDialogProps> = ({ onClose, onPull, branches, curr
                 className="dialog-checkbox"
               />
               <span>Stash and reapply local changes</span>
+            </label>
+          </div>
+
+          <div className="dialog-field">
+            <label className="dialog-checkbox-label">
+              <input
+                type="checkbox"
+                checked={rebase}
+                onChange={(e) => setRebase(e.target.checked)}
+                className="dialog-checkbox"
+              />
+              <span>Rebase instead of merge</span>
             </label>
           </div>
         </div>

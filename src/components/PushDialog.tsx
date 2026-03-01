@@ -23,6 +23,17 @@ const PushDialog: React.FC<PushDialogProps> = ({ onClose, onPush, branches, curr
     }
   }, [settings]);
 
+  // Close dialog on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handlePush = (): void => {
     onPush(selectedBranch, remoteBranch, pushAllTags);
   };

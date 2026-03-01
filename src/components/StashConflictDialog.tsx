@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './Dialog.css';
 
 interface StashConflictDialogProps {
@@ -6,6 +6,16 @@ interface StashConflictDialogProps {
 }
 
 function StashConflictDialog({ onClose }: StashConflictDialogProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleOk = () => {
     onClose();
   };

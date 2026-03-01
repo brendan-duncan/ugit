@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import './Dialog.css';
 import './AlertDialog.css';
 
@@ -10,6 +10,16 @@ interface ConfirmDialogProps {
 }
 
 function ConfirmDialog({ message, title = 'Confirm', onConfirm, onCancel }: ConfirmDialogProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onCancel();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   return (
     <div className="dialog-overlay" onClick={onCancel}>
       <div className="dialog-content" onClick={(e) => e.stopPropagation()}>

@@ -16,6 +16,16 @@ function RenameBranchDialog({ onClose, onRename, currentBranchName }: RenameBran
     setNewName(currentBranchName);
   }, [currentBranchName]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleRename = () => {
     if (newName.trim() && newName.trim() !== currentBranchName.trim()) {
       onRename(newName.trim());

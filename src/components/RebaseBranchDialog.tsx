@@ -54,6 +54,16 @@ function RebaseBranchDialog({ onClose, onRebase, sourceBranch, targetBranch, git
     checkConflicts();
   }, [gitAdapter, sourceBranch, targetBranch]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleRebase = () => {
     onRebase({
       sourceBranch,

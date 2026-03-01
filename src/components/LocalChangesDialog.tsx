@@ -22,6 +22,16 @@ function LocalChangesDialog({ onClose, onProceed, targetBranch }: LocalChangesDi
 
   const [selectedOption, setSelectedOption] = useState(getSavedOption());
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   // Save to localStorage whenever option changes
   const handleOptionChange = (option: string) => {
     setSelectedOption(option);
