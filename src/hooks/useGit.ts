@@ -292,6 +292,12 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     }
   }, [gitAdapter, loading, repoPath, getFileStatusType]);
 
+  const refreshStashes = useCallback(async () => {
+    if (!gitAdapter) return;
+    const stashList = await gitAdapter.stashList();
+    setStashes(stashList.all);
+  }, [gitAdapter]);
+
   useEffect(() => {
     if (gitAdapter) {
       loadBranchCommitsFromCache();
@@ -321,6 +327,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     setError,
     branchCommitsCache,
     loadRepoData,
+    refreshStashes,
     updateBranchCache,
     clearBranchCache,
     getFileStatusType
