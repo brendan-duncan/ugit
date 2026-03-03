@@ -595,12 +595,27 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     hideRebaseBranchDialog();
     if (!gitAdapter || !sourceBranch || !targetBranch) return;
 
+    let stashed = false;
     try {
       setIsBusy(true);
+
+      if (hasLocalChanges) {
+        setBusyMessage('git stash push');
+        await gitAdapter.stashPush(`Auto-stash before rebase at ${new Date().toISOString()}`);
+        stashed = true;
+      }
+
+      setBusyMessage(`git checkout ${sourceBranch}`);
+      await gitAdapter.checkoutBranch(sourceBranch);
       setBusyMessage(`git rebase ${targetBranch}`);
       await gitAdapter.rebase(targetBranch);
       clearBranchCache();
       await loadRepoData(true);
+
+      if (stashed) {
+        setBusyMessage('git stash pop');
+        await gitAdapter.stashPop();
+      }
     } catch (error) {
       console.error('Error rebasing branch:', error);
       setError(`Failed to rebase: ${(error as Error).message}`);
@@ -608,7 +623,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideRebaseBranchDialog, clearBranchCache, loadRepoData]);
+  }, [gitAdapter, hideRebaseBranchDialog, clearBranchCache, loadRepoData, hasLocalChanges]);
 
   const handleStash = useCallback(async (message: string, stageNewFiles: boolean) => {
     hideStashDialog();
@@ -734,7 +749,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         showMergeBranchDialog(branchName);
         break;
       case 'rebase-active-onto-branch':
-        showRebaseBranchDialog(currentBranch);
+        showRebaseBranchDialog(currentBranch, branchName);
         break;
       case 'new-branch':
         showCreateBranchDialog(branchName);
@@ -1338,7 +1353,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           onClose={hideRebaseBranchDialog}
           onRebase={handleRebaseBranchDialog}
           sourceBranch={pendingState.rebaseSourceBranch}
-          targetBranch={currentBranch}
+          targetBranch={pendingState.rebaseTargetBranch}
           gitAdapter={gitAdapter}
         />
       )}

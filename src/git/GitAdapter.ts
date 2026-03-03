@@ -388,6 +388,13 @@ export abstract class GitAdapter {
   abstract raw(args: string[]): Promise<string>;
 
   /**
+   * Get the merge base between two branches
+   * @param branch1 - First branch
+   * @param branch2 - Second branch
+   */
+  abstract getMergeBase(branch1: string, branch2: string): Promise<string | null>;
+
+  /**
    * Check if Git LFS is initialized in the repository
    */
   abstract isLfsInitialized(): Promise<boolean>;
