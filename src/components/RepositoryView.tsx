@@ -1092,7 +1092,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         navigator.clipboard.writeText(info);
         break;
       case 'save-patch':
-        const patchContent = await gitAdapter.raw(['format-patch', '-1', commit.hash]);
+        const patchContent = await gitAdapter.raw(['format-patch', '-1', commit.hash, '--stdout']);
+        console.log('Generated patch content:', patchContent);
         const blob = new Blob([patchContent], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
