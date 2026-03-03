@@ -30,6 +30,7 @@ interface UseRepositoryViewDialogsResult {
     branchToRename: string | null;
     mergeSourceBranch: string | null;
     rebaseSourceBranch: string | null;
+    rebaseTargetBranch: string | null;
     stashToApply: { message: string; index: number } | null;
     stashToRename: { message: string; index: number } | null;
     stashToDelete: { message: string; index: number } | null;
@@ -59,7 +60,7 @@ interface UseRepositoryViewDialogsResult {
   hideRenameBranchDialog: () => void;
   showMergeBranchDialog: (sourceBranch: string) => void;
   hideMergeBranchDialog: () => void;
-  showRebaseBranchDialog: (sourceBranch: string) => void;
+  showRebaseBranchDialog: (sourceBranch: string, targetBranch: string) => void;
   hideRebaseBranchDialog: () => void;
   showApplyStashDialog: (stash: { message: string; index: number }) => void;
   hideApplyStashDialog: () => void;
@@ -105,6 +106,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
   const [branchToRename, setBranchToRename] = useState<string | null>(null);
   const [mergeSourceBranch, setMergeSourceBranch] = useState<string | null>(null);
   const [rebaseSourceBranch, setRebaseSourceBranch] = useState<string | null>(null);
+  const [rebaseTargetBranch, setRebaseTargetBranch] = useState<string | null>(null);
   const [stashToApply, setStashToApply] = useState<{ message: string; index: number } | null>(null);
   const [stashToRename, setStashToRename] = useState<{ message: string; index: number } | null>(null);
   const [stashToDelete, setStashToDelete] = useState<{ message: string; index: number } | null>(null);
@@ -141,6 +143,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
   const hideRebaseBranchDialog = useCallback(() => {
     setShowRebaseBranchDialog(false);
     setRebaseSourceBranch(null);
+    setRebaseTargetBranch(null);
   }, []);
   const hideApplyStashDialog = useCallback(() => {
     setShowApplyStashDialog(false);
@@ -198,6 +201,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       branchToRename,
       mergeSourceBranch,
       rebaseSourceBranch,
+      rebaseTargetBranch,
       stashToApply,
       stashToRename,
       stashToDelete,
@@ -242,8 +246,9 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       setShowMergeBranchDialog(true);
     }, []),
     hideMergeBranchDialog,
-    showRebaseBranchDialog: useCallback((sourceBranch: string) => {
+    showRebaseBranchDialog: useCallback((sourceBranch: string, targetBranch: string) => {
       setRebaseSourceBranch(sourceBranch);
+      setRebaseTargetBranch(targetBranch);
       setShowRebaseBranchDialog(true);
     }, []),
     hideRebaseBranchDialog,

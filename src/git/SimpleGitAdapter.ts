@@ -888,6 +888,20 @@ export class SimpleGitAdapter extends GitAdapter {
     return result || '';
   }
 
+  async getMergeBase(branch1: string, branch2: string): Promise<string | null> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git merge-base ${branch1} ${branch2}`, startTime);
+    try {
+      const result = await this.git.raw(['merge-base', branch1, branch2]);
+      this._endCommand(id, startTime);
+      return result.trim() || null;
+    } catch (error) {
+      console.error(`Error getting merge base for ${branch1} and ${branch2}:`, error);
+      this._endCommand(id, startTime);
+      return null;
+    }
+  }
+
   async isLfsInitialized(): Promise<boolean> {
     try {
       // Check if git-lfs is installed by running git lfs version

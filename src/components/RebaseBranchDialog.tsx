@@ -21,15 +21,27 @@ function RebaseBranchDialog({ onClose, onRebase, sourceBranch, targetBranch, git
       }
 
       try {
+        const mergeBase = await gitAdapter.getMergeBase(targetBranch, sourceBranch);
+        if (!mergeBase) {
+          setConflictCheck({ 
+            loading: false, 
+            result: {
+              hasConflicts: null,
+              message: '⚠️ Unable to find common ancestor'
+            }
+          });
+          return;
+        }
+
         const result = await gitAdapter.raw([
           'merge-tree',
-          `$(git merge-base ${targetBranch} ${sourceBranch})`,
+          mergeBase,
           targetBranch,
           sourceBranch
         ]);
 
         const hasConflicts = !!result?.includes('<<<<<<< ');
-        
+
         setConflictCheck({ 
           loading: false, 
           result: {

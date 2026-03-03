@@ -66,18 +66,30 @@ function MergeBranchDialog({ onClose, onMerge, sourceBranch, targetBranch, gitAd
       }
 
       try {
+        const mergeBase = await gitAdapter.getMergeBase(targetBranch, sourceBranch);
+        if (!mergeBase) {
+          setConflictCheck({ 
+            loading: false, 
+            result: {
+              hasConflicts: null,
+              message: '⚠️ Unable to find common ancestor'
+            }
+          });
+          return;
+        }
+
         // Check if merge would cause conflicts by doing a dry run
         // We use git merge-tree to check for conflicts without actually merging
         const result = await gitAdapter.raw([
           'merge-tree', 
-          `$(git merge-base ${targetBranch} ${sourceBranch})`,
+          mergeBase,
           targetBranch,
           sourceBranch
         ]);
 
         // If the result contains conflict markers, there are conflicts
         const hasConflicts = !!result?.includes('<<<<<<< ');
-        
+
         setConflictCheck({ 
           loading: false, 
           result: {
