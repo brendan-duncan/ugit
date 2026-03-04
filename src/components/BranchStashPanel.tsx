@@ -14,6 +14,7 @@ interface BranchStashPanelProps {
   onBranchSelect: (branchName: string) => void;
   stashes: Array<StashInfo>;
   onSelectStash: (item: SelectedItem) => void;
+  onStashDoubleClick?: (stashIndex: number) => void;
   selectedItem: SelectedItem | null;
   onMouseDown: (panelIndex: number) => void;
   onBranchContextMenu: (action: string, branchName: string, currentBranch: string) => void;
@@ -26,7 +27,7 @@ interface BranchStashPanelProps {
 }
 
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
-      onBranchSelect, stashes, onSelectStash, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
+      onBranchSelect, stashes, onSelectStash, onStashDoubleClick, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
       remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded }: BranchStashPanelProps) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
@@ -82,6 +83,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
         <StashList
           stashes={stashes}
           onSelectStash={(stash) => onSelectStash(stash)}
+          onDoubleClick={onStashDoubleClick}
           selectedItem={selectedItem}
           collapsed={stashesCollapsed}
           onToggleCollapse={() => setStashesCollapsed(!stashesCollapsed)}

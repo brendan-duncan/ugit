@@ -810,6 +810,19 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   }, [gitAdapter, hideApplyStashDialog, refreshFileStatus, loadRepoData]);
 
+  const handleStashDoubleClick = useCallback(async (stashIndex: number) => {
+    if (!gitAdapter) return;
+
+    try {
+      await gitAdapter.raw(['stash', 'apply', `stash@{${stashIndex}}`]);
+      await refreshFileStatus(false);
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error applying stash:', error);
+      setError(`Failed to apply stash: ${(error as Error).message}`);
+    }
+  }, [gitAdapter, refreshFileStatus, loadRepoData]);
+
   const handleRenameStashDialog = useCallback(async (newName: string) => {
     hideRenameStashDialog();
     const stash = pendingState.stashToRename;
@@ -1246,6 +1259,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                   onBranchSelect={handleBranchSelect}
                   stashes={stashes}
                   onSelectStash={(stash) => handleItemSelect({ type: 'stash', ...stash })}
+                  onStashDoubleClick={handleStashDoubleClick}
                   selectedItem={selectedItem}
                   onMouseDown={handleMouseDown}
                   onBranchContextMenu={handleBranchContextMenu}

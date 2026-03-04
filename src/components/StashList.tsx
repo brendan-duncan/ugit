@@ -6,13 +6,14 @@ import './StashList.css';
 interface StashListProps {
   stashes: Array<StashInfo>;
   onSelectStash: (item: SelectedItem) => void;
+  onDoubleClick?: (stashIndex: number) => void;
   selectedItem: SelectedItem | null;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onStashContextMenu: (action: string, stash: StashInfo, stashIndex: number) => void;
 }
 
-function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCollapse, onStashContextMenu }: StashListProps) {
+function StashList({ stashes, onSelectStash, onDoubleClick, selectedItem, collapsed, onToggleCollapse, onStashContextMenu }: StashListProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; stash: StashInfo; index: number } | null>(null);
 
   const handleStashContextMenu = (e: React.MouseEvent, stash: StashInfo, index: number) => {
@@ -82,6 +83,7 @@ function StashList({ stashes, onSelectStash, selectedItem, collapsed, onToggleCo
                 key={index}
                 className={`stash-item ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelectStash && onSelectStash({type: 'stash', index, stash})}
+                onDoubleClick={() => onDoubleClick?.(index)}
                 onContextMenu={(e: React.MouseEvent<HTMLDivElement>) => handleStashContextMenu(e, stash, index)}
               >
                 <span className="stash-item-icon">🗂️</span>
