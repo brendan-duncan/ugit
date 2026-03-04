@@ -21,6 +21,7 @@ interface UseRepositoryViewDialogsResult {
     showCreateTagFromCommitDialog: boolean;
     showAmendCommitDialog: boolean;
     showPullRequestDialog: boolean;
+    showCheckoutCommitDialog: boolean;
   };
   pendingState: {
     pendingBranchSwitch: string | null;
@@ -35,6 +36,7 @@ interface UseRepositoryViewDialogsResult {
     stashToRename: { message: string; index: number } | null;
     stashToDelete: { message: string; index: number } | null;
     commitForDialog: any;
+    commitToCheckout: string | null;
     pullRequestUrl: string;
     pullRequestBranch: string;
   };
@@ -76,6 +78,8 @@ interface UseRepositoryViewDialogsResult {
   hideAmendCommitDialog: () => void;
   showPullRequestDialog: (url: string, branch: string) => void;
   hidePullRequestDialog: () => void;
+  showCheckoutCommitDialog: (commitHash: string) => void;
+  hideCheckoutCommitDialog: () => void;
 }
 
 export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
@@ -98,6 +102,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
   const [showCreateTagFromCommitDialog, setShowCreateTagFromCommitDialog] = useState(false);
   const [showAmendCommitDialog, setShowAmendCommitDialog] = useState(false);
   const [showPullRequestDialog, setShowPullRequestDialog] = useState(false);
+  const [showCheckoutCommitDialog, setShowCheckoutCommitDialog] = useState(false);
 
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState<string | null>(null);
   const [pullingBranch, setPullingBranch] = useState<string | null>(null);
@@ -111,6 +116,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
   const [stashToRename, setStashToRename] = useState<{ message: string; index: number } | null>(null);
   const [stashToDelete, setStashToDelete] = useState<{ message: string; index: number } | null>(null);
   const [commitForDialog, setCommitForDialog] = useState<any>(null);
+  const [commitToCheckout, setCommitToCheckout] = useState<string | null>(null);
   const [pullRequestUrl, setPullRequestUrl] = useState<string>('');
   const [pullRequestBranch, setPullRequestBranch] = useState<string>('');
 
@@ -192,6 +198,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       showCreateTagFromCommitDialog,
       showAmendCommitDialog,
       showPullRequestDialog,
+      showCheckoutCommitDialog,
     },
     pendingState: {
       pendingBranchSwitch,
@@ -206,6 +213,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       stashToRename,
       stashToDelete,
       commitForDialog,
+      commitToCheckout,
       pullRequestUrl,
       pullRequestBranch,
     },
@@ -288,5 +296,13 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       setShowPullRequestDialog(true);
     }, []),
     hidePullRequestDialog,
+    showCheckoutCommitDialog: useCallback((commitHash: string) => {
+      setCommitToCheckout(commitHash);
+      setShowCheckoutCommitDialog(true);
+    }, []),
+    hideCheckoutCommitDialog: useCallback(() => {
+      setShowCheckoutCommitDialog(false);
+      setCommitToCheckout(null);
+    }, []),
   };
 }

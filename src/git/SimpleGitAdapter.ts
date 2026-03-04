@@ -691,6 +691,13 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
+  async checkout(ref: string): Promise<void> {   
+    const startTime = performance.now();
+    const id = this._startCommand(`git checkout ${ref}`, startTime);
+    await this.git.checkout(ref);
+    this._endCommand(id, startTime);
+  }
+
   async checkoutBranch(branchName: string): Promise<void> {   
     const startTime = performance.now();
     const id = this._startCommand(`git checkout ${branchName}`, startTime);

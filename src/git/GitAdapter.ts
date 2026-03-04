@@ -353,6 +353,12 @@ export abstract class GitAdapter {
   abstract discard(filePaths: string[]): Promise<void>;
 
   /**
+   * Checkout a branch or commit
+   * @param ref - Branch name or commit hash
+   */
+  abstract checkout(ref: string): Promise<void>;
+
+  /**
    * Checkout a branch
    * @param branchName - Name of the branch to checkout
    */
