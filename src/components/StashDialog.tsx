@@ -59,11 +59,11 @@ const StashDialog: React.FC<StashDialogProps> = ({ onClose, onStash }) => {
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-primary" onClick={handleStash}>
-            Save Stash
-          </button>
           <button className="dialog-button dialog-button-cancel" onClick={onClose}>
             Cancel
+          </button>
+          <button className="dialog-button dialog-button-primary" onClick={handleStash}>
+            Save Stash
           </button>
         </div>
       </div>

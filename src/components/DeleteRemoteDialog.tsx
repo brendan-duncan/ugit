@@ -42,16 +42,16 @@ function DeleteRemoteDialog({ onClose, onDeleteRemote, remoteName, remoteUrl }: 
 
         <div className="dialog-footer">
           <button 
-            className="dialog-button dialog-button-primary" 
-            onClick={handleDelete}
-          >
-            Delete Remote
-          </button>
-          <button 
             className="dialog-button dialog-button-cancel" 
             onClick={onClose}
           >
             Cancel
+          </button>
+          <button 
+            className="dialog-button dialog-button-primary" 
+            onClick={handleDelete}
+          >
+            Delete Remote
           </button>
         </div>
       </div>

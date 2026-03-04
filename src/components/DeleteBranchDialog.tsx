@@ -60,11 +60,11 @@ function DeleteBranchDialog({ onClose, onConfirm, branchName }: DeleteBranchDial
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-primary" onClick={handleConfirm}>
-            Delete
-          </button>
           <button className="dialog-button dialog-button-cancel" onClick={onClose}>
             Cancel
+          </button>
+          <button className="dialog-button dialog-button-primary" onClick={handleConfirm}>
+            Delete
           </button>
         </div>
       </div>

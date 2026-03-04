@@ -50,13 +50,6 @@ function EditOriginDialog({ onClose, onEditOrigin, currentOriginUrl }: EditOrigi
         </div>
 
         <div className="dialog-footer">
-          <button 
-            className="dialog-button dialog-button-primary" 
-            onClick={handleEdit}
-            disabled={!originUrl.trim()}
-          >
-            Save
-          </button>
           <button className="dialog-button dialog-button-cancel" onClick={onClose}>
             Cancel
           </button>
