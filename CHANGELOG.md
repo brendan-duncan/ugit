@@ -1,4 +1,4 @@
-## [v0.1.11](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (XXX)
+## [v0.1.11](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (March 3, 2026)
 
 ### New Features
 
@@ -7,10 +7,14 @@
 ### Improvements
 
 * Escape will now close dialogs.
+* Make the Cancel button for all dialogs consistently on the left.
+* Double-click on a commit to check it out.
+* Double-click on a stash to apply the stash.
 
 ### Bug Fixes
 
 * Creating a stash wasn't updating the Stashes list.
+* Fix "Save as patch".
 
 ## [v0.1.10](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.10) (February 27, 2026)
 
