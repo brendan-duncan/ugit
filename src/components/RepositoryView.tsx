@@ -630,7 +630,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleStash = useCallback(async (message: string, stageNewFiles: boolean) => {
     hideStashDialog();
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       setIsBusy(true);
@@ -795,7 +796,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleApplyStashDialog = useCallback(async ({ stashIndex, deleteAfterApplying }: { stashIndex: number; deleteAfterApplying: boolean }) => {
     hideApplyStashDialog();
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       await gitAdapter.raw(['stash', 'apply', `stash@{${stashIndex}}`]);
@@ -811,17 +813,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, hideApplyStashDialog, refreshFileStatus, loadRepoData]);
 
   const handleStashDoubleClick = useCallback(async (stashIndex: number) => {
-    if (!gitAdapter) return;
-
-    try {
-      await gitAdapter.raw(['stash', 'apply', `stash@{${stashIndex}}`]);
-      await refreshFileStatus(false);
-      await loadRepoData(true);
-    } catch (error) {
-      console.error('Error applying stash:', error);
-      setError(`Failed to apply stash: ${(error as Error).message}`);
-    }
-  }, [gitAdapter, refreshFileStatus, loadRepoData]);
+    showApplyStashDialog({ message: stashes[stashIndex].message, index: stashIndex });
+  }, [gitAdapter, stashes, showApplyStashDialog]);
 
   const handleRenameStashDialog = useCallback(async (newName: string) => {
     hideRenameStashDialog();
