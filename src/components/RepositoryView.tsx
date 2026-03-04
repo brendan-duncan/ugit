@@ -22,6 +22,7 @@ import CreateBranchFromCommitDialog from './CreateBranchFromCommitDialog';
 import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import AmendCommitDialog from './AmendCommitDialog';
 import PullRequestDialog from './PullRequestDialog';
+import ConfirmDialog from './ConfirmDialog';
 import { useGitAdapter, useRepositoryData } from '../hooks/useGit';
 import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
@@ -133,6 +134,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     hideAmendCommitDialog,
     showPullRequestDialog,
     hidePullRequestDialog,
+    showCheckoutCommitDialog,
+    hideCheckoutCommitDialog,
   } = useRepositoryViewDialogs();
 
   const loading = gitLoading || repoLoading;
@@ -1031,6 +1034,30 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   }, [gitAdapter, hideAmendCommitDialog, pendingState.commitForDialog, clearBranchCache, loadRepoData]);
 
+  const handleCommitDoubleClick = useCallback((commit: Commit) => {
+    showCheckoutCommitDialog(commit.hash);
+  }, [showCheckoutCommitDialog]);
+
+  const handleCheckoutCommit = useCallback(async () => {
+    const commitHash = pendingState.commitToCheckout;
+    if (!gitAdapter || !commitHash) return;
+
+    hideCheckoutCommitDialog();
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git checkout ${commitHash}`);
+      await gitAdapter.checkout(commitHash);
+      clearBranchCache();
+      await loadRepoData(true);
+    } catch (error) {
+      console.error('Error checking out commit:', error);
+      setError(`Failed to checkout commit: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideCheckoutCommitDialog, pendingState.commitToCheckout, clearBranchCache, loadRepoData]);
+
   const handleCommitContextMenu = useCallback(async (action: string, commit: Commit, _currentBranch: string, tagName?: string) => {
     if (!gitAdapter) return;
 
@@ -1246,6 +1273,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                 onRefresh={() => refreshFileStatus(false)}
                 onBranchStatusRefresh={refreshBranchStatus}
                 onContextMenu={handleCommitContextMenu}
+                onCommitDoubleClick={handleCommitDoubleClick}
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}
                 onError={setError}
@@ -1392,6 +1420,14 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
           prUrl={pendingState.pullRequestUrl}
           branchName={pendingState.pullRequestBranch}
           onClose={hidePullRequestDialog}
+        />
+      )}
+      {dialogStates.showCheckoutCommitDialog && (
+        <ConfirmDialog
+          title="Checkout Commit"
+          message={`Are you sure you want to checkout commit "${pendingState.commitToCheckout?.substring(0, 7)}"? This will put you in a detached HEAD state.`}
+          onConfirm={handleCheckoutCommit}
+          onCancel={hideCheckoutCommitDialog}
         />
       )}
     </div>

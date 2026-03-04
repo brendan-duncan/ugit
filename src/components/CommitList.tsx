@@ -8,6 +8,7 @@ interface CommitListProps {
   selectedCommit: Commit | null;
   onSelectCommit: (commit: Commit | null) => void;
   onContextMenu: (action: string, commit: Commit, currentBranch: string, tagName?: string) => void;
+  onDoubleClick?: (commit: Commit) => void;
   currentBranch: string;
 }
 
@@ -19,7 +20,7 @@ interface CommitFilters {
   dateTo: string;
 }
 
-function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, currentBranch }: CommitListProps) {
+function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, onDoubleClick, currentBranch }: CommitListProps) {
   const { settings } = useSettings();
   const [contextMenu, setContextMenu] = useState(null);
   const [tagSubmenuOpen, setTagSubmenuOpen] = useState(false);
@@ -228,6 +229,7 @@ function CommitList({ commits, selectedCommit, onSelectCommit, onContextMenu, cu
               key={commit.hash}
               className={`commit-item ${isSelected ? 'selected' : ''} ${!commit.onOrigin ? 'not-on-origin' : ''}`}
               onClick={() => onSelectCommit(commit)}
+              onDoubleClick={() => onDoubleClick?.(commit)}
               onContextMenu={(e) => handleContextMenu(e, commit)}
             >
               {!commit.onOrigin && <span className="commit-remote-indicator">⚡</span>}

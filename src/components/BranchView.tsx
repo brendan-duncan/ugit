@@ -12,10 +12,11 @@ interface BranchViewProps {
   gitAdapter: GitAdapter;
   onRefresh: () => Promise<void>;
   onContextMenu: (action: string, commit: Commit, currentBranch: string) => Promise<void>;
+  onDoubleClick?: (commit: Commit) => void;
   currentBranch: string;
 }
 
-function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, currentBranch }: BranchViewProps) {
+function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, onDoubleClick, currentBranch }: BranchViewProps) {
   const [selectedCommit, setSelectedCommit] = useState<Commit | null>(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -86,6 +87,7 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onCon
               selectedCommit={selectedCommit}
               onSelectCommit={handleCommitSelect}
               onContextMenu={onContextMenu}
+              onDoubleClick={onDoubleClick}
               currentBranch={currentBranch}
             />
           </div>
