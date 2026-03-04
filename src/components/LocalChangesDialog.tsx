@@ -116,11 +116,11 @@ function LocalChangesDialog({ onClose, onProceed, targetBranch }: LocalChangesDi
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-primary" onClick={handleProceed}>
-            Proceed
-          </button>
           <button className="dialog-button dialog-button-cancel" onClick={onClose}>
             Cancel
+          </button>
+          <button className="dialog-button dialog-button-primary" onClick={handleProceed}>
+            Proceed
           </button>
         </div>
       </div>

@@ -138,14 +138,14 @@ function RebaseBranchDialog({ onClose, onRebase, sourceBranch, targetBranch, git
         </div>
 
         <div className="dialog-footer">
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+            Cancel
+          </button>
           <button 
             className="dialog-button dialog-button-primary" 
             onClick={handleRebase}
           >
             Rebase
-          </button>
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
           </button>
         </div>
       </div>

@@ -108,18 +108,17 @@ function AddRemoteDialog({ onClose, onAddRemote }: AddRemoteDialogProps) {
 
         <div className="dialog-footer">
           <button 
+            className="dialog-button dialog-button-cancel" 
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button 
             className="dialog-button dialog-button-primary" 
             onClick={handleAdd}
             disabled={loading || !remoteName.trim() || !remoteUrl.trim()}
           >
             {loading ? 'Adding...' : 'Add Remote'}
-          </button>
-          <button 
-            className="dialog-button dialog-button-cancel" 
-            onClick={onClose}
-            disabled={loading}
-          >
-            Cancel
           </button>
         </div>
       </div>
