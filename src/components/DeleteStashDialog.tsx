@@ -57,11 +57,11 @@ function DeleteStashDialog({ onClose, onDelete, stashMessage, stashIndex }: Dele
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
-          </button>
           <button className="dialog-button dialog-button-primary" onClick={handleDelete}>
             Delete
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+            Cancel
           </button>
         </div>
       </div>

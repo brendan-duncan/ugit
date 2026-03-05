@@ -704,11 +704,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               />
             </div>
             <div className="dialog-footer">
-              <button className="dialog-button dialog-button-cancel" onClick={() => setShowDescriptionEditor(false)}>
-                Cancel
-              </button>
               <button className="dialog-button dialog-button-primary" onClick={() => setShowDescriptionEditor(false)}>
                 Done
+              </button>
+              <button className="dialog-button dialog-button-cancel" onClick={() => setShowDescriptionEditor(false)}>
+                Cancel
               </button>
             </div>
           </div>

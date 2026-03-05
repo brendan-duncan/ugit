@@ -132,15 +132,15 @@ const CreateBranchDialog: React.FC<CreateBranchDialogProps> = ({ onClose, onCrea
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
-          </button>
           <button 
             className={`dialog-button dialog-button-primary ${!branchName.trim() || branchExists ? 'disabled' : ''}`}
             onClick={handleCreate}
             disabled={!branchName.trim() || branchExists}
           >
             Create
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+            Cancel
           </button>
         </div>
       </div>

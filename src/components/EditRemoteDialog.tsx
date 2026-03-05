@@ -111,17 +111,17 @@ function EditRemoteDialog({ onClose, onEditRemote, currentName, currentUrl }: Ed
 
         <div className="dialog-footer">
           <button 
-            className="dialog-button dialog-button-cancel" 
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button 
             className="dialog-button dialog-button-primary" 
             onClick={handleEdit}
             disabled={loading || !remoteName.trim() || !remoteUrl.trim()}
           >
             {loading ? 'Saving...' : 'Save Changes'}
+          </button>
+          <button 
+            className="dialog-button dialog-button-cancel" 
+            onClick={onClose}
+          >
+            Cancel
           </button>
         </div>
       </div>

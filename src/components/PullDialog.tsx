@@ -78,11 +78,11 @@ const PullDialog: React.FC<PullDialogProps> = ({ onClose, onPull, branches, curr
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
-          </button>
           <button className="dialog-button dialog-button-primary" onClick={handlePull}>
             Pull
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+            Cancel
           </button>
         </div>
       </div>
