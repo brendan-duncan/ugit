@@ -89,7 +89,7 @@
 }
 
 .tree-node-content.current:hover {
-  background-color: var(--bg-tertiary);
+  background-color: var(--accent-hover);
 }
 
 .tree-node-content.branch-selected {
@@ -105,7 +105,7 @@
 }
 
 .tree-node-content.switchable:hover {
-  background-color: var(--bg-tertiary);
+  background-color: var(--accent-hover);
 }
 
 .tree-node-icon {

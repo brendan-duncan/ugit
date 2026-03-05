@@ -397,7 +397,8 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
   };
 
   const handleStageFile = async () => {
-    if (!file || !gitAdapter) return;
+    if (!file || !gitAdapter)
+      return;
     setFileMenuOpen(false);
     try {
       await gitAdapter.add(file.path);
@@ -411,7 +412,8 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
   };
 
   const handleUnstageFile = async () => {
-    if (!file || !gitAdapter) return;
+    if (!file || !gitAdapter)
+      return;
     setFileMenuOpen(false);
     try {
       await gitAdapter.reset(['HEAD', '--', file.path]);
@@ -425,11 +427,13 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
   };
 
   const handleDiscardFile = async () => {
-    if (!file || !gitAdapter) return;
+    if (!file || !gitAdapter)
+      return;
     const confirmed = await showConfirm(
       `Are you sure you want to discard all changes to '${file.path}'? This cannot be undone.`
     );
-    if (!confirmed) return;
+    if (!confirmed)
+      return;
     setFileMenuOpen(false);
     try {
       if (isStaged) {
@@ -464,7 +468,8 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
   };
 
   const handleRunMergetool = async (tool?: string) => {
-    if (!file || !gitAdapter) return;
+    if (!file || !gitAdapter)
+      return;
     setMergeToolDropdownOpen(false);
     setConflictResolving(true);
     try {
