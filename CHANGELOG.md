@@ -1,3 +1,13 @@
+## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (March 5, 2026)
+
+### Bug Fixes
+
+* Fix Branch checkout not working
+
+### Improvements
+
+* Move the Cancel button for dialogs to always be on the right side.
+
 ## [v0.1.11](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (March 3, 2026)
 
 ### New Features
