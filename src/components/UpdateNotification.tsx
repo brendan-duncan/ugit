@@ -140,6 +140,14 @@ function UpdateNotification() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const stripHtmlTags = (html: string) => {
+    // Create a temporary div element to parse HTML
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    // Extract text content and preserve line breaks
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   return (
     <div className="update-notification">
       <div className="update-notification-content">
@@ -173,7 +181,7 @@ function UpdateNotification() {
               <div className="update-release-notes">
                 <p className="update-release-notes-label">Release notes:</p>
                 <div className="update-release-notes-content">
-                  {updateInfo.releaseNotes}
+                  {stripHtmlTags(updateInfo.releaseNotes)}
                 </div>
               </div>
             )}
