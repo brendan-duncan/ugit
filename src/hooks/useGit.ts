@@ -75,7 +75,8 @@ export function useGitAdapter({ repoPath, onError }: UseGitOptions): UseGitResul
   }, [repoPath, onError]);
 
   const refresh = useCallback(async () => {
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       const backend = await ipcRenderer.invoke('get-git-backend');
@@ -173,7 +174,8 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
   }, [repoPath]);
 
   const loadRepoData = useCallback(async (isRefresh = false) => {
-    if (!gitAdapter || loading) return;
+    if (!gitAdapter || loading)
+      return;
 
     if (isRefresh) {
       setLoading(true);
@@ -293,7 +295,8 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
   }, [gitAdapter, loading, repoPath, getFileStatusType]);
 
   const refreshStashes = useCallback(async () => {
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
     const stashList = await gitAdapter.stashList();
     setStashes(stashList.all);
   }, [gitAdapter]);

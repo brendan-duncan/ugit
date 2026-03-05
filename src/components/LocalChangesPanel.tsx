@@ -543,7 +543,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                 }
               }}
               onStageAll={async () => {
-                if (unstagedFiles.length === 0) return;
+                if (unstagedFiles.length === 0)
+                  return;
                 try {
                   setIsBusy(true);
                   if (onBusyMessageChange) onBusyMessageChange(`git add (${unstagedFiles.length} files)`);
@@ -577,7 +578,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
               onStageAll={async () => {
-                if (stagedFiles.length === 0) return;
+                if (stagedFiles.length === 0)
+                  return;
                 try {
                   setIsBusy(true);
                   if (onBusyMessageChange) onBusyMessageChange(`git reset (${stagedFiles.length} files)`);
