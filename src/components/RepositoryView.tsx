@@ -149,19 +149,24 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const updateCachedCommitsOriginStatus = useCallback(async () => {
     const git = gitAdapter;
-    if (!git) return;
+    if (!git)
+      return;
 
     const cachedBranches = Array.from(branchCommitsCache.current.keys());
-    if (cachedBranches.length === 0) return;
+    if (cachedBranches.length === 0)
+      return;
 
     for (const branchName of cachedBranches) {
-      if (branchName.startsWith('origin/')) continue;
+      if (branchName.startsWith('origin/'))
+        continue;
 
       const commits = branchCommitsCache.current.get(branchName);
-      if (!commits || commits.length === 0) continue;
+      if (!commits || commits.length === 0)
+        continue;
 
       const commitsToCheck = commits.filter(commit => commit.onOrigin === false);
-      if (commitsToCheck.length === 0) continue;
+      if (commitsToCheck.length === 0)
+        continue;
 
       for (const commit of commitsToCheck) {
         try {
@@ -177,7 +182,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, branchCommitsCache, updateBranchCache]);
 
   const refreshFileStatus = useCallback(async (noLock: boolean) => {
-    if (!gitAdapter || !currentBranch) return;
+    if (!gitAdapter || !currentBranch) 
+      return;
 
     try {
       const status = await gitAdapter.status(undefined, noLock, true);
@@ -221,7 +227,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, currentBranch, repoPath, getFileStatusType, setCurrentBranch, setUnstagedFiles, setStagedFiles, setModifiedCount]);
 
   const refreshBranchStatus = useCallback(async () => {
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       const branchSummary = await gitAdapter.branchLocal();
@@ -242,7 +249,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, setBranchStatus]);
 
   useEffect(() => {
-    if (loading || !settings || !isActiveTab) return;
+    if (loading || !settings || !isActiveTab)
+      return;
 
     const refreshTime = getSetting('localFileRefreshTime') || 5;
     const intervalId = setInterval(() => refreshFileStatus(true), refreshTime * 1000);
@@ -282,7 +290,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, clearBranchCache, loadRepoData]);
 
   const handleFetchClick = useCallback(async () => {
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       setIsBusy(true);
@@ -301,7 +310,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handlePull = useCallback(async (branch: string, stashAndReapply: boolean, rebase: boolean) => {
     hidePullDialog();
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       setIsBusy(true);
@@ -326,7 +336,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handlePush = useCallback(async (branch: string, remoteBranch: string, pushAllTags: boolean) => {
     hidePushDialog();
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       setIsBusy(true);
@@ -358,23 +369,16 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   }, [gitAdapter, hidePushDialog, loadRepoData, showPullRequestDialog]);
 
-  const handleBranchSwitch = useCallback(async (branchName: string) => {
-    if (hasLocalChanges) {
-      showLocalChangesDialog(branchName);
-      return;
-    }
-    await performBranchSwitch(branchName);
-  }, [hasLocalChanges, showLocalChangesDialog]);
-
   const performBranchSwitch = useCallback(async (branchName: string, skipBusyManagement = false) => {
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       if (!skipBusyManagement) {
         setIsBusy(true);
         setBusyMessage(`git checkout ${branchName}`);
       }
-      
+
       await gitAdapter.checkoutBranch(branchName);
 
       const branchStashMessage = `branch-stash-${branchName}`;
@@ -404,10 +408,19 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   }, [gitAdapter, refreshFileStatus]);
 
+  const handleBranchSwitch = useCallback(async (branchName: string) => {
+    if (hasLocalChanges) {
+      showLocalChangesDialog(branchName);
+      return;
+    }
+    await performBranchSwitch(branchName);
+  }, [hasLocalChanges, showLocalChangesDialog, performBranchSwitch]);
+
   const handleLocalChangesDialog = useCallback(async (option: string) => {
     hideLocalChangesDialog();
     const branchName = pendingState.pendingBranchSwitch;
-    if (!branchName || !gitAdapter) return;
+    if (!branchName || !gitAdapter)
+      return;
 
     try {
       setIsBusy(true);
@@ -471,7 +484,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     currentBranchLoadId.current += 1;
     const thisLoadId = currentBranchLoadId.current;
 
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     setSelectedItem({ type: 'branch', branchName, commits: [], loading: true });
 
@@ -492,7 +506,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, branchCommitsCache, updateBranchCache]);
 
   const handleCreateBranch = useCallback(async (branchName: string, checkoutAfterCreate: boolean) => {
-    if (!gitAdapter) return;
+    if (!gitAdapter)
+      return;
 
     try {
       setIsBusy(true);
@@ -518,7 +533,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const handleDeleteBranchDialog = useCallback(async ({ deleteRemote }: { deleteRemote: boolean }) => {
     hideDeleteBranchDialog();
     const branchName = pendingState.branchToDelete;
-    if (!branchName || !gitAdapter) return;
+    if (!branchName || !gitAdapter)
+      return;
 
     try {
       setIsBusy(true);
@@ -549,7 +565,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const handleRenameBranchDialog = useCallback(async (newName: string) => {
     hideRenameBranchDialog();
     const oldName = pendingState.branchToRename;
-    if (!oldName || !gitAdapter) return;
+    if (!oldName || !gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -577,7 +594,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleMergeBranchDialog = useCallback(async ({ sourceBranch, targetBranch, flag }: { sourceBranch: string; targetBranch: string; flag?: string }) => {
     hideMergeBranchDialog();
-    if (!gitAdapter || !sourceBranch || !targetBranch) return;
+    if (!gitAdapter || !sourceBranch || !targetBranch) 
+      return;
 
     try {
       setIsBusy(true);
@@ -596,7 +614,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleRebaseBranchDialog = useCallback(async ({ sourceBranch, targetBranch }: { sourceBranch: string; targetBranch: string }) => {
     hideRebaseBranchDialog();
-    if (!gitAdapter || !sourceBranch || !targetBranch) return;
+    if (!gitAdapter || !sourceBranch || !targetBranch) 
+      return;
 
     let stashed = false;
     try {
@@ -659,7 +678,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleResetToOrigin = useCallback(async () => {
     hideResetDialog();
-    if (!gitAdapter) return;
+    if (!gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -678,7 +698,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleCleanWorkingDirectory = useCallback(async () => {
     hideCleanWorkingDirectoryDialog();
-    if (!gitAdapter) return;
+    if (!gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -695,10 +716,12 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, hideCleanWorkingDirectoryDialog, loadRepoData]);
 
   const handleDiscardAllChanges = useCallback(async () => {
-    if (modifiedCount === 0 || !gitAdapter) return;
+    if (modifiedCount === 0 || !gitAdapter) 
+      return;
 
     const confirmed = await showConfirm(`Are you sure you want to discard all ${modifiedCount} local changes?`);
-    if (!confirmed) return;
+    if (!confirmed) 
+      return;
 
     try {
       setIsBusy(true);
@@ -819,7 +842,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const handleRenameStashDialog = useCallback(async (newName: string) => {
     hideRenameStashDialog();
     const stash = pendingState.stashToRename;
-    if (!stash || !gitAdapter) return;
+    if (!stash || !gitAdapter) 
+      return;
 
     try {
       const currentMessage = stash.message;
@@ -839,7 +863,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleDeleteStashDialog = useCallback(async (stashIndex: number) => {
     hideDeleteStashDialog();
-    if (!gitAdapter) return;
+    if (!gitAdapter) 
+      return;
 
     try {
       await gitAdapter.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
@@ -863,7 +888,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       return;
     }
 
-    if (!gitAdapter) return;
+    if (!gitAdapter) 
+      return;
 
     currentBranchLoadId.current += 1;
     const thisLoadId = currentBranchLoadId.current;
@@ -896,7 +922,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleDeleteRemoteBranch = useCallback(async (remoteName: string, branchName: string) => {
     const confirmed = await showConfirm(`Delete remote branch '${remoteName}/${branchName}'?`);
-    if (!confirmed || !gitAdapter) return;
+    if (!confirmed || !gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -913,7 +940,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, showConfirm, loadRepoData]);
 
   const handleCheckoutRemoteBranch = useCallback(async (remoteName: string, branchName: string) => {
-    if (!gitAdapter) return;
+    if (!gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -968,7 +996,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const handleCreateBranchFromCommit = useCallback(async (branchName: string, checkoutAfterCreate: boolean) => {
     const commit = pendingState.commitForDialog;
     hideCreateBranchFromCommitDialog();
-    if (!commit || !gitAdapter) return;
+    if (!commit || !gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -992,7 +1021,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const handleCreateTagFromCommit = useCallback(async (tagName: string, tagMessage: string) => {
     const commit = pendingState.commitForDialog;
     hideCreateTagFromCommitDialog();
-    if (!commit || !gitAdapter) return;
+    if (!commit || !gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -1023,7 +1053,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const handleAmendCommit = useCallback(async (newMessage: string) => {
     const commit = pendingState.commitForDialog;
     hideAmendCommitDialog();
-    if (!commit || !gitAdapter) return;
+    if (!commit || !gitAdapter) 
+      return;
 
     try {
       setIsBusy(true);
@@ -1046,7 +1077,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const handleCheckoutCommit = useCallback(async () => {
     const commitHash = pendingState.commitToCheckout;
-    if (!gitAdapter || !commitHash) return;
+    if (!gitAdapter || !commitHash) 
+      return;
 
     hideCheckoutCommitDialog();
     try {
@@ -1065,7 +1097,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, [gitAdapter, hideCheckoutCommitDialog, pendingState.commitToCheckout, clearBranchCache, loadRepoData]);
 
   const handleCommitContextMenu = useCallback(async (action: string, commit: Commit, _currentBranch: string, tagName?: string) => {
-    if (!gitAdapter) return;
+    if (!gitAdapter) 
+      return;
 
     switch (action) {
       case 'new-branch':
@@ -1162,7 +1195,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (activeSplitter.current === null) return;
+    if (activeSplitter.current === null) 
+      return;
 
     const container = e.currentTarget;
     const rect = container.getBoundingClientRect();
