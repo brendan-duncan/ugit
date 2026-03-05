@@ -13,6 +13,7 @@ interface TreeNodeProps {
   selectedItem: SelectedItem | null;
   onContextMenu: (e: React.MouseEvent, branchName: string) => void;
   branchesWithStash: Set<string>;
+  onActionHandler: (action: string, branchName: string, currentBranch: string) => void;
 }
 
 interface BranchTreeProps {
@@ -30,7 +31,7 @@ interface BranchTreeProps {
 }
 
 function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
-      onBranchSelect, selectedItem, onContextMenu, branchesWithStash }: TreeNodeProps) {
+      onBranchSelect, selectedItem, onContextMenu, branchesWithStash, onActionHandler }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
   const isCurrent = node.fullPath === currentBranch;
@@ -60,8 +61,8 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     // Only allow switching for leaf nodes (actual branches) and not the current branch
-    if (!hasChildren && !isCurrent && onBranchSwitch) {
-      onBranchSwitch(node.fullPath);
+    if (!hasChildren && !isCurrent && onActionHandler) {
+      onActionHandler('checkout', node.fullPath, currentBranch);
     }
   };
 
@@ -137,6 +138,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
               selectedItem={selectedItem}
               onContextMenu={onContextMenu}
               branchesWithStash={branchesWithStash}
+              onActionHandler={onActionHandler}
             />
           ))}
         </div>
@@ -300,6 +302,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               selectedItem={selectedItem}
               onContextMenu={handleContextMenu}
               branchesWithStash={branchesWithStash}
+              onActionHandler={onContextMenu}
             />
           ))}
         </div>
