@@ -87,11 +87,11 @@ function ApplyStashDialog({ onClose, onApply, stashMessage, stashIndex }: ApplyS
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
-          </button>
           <button className="dialog-button dialog-button-primary" onClick={handleApply}>
             Apply
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+            Cancel
           </button>
         </div>
       </div>

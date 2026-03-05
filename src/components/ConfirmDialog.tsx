@@ -30,11 +30,11 @@ function ConfirmDialog({ message, title = 'Confirm', onConfirm, onCancel }: Conf
           <div className="alert-dialog-message">{message}</div>
         </div>
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onCancel}>
-            Cancel
-          </button>
           <button className="dialog-button dialog-button-primary" onClick={onConfirm}>
             OK
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onCancel}>
+            Cancel
           </button>
         </div>
       </div>

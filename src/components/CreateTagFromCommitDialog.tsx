@@ -112,15 +112,15 @@ function CreateTagFromCommitDialog({ onClose, onCreateTag, commitHash, commitMes
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isCreating}>
-            Cancel
-          </button>
           <button
             className={`dialog-button dialog-button-primary ${!tagName.trim() || tagExists || isCreating ? 'disabled' : ''}`}
             onClick={handleCreate}
             disabled={!tagName.trim() || tagExists || isCreating}
           >
             {isCreating ? 'Creating...' : 'Create'}
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isCreating}>
+            Cancel
           </button>
         </div>
       </div>

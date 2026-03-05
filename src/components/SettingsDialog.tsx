@@ -218,18 +218,18 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
           </button>
           <div className="footer-spacer"></div>
           <button 
-            onClick={onClose} 
-            disabled={isSaving}
-            className="button-secondary"
-          >
-            Cancel
-          </button>
-          <button 
             onClick={handleSave} 
             disabled={isSaving}
             className="button-primary"
           >
             {isSaving ? 'Saving...' : 'Save'}
+          </button>
+          <button 
+            onClick={onClose} 
+            disabled={isSaving}
+            className="button-secondary"
+          >
+            Cancel
           </button>
         </div>
       </div>

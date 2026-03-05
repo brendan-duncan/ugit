@@ -124,15 +124,15 @@ function CreateBranchFromCommitDialog({ onClose, onCreateBranch, commitHash, com
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isCreating}>
-            Cancel
-          </button>
           <button
             className={`dialog-button dialog-button-primary ${!branchName.trim() || branchExists || isCreating ? 'disabled' : ''}`}
             onClick={handleCreate}
             disabled={!branchName.trim() || branchExists || isCreating}
           >
             {isCreating ? 'Creating...' : 'Create'}
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isCreating}>
+            Cancel
           </button>
         </div>
       </div>

@@ -65,15 +65,15 @@ function AmendCommitDialog({ onClose, onAmend, commitMessage }: AmendCommitDialo
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isAmending}>
-            Cancel
-          </button>
           <button
             className={`dialog-button dialog-button-primary ${!message.trim() || isAmending ? 'disabled' : ''}`}
             onClick={handleAmend}
             disabled={!message.trim() || isAmending}
           >
             {isAmending ? 'Amending...' : 'Amend'}
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose} disabled={isAmending}>
+            Cancel
           </button>
         </div>
       </div>

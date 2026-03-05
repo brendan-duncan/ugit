@@ -25,11 +25,11 @@ const CleanWorkingDirectoryDialog: React.FC<CleanWorkingDirectoryDialogProps> = 
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
-          </button>
           <button className="dialog-button dialog-button-primary" onClick={onClean}>
             Clean
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+            Cancel
           </button>
         </div>
       </div>

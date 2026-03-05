@@ -35,11 +35,11 @@ const ResetToOriginDialog: React.FC<ResetToOriginDialogProps> = ({ onClose, onRe
         </div>
 
         <div className="dialog-footer">
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
-          </button>
           <button className="dialog-button dialog-button-primary" onClick={onReset}>
             Reset
+          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
+            Cancel
           </button>
         </div>
       </div>
