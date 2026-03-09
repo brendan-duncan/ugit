@@ -72,7 +72,8 @@ const BranchTreeNode: React.FC<{
   onContextMenu: (e: React.MouseEvent<HTMLDivElement>, remoteName: string, branchName: string) => void;
   expandedFolders: Record<string, boolean>;
   onFolderToggle: (remoteName: string, folderPath: string) => void;
-}> = ({ node, level, remoteName, path, selectedItem, onSelectRemoteBranch, onContextMenu, expandedFolders, onFolderToggle }) => {
+  onRemoteBranchAction?: (action: string, remoteName: string, branchName: string, fullName: string) => void;
+}> = ({ node, level, remoteName, path, selectedItem, onSelectRemoteBranch, onContextMenu, expandedFolders, onFolderToggle, onRemoteBranchAction }) => {
   const fullPath = path ? `${path}/${node.name}` : node.name;
   const folderKey = `${remoteName}/${fullPath}`;
   const isExpanded = expandedFolders[folderKey];
@@ -92,6 +93,13 @@ const BranchTreeNode: React.FC<{
             onSelectRemoteBranch(remoteName, node.fullName);
           } else {
             onFolderToggle(remoteName, fullPath);
+          }
+        }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (node.isLeaf && node.fullName && onRemoteBranchAction) {
+            const fullName = `${remoteName}/${node.fullName}`;
+            onRemoteBranchAction('checkout', remoteName, node.fullName, fullName);
           }
         }}
         onContextMenu={node.isLeaf && node.fullName ? (e) => onContextMenu(e, remoteName, node.fullName) : undefined}
@@ -131,6 +139,7 @@ const BranchTreeNode: React.FC<{
                 onContextMenu={onContextMenu}
                 expandedFolders={expandedFolders}
                 onFolderToggle={onFolderToggle}
+                onRemoteBranchAction={onRemoteBranchAction}
               />
             ))}
         </div>
@@ -452,6 +461,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                               onContextMenu={handleRemoteBranchContextMenu}
                               expandedFolders={expandedFolders}
                               onFolderToggle={handleFolderToggle}
+                              onRemoteBranchAction={onRemoteBranchAction}
                             />
                           ))
                       ) : (
