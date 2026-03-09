@@ -1,8 +1,17 @@
 ## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.13) (XXX)
 
+### Bug Fixes
+
+* Fix for window going blank When git has an error.
+
+### Improvements
+
+* Double-click remote branch to do a checkout.
+
 ### New Features
 
 * Add Filter field to Remotes to filter the remote branches displayed.
+* Add Filter field to Branches to filter the local branches displayed.
 
 ## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.12) (March 5, 2026)
 
