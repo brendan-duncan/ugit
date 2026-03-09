@@ -151,6 +151,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
       collapsed, onToggleCollapse, onContextMenu, stashes }: BranchTreeProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [branchFilter, setBranchFilter] = useState('');
 
   // Create a set of branches that have branch stashes
   const branchesWithStash = new Set<string>();
@@ -223,7 +224,12 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
     return root;
   };
 
-  const tree = buildTree(branches);
+  // Filter branches if filter is active
+  const filteredBranches = branchFilter.trim()
+    ? branches.filter(branch => branch.toLowerCase().includes(branchFilter.toLowerCase()))
+    : branches;
+
+  const tree = buildTree(filteredBranches);
 
   return (
     <div className="branch-tree">
@@ -234,7 +240,17 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
         </button>
       </div>
       {!collapsed && (
-        <div className="branch-tree-content">
+        <>
+          <div className="branch-filter">
+            <input
+              type="text"
+              placeholder="Filter branches..."
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="branch-filter-input"
+            />
+          </div>
+          <div className="branch-tree-content">
           {contextMenu && (
             <div
               ref={menuRef}
@@ -306,6 +322,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
             />
           ))}
         </div>
+        </>
       )}
     </div>
   );
