@@ -150,6 +150,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
   const [showEditRemoteDialog, setShowEditRemoteDialog] = useState(false);
   const [showDeleteRemoteDialog, setShowDeleteRemoteDialog] = useState(false);
   const [remoteActionMenu, setRemoteActionMenu] = useState<{ x: number; y: number; remote: RemoteInfo } | null>(null);
+  const [branchFilter, setBranchFilter] = useState('');
 
   const contextMenuRef = { current: null };
 
@@ -378,7 +379,17 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
         </div>
       </div>
       {!collapsed && (
-        <div className="remote-list-content">
+        <>
+          <div className="remote-filter">
+            <input
+              type="text"
+              placeholder="Filter branches..."
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="remote-filter-input"
+            />
+          </div>
+          <div className="remote-list-content">
           {(!remotes || remotes.length === 0) ? (
             <div className="remote-list-empty">No remotes found</div>
           ) : (
@@ -408,32 +419,45 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
                   {loadingRemotes[remote.name] ? (
                     <div className="loading-branches">Loading branches...</div>
                   ) : remoteBranchesTreeCache[remote.name] ? (
-                    Object.keys(remoteBranchesTreeCache[remote.name]).length > 0 ? (
-                      Object.values(remoteBranchesTreeCache[remote.name])
-                        .sort((a, b) => {
-                          // Sort folders first, then leaves, then alphabetically
-                          if (a.isLeaf !== b.isLeaf) {
-                            return a.isLeaf ? 1 : -1;
-                          }
-                          return a.name.localeCompare(b.name);
-                        })
-                        .map((node) => (
-                          <BranchTreeNode
-                            key={node.name}
-                            node={node}
-                            level={0}
-                            remoteName={remote.name}
-                            path=""
-                            selectedItem={selectedItem}
-                            onSelectRemoteBranch={handleRemoteBranchSelect}
-                            onContextMenu={handleRemoteBranchContextMenu}
-                            expandedFolders={expandedFolders}
-                            onFolderToggle={handleFolderToggle}
-                          />
-                        ))
-                    ) : (
-                      <div className="no-branches">No branches found</div>
-                    )
+                    (() => {
+                      // Filter branches if filter is active
+                      let treeToDisplay = remoteBranchesTreeCache[remote.name];
+
+                      if (branchFilter.trim()) {
+                        const filterLower = branchFilter.toLowerCase();
+                        const filteredBranches = remoteBranchesCache[remote.name]?.filter(branch =>
+                          branch.toLowerCase().includes(filterLower)
+                        ) || [];
+                        treeToDisplay = buildBranchTree(filteredBranches);
+                      }
+
+                      return Object.keys(treeToDisplay).length > 0 ? (
+                        Object.values(treeToDisplay)
+                          .sort((a, b) => {
+                            // Sort folders first, then leaves, then alphabetically
+                            if (a.isLeaf !== b.isLeaf) {
+                              return a.isLeaf ? 1 : -1;
+                            }
+                            return a.name.localeCompare(b.name);
+                          })
+                          .map((node) => (
+                            <BranchTreeNode
+                              key={node.name}
+                              node={node}
+                              level={0}
+                              remoteName={remote.name}
+                              path=""
+                              selectedItem={selectedItem}
+                              onSelectRemoteBranch={handleRemoteBranchSelect}
+                              onContextMenu={handleRemoteBranchContextMenu}
+                              expandedFolders={expandedFolders}
+                              onFolderToggle={handleFolderToggle}
+                            />
+                          ))
+                      ) : (
+                        <div className="no-branches">No branches found</div>
+                      );
+                    })()
                   ) : (
                     <div className="branches-placeholder">Click to load branches</div>
                   )}
@@ -442,6 +466,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
             </div>
           )))}
         </div>
+        </>
       )}
 
       {contextMenu && (
