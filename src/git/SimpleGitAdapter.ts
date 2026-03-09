@@ -207,8 +207,8 @@ export class SimpleGitAdapter extends GitAdapter {
     let idReset: number;
     try {
       // Fetch latest from origin
-      idFetch = this._startCommand('git fetch origin', startTime);
-      await this.git.fetch('origin');
+      idFetch = this._startCommand('git fetch origin --prune', startTime);
+      await this.git.fetch('origin', ['--prune']);
       this._endCommand(idFetch, startTime);
 
       // Hard reset to origin/branch
@@ -244,11 +244,12 @@ export class SimpleGitAdapter extends GitAdapter {
     };
   }
 
-  async fetch(remote: string): Promise<void> {
+  async fetch(remote: string, options?: string[]): Promise<void> {
     const startTime = performance.now();
-    const id = this._startCommand(`git fetch ${remote}`, startTime);
+    const optionsStr = options ? ` ${options.join(' ')}` : '';
+    const id = this._startCommand(`git fetch ${remote}${optionsStr}`, startTime);
     try {
-      await this.git.fetch(remote);
+      await this.git.fetch(remote, options);
     } catch (error) {
       console.error(`Error fetching from ${remote}:`, error);
     }

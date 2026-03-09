@@ -277,8 +277,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     try {
       if (gitAdapter) {
         setIsBusy(true);
-        setBusyMessage('git fetch --tags');
-        await gitAdapter.raw(['fetch', '--tags']);
+        setBusyMessage('git fetch --tags --prune');
+        await gitAdapter.raw(['fetch', '--tags', '--prune']);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
@@ -295,8 +295,8 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
     try {
       setIsBusy(true);
-      setBusyMessage('git fetch origin');
-      await gitAdapter.fetch('origin');
+      setBusyMessage('git fetch origin --prune');
+      await gitAdapter.fetch('origin', ['--prune']);
       setBusyMessage('Updating branch status...');
       await updateCachedCommitsOriginStatus();
     } catch (error) {
@@ -977,7 +977,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         break;
       case 'new-tag':
         if (gitAdapter) {
-          await gitAdapter.fetch(remoteName);
+          await gitAdapter.fetch(remoteName, ['--prune']);
           const result = await gitAdapter.raw(['rev-parse', `${remoteName}/${branchName}`]);
           const logResult = await gitAdapter.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', result.trim()]);
           const [h, author, email, date, message] = logResult.trim().split('|');

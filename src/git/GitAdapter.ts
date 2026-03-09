@@ -244,8 +244,9 @@ export abstract class GitAdapter {
   /**
    * Fetch from remote
    * @param remote - Remote name (e.g., 'origin')
+   * @param options - Additional fetch options (e.g., ['--prune'])
    */
-  abstract fetch(remote: string): Promise<void>;
+  abstract fetch(remote: string, options?: string[]): Promise<void>;
 
   /**
    * Pull from remote branch
