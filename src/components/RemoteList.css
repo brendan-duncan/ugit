@@ -50,6 +50,34 @@
   background-color: var(--bg-tertiary);
 }
 
+.remote-filter {
+  margin-bottom: 12px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.remote-filter-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.remote-filter-input:focus {
+  border-color: var(--accent-color);
+}
+
+.remote-filter-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
 .remote-list-content {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 14px;
