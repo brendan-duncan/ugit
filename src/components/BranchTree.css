@@ -53,6 +53,34 @@
   flex-shrink: 0;
 }
 
+.branch-filter {
+  margin-bottom: 12px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.branch-filter-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.branch-filter-input:focus {
+  border-color: var(--accent-color);
+}
+
+.branch-filter-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
 .branch-tree-content {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 14px;
