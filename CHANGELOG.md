@@ -1,4 +1,10 @@
-## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (March 5, 2026)
+## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.13) (XXX)
+
+### New Features
+
+* Add Filter field to Remotes to filter the remote branches displayed.
+
+## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.12) (March 5, 2026)
 
 ### Bug Fixes
 
