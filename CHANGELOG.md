@@ -3,10 +3,12 @@
 ### Bug Fixes
 
 * Fix for window going blank When git has an error.
+* Fix copying text on macOS.
 
 ### Improvements
 
 * Double-click remote branch to do a checkout.
+* Add Edit menu.
 
 ### New Features
 
