@@ -81,7 +81,7 @@ function AddRemoteDialog({ onClose, onAddRemote }: AddRemoteDialogProps) {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRemoteName(e.target.value)}
               className="dialog-input"
               placeholder="upstream"
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               disabled={loading}
             />
           </div>
@@ -95,7 +95,7 @@ function AddRemoteDialog({ onClose, onAddRemote }: AddRemoteDialogProps) {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRemoteUrl(e.target.value)}
               className="dialog-input"
               placeholder="https://github.com/user/repo.git"
-              onKeyPress={handleUrlKeyPress}
+              onKeyDown={handleUrlKeyPress}
               disabled={loading}
             />
           </div>
