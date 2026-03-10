@@ -154,7 +154,7 @@
   transition: background-color 0.2s;
   cursor: default;
   gap: 6px;
-  user-select: none;
+  user-select: text;
 }
 
 .folder-item:hover {
@@ -207,7 +207,7 @@
   padding: 6px 16px;
   color: var(--text-primary);
   cursor: pointer;
-  user-select: none;
+  user-select: text;
   transition: background-color 0.1s;
   display: flex;
   justify-content: space-between;

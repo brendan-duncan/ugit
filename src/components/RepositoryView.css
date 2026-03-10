@@ -12,7 +12,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  user-select: none;
+  user-select: text;
 }
 
 .split-panel {
@@ -79,7 +79,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: row;
-  user-select: none;
+  user-select: text;
   position: relative;
 }
 

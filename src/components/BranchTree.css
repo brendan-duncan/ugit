@@ -96,7 +96,7 @@
 }
 
 .tree-node {
-  user-select: none;
+  user-select: text;
 }
 
 .tree-node-content {
@@ -251,7 +251,7 @@
   padding: 6px 16px;
   color: #cccccc;
   cursor: pointer;
-  user-select: none;
+  user-select: text;
   transition: background-color 0.1s;
   display: flex;
   justify-content: space-between;

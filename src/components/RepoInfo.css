@@ -26,7 +26,7 @@
   padding: 4px;
   border-radius: 4px;
   transition: all 0.2s;
-  user-select: none;
+  user-select: text;
   width: 24px;
   text-align: center;
   height: 24px;
@@ -67,7 +67,7 @@
 }
 
 .local-changes-section {
-  user-select: none;
+  user-select: text;
 }
 
 .local-changes-item {
@@ -135,7 +135,7 @@
   padding: 6px 16px;
   color: var(--text-primary);
   cursor: pointer;
-  user-select: none;
+  user-select: text;
   transition: background-color 0.1s;
   display: flex;
   justify-content: space-between;
