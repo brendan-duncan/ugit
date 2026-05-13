@@ -14,11 +14,13 @@ function ConfirmDialog({ message, title = 'Confirm', onConfirm, onCancel }: Conf
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         onCancel();
+      } else if (e.key === 'Enter') {
+        onConfirm();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
+  }, [onCancel, onConfirm]);
 
   return (
     <div className="dialog-overlay" onClick={onCancel}>
