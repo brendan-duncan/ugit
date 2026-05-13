@@ -1,4 +1,10 @@
-## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.13) (XXX)
+## [v0.1.14](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.13) (May 13, 2026))
+
+### Bug Fixes
+
+* Enter and Escape aren't working with confirm dialogs.
+
+## [v0.1.13](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.13) (XXX)
 
 ### Bug Fixes
 
