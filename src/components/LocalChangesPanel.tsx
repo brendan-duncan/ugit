@@ -629,6 +629,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               onChange={(e) => setCommitMessage(e.target.value)}
               placeholder="Commit message"
               disabled={isBusy}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleCommit();
+                }
+              }}
             />
             <div className={`commit-message-counter ${commitMessage.length > 50 ? 'over-limit' : ''}`}>
               {50 - commitMessage.length}
@@ -641,6 +646,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
             onChange={(e) => setCommitDescription(e.target.value)}
             placeholder="Description (optional)"
             disabled={isBusy}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleCommit();
+              }
+            }}
           />
           <button
             className="commit-description-expand"
