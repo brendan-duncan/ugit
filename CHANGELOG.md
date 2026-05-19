@@ -1,4 +1,11 @@
-## [v0.1.14](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.13) (May 13, 2026))
+## [v0.1.15](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.15) (May 19, 2026))
+
+### Bug Fixes
+
+* Remote branch sometimes had stale info when checking for pulls before commit.
+* Rename "Blocked Branches" to "Locked Branches", fixed checking for them before allowing a commit, add indicator to Branch List label.
+
+## [v0.1.14](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.14) (May 13, 2026))
 
 ### Bug Fixes
 
