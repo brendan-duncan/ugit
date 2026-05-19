@@ -158,11 +158,31 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       return;
     }
 
-    // Check if current branch is behind remote
+    // Actively check the remote for new commits before committing, so we don't
+    // create a divergent history that requires a merge. We fetch first because
+    // the cached branchStatus may be stale.
     let needsPull = false;
-    if (currentBranch && branchStatus && branchStatus[currentBranch]) {
-      const status = branchStatus[currentBranch];
-      needsPull = status.behind && status.behind > 0;
+    if (currentBranch) {
+      try {
+        setIsBusy(true);
+        if (onBusyMessageChange) onBusyMessageChange('git fetch origin');
+        await gitAdapter.fetch('origin');
+        const { behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
+        needsPull = behind > 0;
+        if (onBranchStatusRefresh) {
+          await onBranchStatusRefresh();
+        }
+      } catch (err) {
+        // No remote, offline, or no upstream tracking — fall back to cached status.
+        console.warn('Pre-commit fetch failed, using cached branch status:', err);
+        if (branchStatus && branchStatus[currentBranch]) {
+          const status = branchStatus[currentBranch];
+          needsPull = !!(status.behind && status.behind > 0);
+        }
+      } finally {
+        setIsBusy(false);
+        if (onBusyMessageChange) onBusyMessageChange('');
+      }
     }
 
     if (needsPull) {
