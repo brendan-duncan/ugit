@@ -8,6 +8,7 @@ import { GitAdapter } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import { useAlert } from '../contexts/AlertContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { isBranchLocked } from '../utils/settings';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
@@ -158,6 +159,15 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       return;
     }
 
+    // Reject commits on locked branches before doing any remote work.
+    const lockedPatterns = getSetting('lockedBranchPatterns') || [];
+    if (currentBranch && isBranchLocked(currentBranch, lockedPatterns)) {
+      if (onError) {
+        onError(`The current branch '${currentBranch}' matches a Locked Branch Pattern (from Preferences). You probably forgot to make a branch before doing the Commit.`);
+      }
+      return;
+    }
+
     // Actively check the remote for new commits before committing, so we don't
     // create a divergent history that requires a merge. We fetch first because
     // the cached branchStatus may be stale.
@@ -196,23 +206,6 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
 
   const performCommit = async (doPullFirst = false) => {
     try {
-      const blockCommitBranches = getSetting('blockCommitBranches') || [];
-      if (currentBranch && blockCommitBranches.length > 0) {
-        const isBlocked = blockCommitBranches.some(pattern => {
-          if (pattern.includes('*')) {
-            const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-            return regex.test(currentBranch);
-          }
-          return pattern === currentBranch;
-        });
-        if (isBlocked) {
-          if (onError) {
-            onError(`The current branch '${currentBranch}' is in the Commit Block List (from Preferences). You probably forgot to make a branch before doing the Commit.`);
-          }
-          return;
-        }
-      }
-
       setIsBusy(true);
       const git = gitAdapter;
 

@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import { AppSettings, DEFAULT_SETTINGS } from './settings';
+import { AppSettings, DEFAULT_SETTINGS, isBranchLocked } from './settings';
 
 /**
  * Utility functions for working with settings in non-React contexts
@@ -33,21 +33,13 @@ export class SettingsUtils {
   }
 
   /**
-   * Check if a branch should be blocked for commits
+   * Check if a branch is locked for commits.
    * @param branchName - Name of the branch to check
-   * @returns True if commits should be blocked on this branch
+   * @returns True if commits should be prevented on this branch
    */
-  static async shouldBlockCommit(branchName: string): Promise<boolean> {
+  static async isBranchLocked(branchName: string): Promise<boolean> {
     const settings = await this.getSettings();
-
-    // Check each blocked branch pattern
-    for (const pattern of settings.blockCommitBranches) {
-      if (this.matchesPattern(branchName, pattern)) {
-        return true;
-      }
-    }
-
-    return false;
+    return isBranchLocked(branchName, settings.lockedBranchPatterns);
   }
 
   /**
@@ -68,34 +60,11 @@ export class SettingsUtils {
   }
 
   /**
-   * Check if a branch name matches a pattern
-   * @param branchName - Branch name to check
-   * @param pattern - Pattern (supports wildcards)
-   * @returns True if the branch matches the pattern
+   * Get all locked branch patterns
+   * @returns Array of locked branch patterns
    */
-  private static matchesPattern(branchName: string, pattern: string): boolean {
-    // Simple wildcard matching (supports * at the end)
-    if (pattern.endsWith('/*') || pattern.endsWith('/*')) {
-      const prefix = pattern.slice(0, -1);
-      return branchName.startsWith(prefix);
-    }
-
-    // Simple glob-like pattern matching
-    if (pattern.includes('*')) {
-      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-      return regex.test(branchName);
-    }
-
-    // Exact match
-    return branchName === pattern;
-  }
-
-  /**
-   * Get all blocked branch patterns
-   * @returns Array of blocked branch patterns
-   */
-  static async getBlockedBranchPatterns(): Promise<string[]> {
+  static async getLockedBranchPatterns(): Promise<string[]> {
     const settings = await this.getSettings();
-    return [...settings.blockCommitBranches];
+    return [...settings.lockedBranchPatterns];
   }
 }

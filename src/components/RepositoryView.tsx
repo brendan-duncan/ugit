@@ -1296,6 +1296,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
                   onRemoteBranchAction={handleRemoteBranchContextMenu}
                   onRemoteAdded={() => loadRepoData(true)}
                   gitAdapter={gitAdapter}
+                  lockedPatterns={getSetting('lockedBranchPatterns')}
                 />
               </div>
             </div>

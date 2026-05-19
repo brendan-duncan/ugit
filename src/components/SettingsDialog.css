@@ -88,6 +88,11 @@
   margin-top: 0.35rem;
 }
 
+.setting-group small.setting-subtitle {
+  margin-top: -0.25rem;
+  margin-bottom: 0.5rem;
+}
+
 .checkbox-label {
   display: flex !important;
   align-items: center;

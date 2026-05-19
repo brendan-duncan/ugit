@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SelectedItem } from './types';
+import { isBranchLocked } from '../utils/settings';
 import './BranchTree.css';
 
 interface TreeNodeProps {
@@ -13,6 +14,7 @@ interface TreeNodeProps {
   selectedItem: SelectedItem | null;
   onContextMenu: (e: React.MouseEvent, branchName: string) => void;
   branchesWithStash: Set<string>;
+  lockedPatterns: ReadonlyArray<string>;
   onActionHandler: (action: string, branchName: string, currentBranch: string) => void;
 }
 
@@ -28,10 +30,11 @@ interface BranchTreeProps {
   onToggleCollapse: () => void;
   onContextMenu: (action: string, branchName: string, currentBranch: string) => void;
   stashes: Array<any>;
+  lockedPatterns?: ReadonlyArray<string>;
 }
 
 function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
-      onBranchSelect, selectedItem, onContextMenu, branchesWithStash, onActionHandler }: TreeNodeProps) {
+      onBranchSelect, selectedItem, onContextMenu, branchesWithStash, lockedPatterns, onActionHandler }: TreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
   const isCurrent = node.fullPath === currentBranch;
@@ -39,6 +42,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
   const isSelected = selectedItem && selectedItem.type === 'branch' && selectedItem.branchName === node.fullPath;
   const status = branchStatus && branchStatus[node.fullPath];
   const hasStash = branchesWithStash.has(node.fullPath);
+  const isLocked = !hasChildren && isBranchLocked(node.fullPath, lockedPatterns);
 
   const handleToggle = () => {
     if (hasChildren) {
@@ -95,6 +99,12 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
 
         <span className="tree-node-name">{node.name}</span>
 
+        {isLocked && (
+          <span className="tree-node-lock-icon" title="Locked branch — commits are blocked by Locked Branch Patterns in Preferences">
+            🔒
+          </span>
+        )}
+
         {!hasChildren && hasStash && (
           <span className="tree-node-stash-icon" title="Branch has stashed changes">
             📦
@@ -138,6 +148,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
               selectedItem={selectedItem}
               onContextMenu={onContextMenu}
               branchesWithStash={branchesWithStash}
+              lockedPatterns={lockedPatterns}
               onActionHandler={onActionHandler}
             />
           ))}
@@ -148,7 +159,8 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
 }
 
 function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem,
-      collapsed, onToggleCollapse, onContextMenu, stashes }: BranchTreeProps) {
+      collapsed, onToggleCollapse, onContextMenu, stashes, lockedPatterns }: BranchTreeProps) {
+  const lockPatterns = lockedPatterns || [];
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [branchFilter, setBranchFilter] = useState('');
@@ -318,6 +330,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               selectedItem={selectedItem}
               onContextMenu={handleContextMenu}
               branchesWithStash={branchesWithStash}
+              lockedPatterns={lockPatterns}
               onActionHandler={onContextMenu}
             />
           ))}

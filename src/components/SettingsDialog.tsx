@@ -12,7 +12,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const { showConfirm } = useAlert();
   const { settings, loadingSettings, settingsError, updateSetting, resetSettings } = useSettings();
   const [localRefreshTime, setLocalRefreshTime] = useState<number>(5);
-  const [blockCommitBranches, setBlockCommitBranches] = useState<string>('');
+  const [lockedBranchPatterns, setLockedBranchPatterns] = useState<string>('');
   const [pushAllTags, setPushAllTags] = useState<boolean>(false);
   const [maxCommits, setMaxCommits] = useState<number>(100);
   const [externalEditor, setExternalEditor] = useState<string>('code');
@@ -22,7 +22,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   React.useEffect(() => {
     if (settings) {
       setLocalRefreshTime(settings.localFileRefreshTime);
-      setBlockCommitBranches(settings.blockCommitBranches.join(', '));
+      setLockedBranchPatterns(settings.lockedBranchPatterns.join(', '));
       setPushAllTags(settings.pushAllTags);
       setMaxCommits(settings.maxCommits);
       setExternalEditor(settings.externalEditor);
@@ -46,13 +46,13 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
 
     setIsSaving(true);
     try {
-      const branchList = blockCommitBranches
+      const branchList = lockedBranchPatterns
         .split(',')
         .map(branch => branch.trim())
         .filter(branch => branch.length > 0);
 
       await updateSetting('localFileRefreshTime', localRefreshTime);
-      await updateSetting('blockCommitBranches', branchList);
+      await updateSetting('lockedBranchPatterns', branchList);
       await updateSetting('pushAllTags', pushAllTags);
       await updateSetting('maxCommits', maxCommits);
       await updateSetting('externalEditor', externalEditor);
@@ -155,17 +155,18 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
             </div>
 
             <div className="setting-group">
-              <label htmlFor="blockCommitBranches">
-                Blocked Branch Patterns
+              <label htmlFor="lockedBranchPatterns">
+                Locked Branch Patterns
               </label>
+              <small className="setting-subtitle">Commits are prevented on branches that match these patterns.</small>
               <input
-                id="blockCommitBranches"
+                id="lockedBranchPatterns"
                 type="text"
-                value={blockCommitBranches}
-                onChange={(e) => setBlockCommitBranches(e.target.value)}
+                value={lockedBranchPatterns}
+                onChange={(e) => setLockedBranchPatterns(e.target.value)}
                 placeholder="trunk, main, */staging"
               />
-              <small>Branch patterns where commits should be blocked. Use * as wildcard (comma-separated)</small>
+              <small>Use * as wildcard, comma-separated (e.g. "trunk, */staging" locks trunk and 6000.0/staging).</small>
             </div>
           </div>
 
@@ -193,7 +194,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
 
               <div className="setting-group half-width">
                 <label htmlFor="maxCommits">
-                  Max Commits
+                  Max Display Commits
                 </label>
                 <input
                   id="maxCommits"
