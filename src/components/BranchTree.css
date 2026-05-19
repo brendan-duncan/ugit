@@ -183,6 +183,17 @@
   opacity: 1;
 }
 
+.tree-node-lock-icon {
+  margin-left: 8px;
+  font-size: 12px;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+.tree-node-content:hover .tree-node-lock-icon {
+  opacity: 1;
+}
+
 .tree-node-pulling {
   display: flex;
   align-items: center;

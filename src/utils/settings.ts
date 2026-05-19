@@ -1,6 +1,6 @@
 export interface AppSettings {
   localFileRefreshTime: number;
-  blockCommitBranches: string[];
+  lockedBranchPatterns: string[];
   diffViewMode: 'side-by-side' | 'line-by-line';
   pushAllTags: boolean;
   maxCommits: number;
@@ -10,13 +10,32 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   localFileRefreshTime: 5,
-  blockCommitBranches: ['trunk', '*/staging'],
+  lockedBranchPatterns: ['trunk', '*/staging'],
   diffViewMode: 'line-by-line',
   pushAllTags: false,
   maxCommits: 100,
   externalEditor: 'code',
   theme: 'dark'
 };
+
+/**
+ * Returns true if `branchName` matches any of the provided lock patterns.
+ * Patterns support `*` as a wildcard (e.g. `*` /staging` matches `release/staging`).
+ */
+export function isBranchLocked(branchName: string, patterns: ReadonlyArray<string> | undefined): boolean {
+  if (!branchName || !patterns || patterns.length === 0)
+    return false;
+  return patterns.some(raw => {
+    const pattern = raw.trim();
+    if (!pattern)
+      return false;
+    if (pattern.includes('*')) {
+      const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+      return new RegExp('^' + escaped + '$').test(branchName);
+    }
+    return pattern === branchName;
+  });
+}
 
 /**
  * Manages application settings with persistent storage
@@ -37,9 +56,16 @@ export class SettingsManager {
   loadSettings(): AppSettings {
     try {
       const cached = this.cacheManager.loadCache(this.SETTINGS_KEY);
-      if (cached && this.isValidSettings(cached)) {
-        this.settings = { ...DEFAULT_SETTINGS, ...cached };
-        return this.settings;
+      if (cached) {
+        // Migrate legacy `blockCommitBranches` field to `lockedBranchPatterns`.
+        if (cached.blockCommitBranches && !cached.lockedBranchPatterns) {
+          cached.lockedBranchPatterns = cached.blockCommitBranches;
+        }
+        delete cached.blockCommitBranches;
+        if (this.isValidSettings(cached)) {
+          this.settings = { ...DEFAULT_SETTINGS, ...cached };
+          return this.settings;
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -137,8 +163,8 @@ export class SettingsManager {
       data &&
       typeof data === 'object' &&
       typeof data.localFileRefreshTime === 'number' &&
-      Array.isArray(data.blockCommitBranches) &&
-      data.blockCommitBranches.every((item: any) => typeof item === 'string') &&
+      Array.isArray(data.lockedBranchPatterns) &&
+      data.lockedBranchPatterns.every((item: any) => typeof item === 'string') &&
       (data.diffViewMode === undefined ||
        data.diffViewMode === 'side-by-side' ||
        data.diffViewMode === 'line-by-line') &&
