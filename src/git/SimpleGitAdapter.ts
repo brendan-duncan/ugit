@@ -6,7 +6,8 @@ import GitAdapter, {
   BranchInfo,
   StashInfo,
   StashListResponse,
-  CommitFile } from './GitAdapter';
+  CommitFile,
+  RebaseStatus } from './GitAdapter';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
@@ -1145,6 +1146,151 @@ export class SimpleGitAdapter extends GitAdapter {
       throw error;
     }
     this._endCommand(id, startTime);
+  }
+
+  /**
+   * Resolve the absolute path of the repository's git directory, falling back
+   * to the conventional `<repo>/.git` location if the lookup fails.
+   */
+  private async _resolveGitDir(): Promise<string> {
+    try {
+      const dir = (await this.git!.raw(['rev-parse', '--absolute-git-dir'])).trim();
+      if (dir) {
+        return dir;
+      }
+    } catch {
+      // fall through to the default location
+    }
+    return path.join(this.repoPath, '.git');
+  }
+
+  async getRebaseStatus(): Promise<RebaseStatus | null> {
+    const gitDir = await this._resolveGitDir();
+    const mergeDir = path.join(gitDir, 'rebase-merge');
+    const applyDir = path.join(gitDir, 'rebase-apply');
+
+    const isDir = async (p: string): Promise<boolean> => {
+      try {
+        return (await fs.stat(p)).isDirectory();
+      } catch {
+        return false;
+      }
+    };
+
+    const mergeActive = await isDir(mergeDir);
+    const applyActive = mergeActive ? false : await isDir(applyDir);
+    if (!mergeActive && !applyActive) {
+      return null;
+    }
+
+    const stateDir = mergeActive ? mergeDir : applyDir;
+    const kind: 'merge' | 'apply' = mergeActive ? 'merge' : 'apply';
+
+    const readState = async (name: string): Promise<string> => {
+      try {
+        return (await fs.readFile(path.join(stateDir, name), 'utf8')).trim();
+      } catch {
+        return '';
+      }
+    };
+
+    let branch: string | null = null;
+    const headName = await readState('head-name');
+    if (headName) {
+      branch = headName.replace(/^refs\/heads\//, '');
+    }
+
+    let onto: string | null = null;
+    const ontoHash = await readState('onto');
+    if (ontoHash) {
+      onto = ontoHash.substring(0, 8);
+      try {
+        const nameRev = (await this.git!.raw(['name-rev', '--name-only', ontoHash])).trim();
+        if (nameRev && !/undefined|unknown/i.test(nameRev)) {
+          onto = nameRev.replace(/[\^~][0-9]+$/, '');
+        }
+      } catch {
+        // keep the short hash
+      }
+    }
+
+    const currentStep = mergeActive
+      ? parseInt(await readState('msgnum'), 10)
+      : parseInt(await readState('next'), 10);
+    const totalSteps = mergeActive
+      ? parseInt(await readState('end'), 10)
+      : parseInt(await readState('last'), 10);
+
+    let stoppedSha = await readState('stopped-sha');
+    if (!stoppedSha) {
+      try {
+        stoppedSha = (await this.git!.raw(['rev-parse', '--verify', '--quiet', 'REBASE_HEAD'])).trim();
+      } catch {
+        stoppedSha = '';
+      }
+    }
+
+    let currentCommitHash: string | null = null;
+    let currentCommitSubject: string | null = null;
+    if (stoppedSha) {
+      currentCommitHash = stoppedSha.substring(0, 8);
+      try {
+        currentCommitSubject = (await this.git!.raw(['log', '-1', '--format=%s', stoppedSha])).trim();
+      } catch {
+        currentCommitSubject = null;
+      }
+    }
+
+    let conflictedFiles: string[] = [];
+    try {
+      const status = await this.status(undefined, true, true);
+      conflictedFiles = status.conflicted || [];
+    } catch {
+      conflictedFiles = [];
+    }
+
+    return {
+      kind,
+      branch,
+      onto,
+      currentStep: Number.isFinite(currentStep) ? currentStep : 0,
+      totalSteps: Number.isFinite(totalSteps) ? totalSteps : 0,
+      currentCommitHash,
+      currentCommitSubject,
+      conflictedFiles,
+    };
+  }
+
+  /**
+   * Run a `git rebase` continuation command. The editor is disabled so the
+   * command never blocks waiting for commit-message input.
+   */
+  private async _runRebaseCommand(action: '--continue' | '--abort' | '--skip'): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git rebase ${action}`, startTime);
+    try {
+      await execAsync(`git rebase ${action}`, {
+        cwd: this.repoPath,
+        env: { ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true' },
+        maxBuffer: 1024 * 1024 * 10,
+      });
+    } catch (error) {
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async rebaseContinue(): Promise<void> {
+    await this._runRebaseCommand('--continue');
+  }
+
+  async rebaseAbort(): Promise<void> {
+    await this._runRebaseCommand('--abort');
+  }
+
+  async rebaseSkip(): Promise<void> {
+    await this._runRebaseCommand('--skip');
   }
 }
 
