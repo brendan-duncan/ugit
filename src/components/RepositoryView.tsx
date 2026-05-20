@@ -7,6 +7,7 @@ import DeleteBranchDialog from './DeleteBranchDialog';
 import RenameBranchDialog from './RenameBranchDialog';
 import MergeBranchDialog from './MergeBranchDialog';
 import RebaseBranchDialog from './RebaseBranchDialog';
+import RebaseBanner from './RebaseBanner';
 import ApplyStashDialog from './ApplyStashDialog';
 import DeleteStashDialog from './DeleteStashDialog';
 import ContentViewer from './ContentViewer';
@@ -28,7 +29,7 @@ import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit } from "../git/GitAdapter"
+import { GitAdapter, Commit, RebaseStatus } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
 
@@ -49,6 +50,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [busyMessage, setBusyMessage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [rebaseStatus, setRebaseStatus] = useState<RebaseStatus | null>(null);
 
   const activeSplitter = useRef<number | string | null>(null);
   const currentBranchLoadId = useRef(0);
@@ -248,16 +250,32 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     }
   }, [gitAdapter, setBranchStatus]);
 
+  const refreshRebaseStatus = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      const status = await gitAdapter.getRebaseStatus();
+      setRebaseStatus(status);
+    } catch (error) {
+      console.error('Error checking rebase status:', error);
+    }
+  }, [gitAdapter]);
+
   useEffect(() => {
     if (loading || !settings || !isActiveTab)
       return;
 
     const refreshTime = getSetting('localFileRefreshTime') || 5;
-    const intervalId = setInterval(() => refreshFileStatus(true), refreshTime * 1000);
-    refreshFileStatus(true);
+    const refresh = () => {
+      refreshFileStatus(true);
+      refreshRebaseStatus();
+    };
+    const intervalId = setInterval(refresh, refreshTime * 1000);
+    refresh();
 
     return () => clearInterval(intervalId);
-  }, [loading, isActiveTab, settings, getSetting, refreshFileStatus]);
+  }, [loading, isActiveTab, settings, getSetting, refreshFileStatus, refreshRebaseStatus]);
 
   useEffect(() => {
     const handleBranchStatusRefresh = () => refreshBranchStatus();
@@ -329,10 +347,11 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       console.error('Error during pull:', error);
       setErrorWithDialog(`Pull failed: ${(error as Error).message}`);
     } finally {
+      await refreshRebaseStatus();
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hidePullDialog, hasLocalChanges, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hidePullDialog, hasLocalChanges, clearBranchCache, loadRepoData, refreshRebaseStatus, setErrorWithDialog]);
 
   const handlePush = useCallback(async (branch: string, remoteBranch: string, pushAllTags: boolean) => {
     hidePushDialog();
@@ -640,12 +659,80 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
       }
     } catch (error) {
       console.error('Error rebasing branch:', error);
-      setErrorWithDialog(`Failed to rebase: ${(error as Error).message}`);
+      // A rebase that stops on conflicts is not a failure — the rebase banner
+      // takes over and lets the user resolve, continue, or abort it. Only show
+      // an error dialog when no rebase is left in progress.
+      const inProgress = await gitAdapter.getRebaseStatus().catch(() => null);
+      if (!inProgress) {
+        setErrorWithDialog(`Failed to rebase: ${(error as Error).message}`);
+      }
     } finally {
+      await refreshRebaseStatus();
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideRebaseBranchDialog, clearBranchCache, loadRepoData, hasLocalChanges, setErrorWithDialog]);
+  }, [gitAdapter, hideRebaseBranchDialog, clearBranchCache, loadRepoData, hasLocalChanges, refreshRebaseStatus, setErrorWithDialog]);
+
+  const runRebaseStep = useCallback(async (action: 'continue' | 'skip') => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git rebase --${action}`);
+      if (action === 'continue') {
+        await gitAdapter.rebaseContinue();
+      } else {
+        await gitAdapter.rebaseSkip();
+      }
+    } catch (error) {
+      // `git rebase --continue/--skip` exits non-zero when the rebase stops
+      // again on a later conflict — that is expected, and the banner will
+      // surface the new conflicts. Only show an error if the rebase truly
+      // failed to make progress.
+      const stillRebasing = await gitAdapter.getRebaseStatus().catch(() => null);
+      if (!stillRebasing) {
+        setErrorWithDialog(`Failed to ${action} rebase: ${(error as Error).message}`);
+      }
+    } finally {
+      clearBranchCache();
+      await loadRepoData(true);
+      await refreshFileStatus(false);
+      await refreshRebaseStatus();
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, clearBranchCache, loadRepoData, refreshFileStatus, refreshRebaseStatus, setErrorWithDialog]);
+
+  const handleRebaseContinue = useCallback(() => runRebaseStep('continue'), [runRebaseStep]);
+  const handleRebaseSkip = useCallback(() => runRebaseStep('skip'), [runRebaseStep]);
+
+  const handleRebaseAbort = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+
+    const confirmed = await showConfirm(
+      'Abort the rebase and restore the branch to its state before the rebase started?',
+      'Abort Rebase'
+    );
+    if (!confirmed)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage('git rebase --abort');
+      await gitAdapter.rebaseAbort();
+    } catch (error) {
+      setErrorWithDialog(`Failed to abort rebase: ${(error as Error).message}`);
+    } finally {
+      clearBranchCache();
+      await loadRepoData(true);
+      await refreshFileStatus(false);
+      await refreshRebaseStatus();
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, showConfirm, clearBranchCache, loadRepoData, refreshFileStatus, refreshRebaseStatus, setErrorWithDialog]);
 
   const handleStash = useCallback(async (message: string, stageNewFiles: boolean) => {
     hideStashDialog();
@@ -1231,9 +1318,18 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
         onStash={hasLocalChanges ? () => showStashDialog() : null} 
         onCreateBranch={() => showCreateBranchDialog()} 
         refreshing={refreshing} 
-        currentBranch={currentBranch} 
-        branchStatus={branchStatus} 
+        currentBranch={currentBranch}
+        branchStatus={branchStatus}
       />
+      {rebaseStatus && (
+        <RebaseBanner
+          status={rebaseStatus}
+          busy={isBusy}
+          onContinue={handleRebaseContinue}
+          onAbort={handleRebaseAbort}
+          onSkip={handleRebaseSkip}
+        />
+      )}
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}

@@ -53,6 +53,27 @@ export interface AheadBehind {
   behind: number;
 }
 
+export interface RebaseStatus {
+  // Backend used by the in-progress rebase: 'merge' for .git/rebase-merge (the
+  // default for `git rebase` and interactive rebases), 'apply' for the older
+  // .git/rebase-apply backend.
+  kind: 'merge' | 'apply';
+  // Branch being rebased (e.g. 'feature'), or null if it can't be determined.
+  branch: string | null;
+  // Short label for the commit/branch the work is being replayed onto.
+  onto: string | null;
+  // 1-based index of the commit currently being applied.
+  currentStep: number;
+  // Total number of commits in the rebase.
+  totalSteps: number;
+  // Short hash of the commit the rebase is currently stopped on.
+  currentCommitHash: string | null;
+  // Subject line of the commit the rebase is currently stopped on.
+  currentCommitSubject: string | null;
+  // Paths of files with unresolved merge conflicts that block continuing.
+  conflictedFiles: string[];
+}
+
 export interface StashInfo {
   stashRef: string;
   index: number;
@@ -491,6 +512,26 @@ export abstract class GitAdapter {
    * @param tool - Mergetool name (e.g. 'vscode', 'cursor', 'winmerge')
    */
   abstract runMergetool(filePath?: string, tool?: string): Promise<void>;
+
+  /**
+   * Get the state of an in-progress rebase, or null if no rebase is active.
+   */
+  abstract getRebaseStatus(): Promise<RebaseStatus | null>;
+
+  /**
+   * Continue an in-progress rebase after conflicts have been resolved and staged.
+   */
+  abstract rebaseContinue(): Promise<void>;
+
+  /**
+   * Abort an in-progress rebase, restoring the branch to its pre-rebase state.
+   */
+  abstract rebaseAbort(): Promise<void>;
+
+  /**
+   * Skip the current commit of an in-progress rebase.
+   */
+  abstract rebaseSkip(): Promise<void>;
 }
 
 export default GitAdapter;
