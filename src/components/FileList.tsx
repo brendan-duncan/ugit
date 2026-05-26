@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { FixedSizeList, ListChildComponentProps } from 'react-window';
 import { FileInfo } from './types';
 import './FileList.css';
 
@@ -50,20 +51,68 @@ interface FileListProps {
   onStageAll?: () => Promise<void>;
 }
 
+// Flat row representation derived from the tree + expansion state. Replacing
+// the recursive renderTree with a flat list lets us cap and/or virtualize
+// rendering, which is what keeps the renderer responsive when a huge folder
+// gets dumped into the working tree.
+type Row =
+  | { kind: 'folder'; path: string; depth: number; name: string; expanded: boolean }
+  | { kind: 'file'; path: string; depth: number; file: FileInfo };
+
+const RENDER_CAP = 500;
+const ROW_HEIGHT = 32;
+
 function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu, onDiscardAll, onStageAll }: FileListProps) {
   const [dragOver, setDragOver] = useState<boolean>(false);
   const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
   const [selectedItems, setSelectedItems] = useState(new Set<string>());
   const [contextMenu, setContextMenu] = useState(null);
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
+  const [showAll, setShowAll] = useState<boolean>(false);
+  const [contentHeight, setContentHeight] = useState<number>(0);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const lastMouseButton = useRef<number>(0);
   const isDraggingEnabled = useRef<boolean>(false);
   const lastSelectedItem = useRef(null);
 
   // Build tree structure from files
   const tree = useMemo(() => buildTree(files), [files]);
+
+  // Flatten the tree honoring expandedFolders. This is the single source of
+  // truth for both rendering (rowsToRender below) and range selection
+  // (getItemsBetween).
+  const rows = useMemo<Row[]>(() => {
+    const result: Row[] = [];
+    const walk = (node: any, parentPath: string, depth: number) => {
+      const folderNames = Object.keys(node.children).sort();
+      folderNames.forEach(folderName => {
+        const folderPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+        const expanded = expandedFolders[folderPath] !== false;
+        result.push({ kind: 'folder', path: folderPath, depth, name: folderName, expanded });
+        if (expanded)
+          walk(node.children[folderName], folderPath, depth + 1);
+      });
+      node.files.sort((a: any, b: any) => a.path.localeCompare(b.path)).forEach((file: any) => {
+        result.push({ kind: 'file', path: file.path, depth, file });
+      });
+    };
+    walk(tree, '', 0);
+    return result;
+  }, [tree, expandedFolders]);
+
+  const overCap = rows.length > RENDER_CAP;
+  const virtualize = overCap && showAll;
+  const cappedRows = overCap && !showAll ? rows.slice(0, RENDER_CAP) : rows;
+
+  // Reset the user's "Show all" choice once the list shrinks back below the
+  // cap (e.g. they added the folder to .gitignore). Harmless either way since
+  // the non-virtualized path is used whenever we're at/under the cap.
+  useEffect(() => {
+    if (!overCap && showAll)
+      setShowAll(false);
+  }, [overCap, showAll]);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -85,6 +134,19 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     }
   }, [contextMenu, headerMenu]);
 
+  // Track the scrollable container's pixel height so react-window can size its
+  // virtual viewport. Only matters when we're actually virtualizing.
+  useEffect(() => {
+    if (!virtualize) return;
+    const el = contentRef.current;
+    if (!el) return;
+    const update = () => setContentHeight(el.clientHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [virtualize]);
+
   // Get all files under a folder path (recursively)
   const getAllFilesInFolder = useCallback((folderPath: string) => {
     return files.filter(file => file.path.startsWith(folderPath + '/'));
@@ -96,7 +158,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
       e.preventDefault();
       e.stopPropagation();
-      
+
       // Select all files in this FileList
       const allPaths = files.map(f => f.path);
       setSelectedItems(new Set(allPaths));
@@ -132,32 +194,8 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     }));
   };
 
-  // Get all items (files and folders) in display order
-  const getAllItemsInOrder = useMemo(() => {
-    const items = [];
-
-    const traverse = (node, path = '') => {
-      // Get folders first
-      const folderNames = Object.keys(node.children).sort();
-      folderNames.forEach(folderName => {
-        const folderPath = path ? `${path}/${folderName}` : folderName;
-        items.push(folderPath);
-
-        // If folder is expanded, traverse its children
-        if (expandedFolders[folderPath] !== false) {
-          traverse(node.children[folderName], folderPath);
-        }
-      });
-
-      // Then files
-      node.files.sort((a, b) => a.path.localeCompare(b.path)).forEach(file => {
-        items.push(file.path);
-      });
-    };
-
-    traverse(tree);
-    return items;
-  }, [tree, expandedFolders]);
+  // Display-order list of every path (folders + files). Powers range-select.
+  const getAllItemsInOrder = useMemo(() => rows.map(r => r.path), [rows]);
 
   // Get items between two paths (inclusive)
   const getItemsBetween = (startPath: string, endPath: string) => {
@@ -279,7 +317,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     // Add dragging class for visual feedback
     e.currentTarget.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
-    
+
     // Check if this file is selected and there are multiple selected items
     if (selectedItems.has(file.path) && selectedItems.size > 1) {
       // Get all selected files
@@ -289,7 +327,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
           return files.find(f => f.path === path);
         })
         .map(path => files.find(f => f.path === path));
-      
+
       e.dataTransfer.setData('application/json', JSON.stringify({
         type: 'multiple-files',
         files: selectedFiles,
@@ -316,7 +354,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     e.currentTarget.classList.add('dragging');
     e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
-    
+
     // Check if this folder is selected and there are multiple selected items
     if (selectedItems.has(folderPath) && selectedItems.size > 1) {
       // Get all selected items (files and folders)
@@ -330,7 +368,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
           return { type: 'folder', folderPath: path, files: folderFiles };
         }
       });
-      
+
       e.dataTransfer.setData('application/json', JSON.stringify({
         type: 'multiple-items',
         items: selectedData,
@@ -407,74 +445,66 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     }
   };
 
-  const renderTree = (node: any, path = '', depth = 0) => {
-    const items = [];
-
-    // Render folders
-    const folderNames = Object.keys(node.children).sort();
-    folderNames.forEach(folderName => {
-      const folderPath = path ? `${path}/${folderName}` : folderName;
-      const isExpanded = expandedFolders[folderPath] !== false; // Default to expanded
-
-      const isFolderSelected = selectedItems.has(folderPath);
-
-      items.push(
-        <div key={`folder-${folderPath}`} onDragOver={handleItemDragOver}>
-          <div
-            className={`folder-item ${isFolderSelected ? 'selected' : ''}`}
-            style={{ paddingLeft: `${depth * 16}px` }}
-            draggable={false}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-            onDragStart={(e) => handleFolderDragStart(e, folderPath)}
-            onDragEnd={handleDragEnd}
-            onDragOver={handleItemDragOver}
-            onClick={(e) => {
-              if (e.button === 0) {
-                // Handle selection
-                handleItemClick(e, folderPath, true);
-                // Toggle folder if not using modifiers (including shift for range selection)
-                if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
-                  toggleFolder(folderPath);
-                }
-              }
-            }}
-            onContextMenu={(e) => handleContextMenuOpen(e, folderPath, true)}
-          >
-            <span className="folder-icon">{isExpanded ? '📂' : '📁'}</span>
-            <span className="folder-name">{folderName}/</span>
-          </div>
-          {isExpanded && renderTree(node.children[folderName], folderPath, depth + 1)}
-        </div>
-      );
-    });
-
-    // Render files in current folder
-    node.files.sort((a: any, b: any) => a.path.localeCompare(b.path)).forEach((file: any, index: number) => {
-      const isFileSelected = selectedItems.has(file.path);
-      const fileName = file.path.split('/').pop();
-
-      items.push(
+  // Render a single row (folder or file). Used by both the capped plain-div
+  // path and the react-window virtualized path. `style` is supplied by
+  // react-window for absolute positioning; pass-through otherwise.
+  const renderRow = (row: Row, style?: React.CSSProperties) => {
+    if (row.kind === 'folder') {
+      const isFolderSelected = selectedItems.has(row.path);
+      return (
         <div
-          key={`file-${file.path}-${index}`}
-          className={`file-item ${isFileSelected ? 'selected' : ''} ${file.status === 'conflict' ? 'conflict' : ''}`}
-          style={{ paddingLeft: `${depth * 16}px` }}
+          key={`folder-${row.path}`}
+          className={`folder-item ${isFolderSelected ? 'selected' : ''}`}
+          style={{ ...style, paddingLeft: `${row.depth * 16}px` }}
           draggable={false}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
-          onDragStart={(e) => handleFileDragStart(e, file)}
+          onDragStart={(e) => handleFolderDragStart(e, row.path)}
           onDragEnd={handleDragEnd}
           onDragOver={handleItemDragOver}
-          onClick={(e) => handleItemClick(e, file.path, false)}
-          onContextMenu={(e) => handleContextMenuOpen(e, file.path, false)}
+          onClick={(e) => {
+            if (e.button === 0) {
+              handleItemClick(e, row.path, true);
+              if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                toggleFolder(row.path);
+              }
+            }
+          }}
+          onContextMenu={(e) => handleContextMenuOpen(e, row.path, true)}
         >
-          <span className={`file-status ${file.status === 'conflict' ? 'conflict' : ''}`}>{getStatusIcon(file.status)}</span>
-          <span className="file-path">{fileName}</span>
+          <span className="folder-icon">{row.expanded ? '📂' : '📁'}</span>
+          <span className="folder-name">{row.name}/</span>
         </div>
       );
-    });
+    }
 
-    return items;
+    const file = row.file;
+    const isFileSelected = selectedItems.has(file.path);
+    const fileName = file.path.split('/').pop();
+    return (
+      <div
+        key={`file-${file.path}`}
+        className={`file-item ${isFileSelected ? 'selected' : ''} ${file.status === 'conflict' ? 'conflict' : ''}`}
+        style={{ ...style, paddingLeft: `${row.depth * 16}px` }}
+        draggable={false}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onDragStart={(e) => handleFileDragStart(e, file)}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleItemDragOver}
+        onClick={(e) => handleItemClick(e, file.path, false)}
+        onContextMenu={(e) => handleContextMenuOpen(e, file.path, false)}
+      >
+        <span className={`file-status ${file.status === 'conflict' ? 'conflict' : ''}`}>{getStatusIcon(file.status)}</span>
+        <span className="file-path">{fileName}</span>
+      </div>
+    );
+  };
+
+  const VirtualRow = ({ index, style }: ListChildComponentProps) => {
+    const row = rows[index];
+    if (!row) return null;
+    return renderRow(row, style);
   };
 
   const handleMenuAction = (action: string) => {
@@ -485,8 +515,8 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
   };
 
   return (
-    <div 
-      className="file-list" 
+    <div
+      className="file-list"
       onKeyDown={handleKeyDown}
       tabIndex={0}
       ref={containerRef}
@@ -553,6 +583,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
         </div>
       )}
       <div
+        ref={contentRef}
         className={`file-list-content ${dragOver ? 'drag-over' : ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -560,9 +591,34 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
       >
         {files.length === 0 ? (
           <div className="file-list-empty">No files</div>
+        ) : virtualize ? (
+          <FixedSizeList
+            height={contentHeight || 1}
+            width="100%"
+            itemCount={rows.length}
+            itemSize={ROW_HEIGHT}
+          >
+            {VirtualRow}
+          </FixedSizeList>
         ) : (
           <div onDragOver={handleItemDragOver}>
-            {renderTree(tree)}
+            {cappedRows.map(row => renderRow(row))}
+            {overCap && !showAll && (
+              <div className="file-list-cap-banner">
+                <span>
+                  {(rows.length - RENDER_CAP).toLocaleString()} more items hidden.
+                  If this is from copying a folder you didn't mean to track,
+                  consider adding it to .gitignore.
+                </span>
+                <button
+                  type="button"
+                  className="file-list-cap-show-all"
+                  onClick={() => setShowAll(true)}
+                >
+                  Show all
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

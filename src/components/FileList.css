@@ -77,6 +77,40 @@
   padding: 10px 0;
 }
 
+.file-list-cap-banner {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-list-cap-banner span {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.file-list-cap-show-all {
+  background: transparent;
+  border: 1px solid var(--accent-color);
+  color: var(--text-highlight);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.file-list-cap-show-all:hover {
+  background-color: var(--border-color);
+}
+
 .file-item {
   display: flex;
   align-items: center;

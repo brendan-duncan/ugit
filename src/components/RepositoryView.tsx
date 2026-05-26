@@ -58,6 +58,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
   const activeSplitter = useRef<number | string | null>(null);
   const currentBranchLoadId = useRef(0);
   const isBusyRef = useRef(false);
+  const refreshInFlight = useRef(false);
+  const remoteFetchInFlight = useRef(false);
+  const branchStatusRef = useRef<{ [branchName: string]: { ahead: number; behind: number } }>({});
+  const currentBranchCacheRef = useRef<string>('');
 
   const handleGitError = useCallback((err: Error) => {
     setError(err.message);
@@ -188,7 +192,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
   }, [gitAdapter, branchCommitsCache, updateBranchCache]);
 
   const refreshFileStatus = useCallback(async (noLock: boolean) => {
-    if (!gitAdapter || !currentBranch) 
+    if (!gitAdapter || !currentBranch)
       return;
 
     try {
@@ -212,21 +216,46 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
 
       const allPaths = new Set([...unstaged.map(f => f.path), ...staged.map(f => f.path)]);
       setModifiedCount(allPaths.size);
-      
+
+      // Only touch the on-disk cache when something the cache stores actually changed:
+      // the current branch or this branch's ahead/behind counts. The unstaged/staged
+      // file lists are no longer cached (rebuilt from git status on open), so the
+      // sync I/O storm during huge working-tree changes is gone.
+      const branchName = status.current;
+      if (!branchName)
+        return;
+
+      const newAhead = status.ahead;
+      const newBehind = status.behind;
+      const prevStatus = branchStatusRef.current[branchName];
+      const branchChanged = branchName !== currentBranchCacheRef.current;
+
+      let aheadBehindChanged = false;
+      if (newAhead !== undefined && newBehind !== undefined) {
+        const newHasStatus = newAhead > 0 || newBehind > 0;
+        const prevHasStatus = !!prevStatus;
+        if (newHasStatus !== prevHasStatus) {
+          aheadBehindChanged = true;
+        } else if (newHasStatus && prevStatus && (prevStatus.ahead !== newAhead || prevStatus.behind !== newBehind)) {
+          aheadBehindChanged = true;
+        }
+      }
+
+      if (!branchChanged && !aheadBehindChanged)
+        return;
+
       const cacheData = cacheManager.loadCache(repoPath) || {};
-      cacheData.currentBranch = status.current;
-      cacheData.unstagedFiles = unstaged;
-      cacheData.stagedFiles = staged;
-      cacheData.modifiedCount = allPaths.size;
-      if (status.ahead !== undefined && status.behind !== undefined) {
+      cacheData.currentBranch = branchName;
+      if (newAhead !== undefined && newBehind !== undefined) {
         if (!cacheData.branchStatus) cacheData.branchStatus = {};
-        if (status.ahead > 0 || status.behind > 0) {
-          cacheData.branchStatus[status.current!] = { ahead: status.ahead, behind: status.behind };
+        if (newAhead > 0 || newBehind > 0) {
+          cacheData.branchStatus[branchName] = { ahead: newAhead, behind: newBehind };
         } else {
-          delete cacheData.branchStatus[status.current!];
+          delete cacheData.branchStatus[branchName];
         }
       }
       cacheManager.saveCache(repoPath, cacheData);
+      currentBranchCacheRef.current = branchName;
     } catch (err) {
       console.error('Error refreshing file status:', err);
     }
@@ -267,13 +296,42 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
   }, [gitAdapter]);
 
   useEffect(() => {
+    branchStatusRef.current = branchStatus;
+  }, [branchStatus]);
+
+  // Whenever the current branch's ahead/behind changes from any source
+  // (initial load, fetch, pull, push, branch-status refresh), mirror it to the
+  // tab indicator immediately instead of waiting for the 5-minute remote fetch
+  // tick. The Pull/Push toolbar buttons already show this count — the tab
+  // should too.
+  useEffect(() => {
+    if (!currentBranch || !onTabStatusChange)
+      return;
+    const s = branchStatus[currentBranch];
+    if (s && (s.ahead > 0 || s.behind > 0)) {
+      onTabStatusChange({ ahead: s.ahead, behind: s.behind });
+    } else {
+      onTabStatusChange(null);
+    }
+  }, [branchStatus, currentBranch, onTabStatusChange]);
+
+  useEffect(() => {
     if (loading || !settings || !isActiveTab)
       return;
 
     const refreshTime = getSetting('localFileRefreshTime') || 5;
-    const refresh = () => {
-      refreshFileStatus(true);
-      refreshRebaseStatus();
+    const refresh = async () => {
+      // Drop ticks if the previous one is still running. With a huge working
+      // tree, `git status` can take longer than the poll interval; without this
+      // guard, ticks stack up and the renderer falls further behind.
+      if (refreshInFlight.current)
+        return;
+      refreshInFlight.current = true;
+      try {
+        await Promise.allSettled([refreshFileStatus(true), refreshRebaseStatus()]);
+      } finally {
+        refreshInFlight.current = false;
+      }
     };
     const intervalId = setInterval(refresh, refreshTime * 1000);
     refresh();
@@ -298,39 +356,45 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
     let cancelled = false;
 
     const checkRemoteStatus = async () => {
-      if (isBusyRef.current)
+      if (isBusyRef.current || remoteFetchInFlight.current)
         return;
+      remoteFetchInFlight.current = true;
 
       try {
-        await gitAdapter.fetch('origin', ['--prune']);
-      } catch {
-        return;
-      }
-      if (cancelled)
-        return;
-
-      let status: { ahead: number; behind: number } | null = null;
-      try {
-        const { ahead, behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
-        if (ahead > 0 || behind > 0) {
-          status = { ahead, behind };
+        try {
+          await gitAdapter.fetch('origin', ['--prune']);
+        } catch {
+          return;
         }
-      } catch {
-        status = null;
-      }
-      if (cancelled)
-        return;
+        if (cancelled)
+          return;
 
-      setBranchStatus(prev => {
-        const next = { ...prev };
-        if (status) {
-          next[currentBranch] = status;
-        } else {
-          delete next[currentBranch];
+        let status: { ahead: number; behind: number } | null = null;
+        try {
+          const { ahead, behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
+          if (ahead > 0 || behind > 0) {
+            status = { ahead, behind };
+          }
+        } catch {
+          status = null;
         }
-        return next;
-      });
-      onTabStatusChange?.(status);
+        if (cancelled)
+          return;
+
+        setBranchStatus(prev => {
+          const next = { ...prev };
+          if (status) {
+            next[currentBranch] = status;
+          } else {
+            delete next[currentBranch];
+          }
+          return next;
+        });
+        // No direct onTabStatusChange call — the branchStatus useEffect above
+        // mirrors current-branch status to the tab indicator on every change.
+      } finally {
+        remoteFetchInFlight.current = false;
+      }
     };
 
     checkRemoteStatus();
@@ -340,7 +404,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [loading, gitAdapter, currentBranch, setBranchStatus, onTabStatusChange]);
+  }, [loading, gitAdapter, currentBranch, setBranchStatus]);
 
   useEffect(() => {
     if (!loading && selectedItem == null) {

@@ -188,9 +188,6 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       if (cachedData && !isRefresh) {
         setCurrentBranch(cachedData.currentBranch || '');
         setOriginUrl(cachedData.originUrl || '');
-        setUnstagedFiles(cachedData.unstagedFiles || []);
-        setStagedFiles(cachedData.stagedFiles || []);
-        setModifiedCount(cachedData.modifiedCount || 0);
         setBranches(cachedData.branches || []);
         setRemotes(cachedData.remotes || []);
         setBranchStatus(cachedData.branchStatus || {});
@@ -274,9 +271,6 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       const cacheData = {
         currentBranch: status.current,
         originUrl: url,
-        unstagedFiles: unstaged,
-        stagedFiles: staged,
-        modifiedCount: allPaths.size,
         branches: branchSummary.all,
         remotes: remotesList,
         branchStatus: statusMap,
