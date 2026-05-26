@@ -2,7 +2,7 @@ import React from 'react';
 import LocalChangesPanel from './LocalChangesPanel';
 import StashViewer from './StashViewer';
 import BranchView from './BranchView';
-import { GitAdapter, Commit } from '../git/GitAdapter';
+import { GitAdapter, Commit, SearchQuery } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import './ContentViewer.css';
 
@@ -21,9 +21,13 @@ interface ContentViewerProps {
   onBusyChange?: (busy: boolean) => void;
   onBusyMessageChange?: (message: string) => void;
   onCommitCreated?: () => void;
+  pageSize: number;
+  onLoadCommitPage: (page: number) => void;
+  onSearchCommits: (query: SearchQuery) => void;
+  onClearCommitSearch: () => void;
 }
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: ContentViewerProps): React.ReactElement {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, pageSize, onLoadCommitPage, onSearchCommits, onClearCommitSearch }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -72,6 +76,13 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           onContextMenu={onContextMenu}
           onDoubleClick={onCommitDoubleClick}
           currentBranch={currentBranch}
+          page={selectedItem.page ?? 0}
+          totalCount={selectedItem.totalCount}
+          pageSize={pageSize}
+          search={selectedItem.search}
+          onLoadPage={onLoadCommitPage}
+          onSearch={onSearchCommits}
+          onClearSearch={onClearCommitSearch}
         />
       )}
       {item.type === 'remote-branch' && (
@@ -84,6 +95,13 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           onContextMenu={onContextMenu}
           onDoubleClick={onCommitDoubleClick}
           currentBranch={currentBranch}
+          page={selectedItem.page ?? 0}
+          totalCount={selectedItem.totalCount}
+          pageSize={pageSize}
+          search={selectedItem.search}
+          onLoadPage={onLoadCommitPage}
+          onSearch={onSearchCommits}
+          onClearSearch={onClearCommitSearch}
         />
       )}
       {item.type !== 'local-changes' && item.type !== 'stash' && item.type !== 'branch' && item.type !== 'remote-branch' && (

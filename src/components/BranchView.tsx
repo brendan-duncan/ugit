@@ -1,9 +1,16 @@
 import React, { useState, useRef } from 'react';
 import CommitList from './CommitList';
 import CommitInfo from './CommitInfo';
-import { Commit } from '../git/GitAdapter';
+import { Commit, SearchQuery } from '../git/GitAdapter';
 import GitAdapter from '../git/GitAdapter';
 import './BranchView.css';
+
+interface CommitSearchState {
+  query: SearchQuery;
+  results: Commit[];
+  truncated: boolean;
+  loading: boolean;
+}
 
 interface BranchViewProps {
   branchName: string;
@@ -14,9 +21,16 @@ interface BranchViewProps {
   onContextMenu: (action: string, commit: Commit, currentBranch: string) => Promise<void>;
   onDoubleClick?: (commit: Commit) => void;
   currentBranch: string;
+  page: number;
+  totalCount?: number;
+  pageSize: number;
+  search?: CommitSearchState;
+  onLoadPage: (page: number) => void;
+  onSearch: (query: SearchQuery) => void;
+  onClearSearch: () => void;
 }
 
-function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, onDoubleClick, currentBranch }: BranchViewProps) {
+function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch }: BranchViewProps) {
   const [selectedCommit, setSelectedCommit] = useState<Commit | null>(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -89,6 +103,13 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onCon
               onContextMenu={onContextMenu}
               onDoubleClick={onDoubleClick}
               currentBranch={currentBranch}
+              page={page}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              search={search}
+              onLoadPage={onLoadPage}
+              onSearch={onSearch}
+              onClearSearch={onClearSearch}
             />
           </div>
 

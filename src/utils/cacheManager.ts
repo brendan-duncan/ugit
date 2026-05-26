@@ -68,7 +68,7 @@ export class CacheManager {
       const cacheData = {
         repoPath,
         timestamp: Date.now(),
-        version: 1,
+        version: 3,
         data
       };
       fs.writeFileSync(cacheFile, JSON.stringify(cacheData), 'utf8');
@@ -94,7 +94,7 @@ export class CacheManager {
       const cacheData = JSON.parse(fileContent);
 
       // Verify version and repo path
-      if (cacheData.version !== 1 || cacheData.repoPath !== repoPath) {
+      if (cacheData.version !== 3 || cacheData.repoPath !== repoPath) {
         return null;
       }
 

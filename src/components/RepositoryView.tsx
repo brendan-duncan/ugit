@@ -29,7 +29,7 @@ import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit, RebaseStatus } from "../git/GitAdapter"
+import { GitAdapter, Commit, RebaseStatus, SearchQuery } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
 
@@ -170,11 +170,15 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
       if (branchName.startsWith('origin/'))
         continue;
 
-      const commits = branchCommitsCache.current.get(branchName);
-      if (!commits || commits.length === 0)
+      const entry = branchCommitsCache.current.get(branchName);
+      if (!entry || !entry.pages)
         continue;
 
-      const commitsToCheck = commits.filter(commit => commit.onOrigin === false);
+      const allCommits: Commit[] = Object.values(entry.pages).flat();
+      if (allCommits.length === 0)
+        continue;
+
+      const commitsToCheck = allCommits.filter((commit: Commit) => commit.onOrigin === false);
       if (commitsToCheck.length === 0)
         continue;
 
@@ -187,7 +191,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
         }
       }
 
-      updateBranchCache(branchName, commits);
+      updateBranchCache(branchName, entry);
     }
   }, [gitAdapter, branchCommitsCache, updateBranchCache]);
 
@@ -612,13 +616,24 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
   }, [gitAdapter, hideLocalChangesDialog, pendingState.pendingBranchSwitch, performBranchSwitch,
       refreshFileStatus, refreshStashes, stagedFiles, unstagedFiles, currentBranch, setErrorWithDialog]);
 
-  const handleBranchSelect = useCallback(async (branchName: string) => {
-    if (branchCommitsCache.current.has(branchName)) {
+  const handleBranchSelect = useCallback(async (branchName: string, page?: number) => {
+    const pageSize = getSetting('maxCommits') || 100;
+    const cached = branchCommitsCache.current.get(branchName);
+    const targetPage = page ?? cached?.currentPage ?? 0;
+
+    // Cache hit: render the page instantly, skip git entirely.
+    const cachedPage = cached?.pages?.[targetPage];
+    if (cachedPage) {
+      if (cached.currentPage !== targetPage) {
+        updateBranchCache(branchName, { ...cached, currentPage: targetPage });
+      }
       setSelectedItem({
         type: 'branch',
         branchName,
-        commits: branchCommitsCache.current.get(branchName),
-        loading: false
+        commits: cachedPage,
+        loading: false,
+        page: targetPage,
+        totalCount: cached.totalCount
       });
       return;
     }
@@ -629,23 +644,53 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
     if (!gitAdapter)
       return;
 
-    setSelectedItem({ type: 'branch', branchName, commits: [], loading: true });
+    setSelectedItem({
+      type: 'branch',
+      branchName,
+      commits: [],
+      loading: true,
+      page: targetPage,
+      totalCount: cached?.totalCount
+    });
 
     try {
-      const commits = await gitAdapter.log(branchName, 100);
-      updateBranchCache(branchName, commits);
+      const offset = targetPage * pageSize;
+      const [commits, totalCount] = await Promise.all([
+        gitAdapter.log(branchName, pageSize, offset),
+        gitAdapter.getCommitCount(branchName)
+      ]);
+      const existing = branchCommitsCache.current.get(branchName);
+      updateBranchCache(branchName, {
+        pages: { ...(existing?.pages || {}), [targetPage]: commits },
+        currentPage: targetPage,
+        totalCount
+      });
 
       if (thisLoadId === currentBranchLoadId.current) {
-        setSelectedItem({ type: 'branch', branchName, commits, loading: false });
+        setSelectedItem({
+          type: 'branch',
+          branchName,
+          commits,
+          loading: false,
+          page: targetPage,
+          totalCount
+        });
       }
     } catch (error) {
       console.error('Error loading branch commits:', error);
       if (thisLoadId === currentBranchLoadId.current) {
         setErrorWithDialog(`Failed to load commits: ${(error as Error).message}`);
-        setSelectedItem({ type: 'branch', branchName, commits: [], loading: false });
+        setSelectedItem({
+          type: 'branch',
+          branchName,
+          commits: [],
+          loading: false,
+          page: targetPage,
+          totalCount: undefined
+        });
       }
     }
-  }, [gitAdapter, branchCommitsCache, updateBranchCache, setErrorWithDialog]);
+  }, [gitAdapter, branchCommitsCache, updateBranchCache, setErrorWithDialog, getSetting]);
 
   const handleCreateBranch = useCallback(async (branchName: string, checkoutAfterCreate: boolean) => {
     if (!gitAdapter)
@@ -1085,42 +1130,88 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
     }
   }, [gitAdapter, hideDeleteStashDialog, loadRepoData, setErrorWithDialog]);
 
-  const loadRemoteBranchCommits = useCallback(async (remoteName: string, branchName: string, fullName: string) => {
-    if (branchCommitsCache.current.has(fullName)) {
+  const loadRemoteBranchCommits = useCallback(async (remoteName: string, branchName: string, fullName: string, page?: number) => {
+    const pageSize = getSetting('maxCommits') || 100;
+    const cached = branchCommitsCache.current.get(fullName);
+    const targetPage = page ?? cached?.currentPage ?? 0;
+
+    const cachedPage = cached?.pages?.[targetPage];
+    if (cachedPage) {
+      if (cached.currentPage !== targetPage) {
+        updateBranchCache(fullName, { ...cached, currentPage: targetPage });
+      }
       setSelectedItem({
         type: 'remote-branch',
         remoteName,
         branchName,
         fullName,
-        commits: branchCommitsCache.current.get(fullName),
-        loading: false
+        commits: cachedPage,
+        loading: false,
+        page: targetPage,
+        totalCount: cached.totalCount
       });
       return;
     }
 
-    if (!gitAdapter) 
+    if (!gitAdapter)
       return;
 
     currentBranchLoadId.current += 1;
     const thisLoadId = currentBranchLoadId.current;
 
-    setSelectedItem({ type: 'remote-branch', remoteName, branchName, fullName, commits: [], loading: true });
+    setSelectedItem({
+      type: 'remote-branch',
+      remoteName,
+      branchName,
+      fullName,
+      commits: [],
+      loading: true,
+      page: targetPage,
+      totalCount: cached?.totalCount
+    });
 
     try {
-      const commits = await gitAdapter.log(fullName, 100);
-      updateBranchCache(fullName, commits);
+      const offset = targetPage * pageSize;
+      const [commits, totalCount] = await Promise.all([
+        gitAdapter.log(fullName, pageSize, offset),
+        gitAdapter.getCommitCount(fullName)
+      ]);
+      const existing = branchCommitsCache.current.get(fullName);
+      updateBranchCache(fullName, {
+        pages: { ...(existing?.pages || {}), [targetPage]: commits },
+        currentPage: targetPage,
+        totalCount
+      });
 
       if (thisLoadId === currentBranchLoadId.current) {
-        setSelectedItem({ type: 'remote-branch', remoteName, branchName, fullName, commits, loading: false });
+        setSelectedItem({
+          type: 'remote-branch',
+          remoteName,
+          branchName,
+          fullName,
+          commits,
+          loading: false,
+          page: targetPage,
+          totalCount
+        });
       }
     } catch (error) {
       console.error('Error loading remote branch commits:', error);
       if (thisLoadId === currentBranchLoadId.current) {
         setErrorWithDialog(`Failed to load commits: ${(error as Error).message}`);
-        setSelectedItem({ type: 'remote-branch', remoteName, branchName, fullName, commits: [], loading: false });
+        setSelectedItem({
+          type: 'remote-branch',
+          remoteName,
+          branchName,
+          fullName,
+          commits: [],
+          loading: false,
+          page: targetPage,
+          totalCount: undefined
+        });
       }
     }
-  }, [gitAdapter, branchCommitsCache, updateBranchCache, setErrorWithDialog]);
+  }, [gitAdapter, branchCommitsCache, updateBranchCache, setErrorWithDialog, getSetting]);
 
   const handleRemoteBranchSelect = useCallback((info: any) => {
     if (info.type === 'remote-branch' && info.fullName) {
@@ -1129,6 +1220,54 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
       setSelectedItem(info);
     }
   }, [loadRemoteBranchCommits]);
+
+  const handleLoadCommitPage = useCallback((page: number) => {
+    if (!selectedItem)
+      return;
+    if (selectedItem.type === 'branch') {
+      handleBranchSelect(selectedItem.branchName, page);
+    } else if (selectedItem.type === 'remote-branch') {
+      loadRemoteBranchCommits(selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName, page);
+    }
+  }, [selectedItem, handleBranchSelect, loadRemoteBranchCommits]);
+
+  const handleSearchCommits = useCallback(async (query: SearchQuery) => {
+    if (!gitAdapter || !selectedItem)
+      return;
+    const branchRef = selectedItem.type === 'remote-branch' ? selectedItem.fullName : selectedItem.branchName;
+    if (!branchRef)
+      return;
+
+    setSelectedItem(prev => prev ? {
+      ...prev,
+      search: { query, results: [], truncated: false, loading: true }
+    } : prev);
+
+    try {
+      const result = await gitAdapter.searchLog(branchRef, query, 500);
+      setSelectedItem(prev => {
+        if (!prev || !prev.search || prev.search.query !== query)
+          return prev;
+        return {
+          ...prev,
+          search: { query, results: result.commits, truncated: result.truncated, loading: false }
+        };
+      });
+    } catch (error) {
+      console.error('Error searching commits:', error);
+      setErrorWithDialog(`Search failed: ${(error as Error).message}`);
+      setSelectedItem(prev => prev ? { ...prev, search: undefined } : prev);
+    }
+  }, [gitAdapter, selectedItem, setErrorWithDialog]);
+
+  const handleClearSearch = useCallback(() => {
+    setSelectedItem(prev => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      delete next.search;
+      return next;
+    });
+  }, []);
 
   const handleDeleteRemoteBranch = useCallback(async (remoteName: string, branchName: string) => {
     const confirmed = await showConfirm(`Delete remote branch '${remoteName}/${branchName}'?`);
@@ -1541,6 +1680,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
                 onBusyChange={setIsBusy}
                 onBusyMessageChange={setBusyMessage}
                 onCommitCreated={() => clearBranchCache(currentBranch)}
+                pageSize={getSetting('maxCommits') || 100}
+                onLoadCommitPage={handleLoadCommitPage}
+                onSearchCommits={handleSearchCommits}
+                onClearCommitSearch={handleClearSearch}
               />
             </div>
           </>
