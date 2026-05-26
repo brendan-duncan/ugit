@@ -5,6 +5,16 @@ import { GitAdapter, Commit, StashInfo, FileStatus, GitStatus } from '../git/Git
 import cacheManager from '../utils/cacheManager';
 import { RunningCommand, FileInfo, RemoteInfo } from '../components/types';
 
+export interface BranchCacheEntry {
+  // Pages of commits keyed by page index. Each entry holds one page worth of commits
+  // (pageSize from settings). Pages are added as the user navigates and persist until
+  // the branch's cache is explicitly cleared (refresh, pull, merge, rebase, etc.).
+  pages: { [page: number]: Commit[] };
+  // Last viewed page; restored on cold open.
+  currentPage: number;
+  totalCount?: number;
+}
+
 interface UseGitOptions {
   repoPath: string;
   onError?: (error: Error) => void;
@@ -116,7 +126,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
   const [usingCache, setUsingCache] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const branchCommitsCache = useRef(new Map<string, Commit[]>());
+  const branchCommitsCache = useRef(new Map<string, BranchCacheEntry>());
 
   const getFileStatusType = useCallback((code: string): string => {
     switch (code) {
@@ -141,18 +151,18 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
   const loadBranchCommitsFromCache = useCallback(() => {
     const cacheData = cacheManager.loadCache(repoPath);
     if (cacheData && cacheData.branchCommits) {
-      Object.entries(cacheData.branchCommits).forEach(([branchName, commits]) => {
-        branchCommitsCache.current.set(branchName, commits as Commit[]);
+      Object.entries(cacheData.branchCommits).forEach(([branchName, entry]) => {
+        branchCommitsCache.current.set(branchName, entry as BranchCacheEntry);
       });
     }
   }, [repoPath]);
 
-  const updateBranchCache = useCallback((branchName: string, commits: Commit[]) => {
-    branchCommitsCache.current.set(branchName, commits);
+  const updateBranchCache = useCallback((branchName: string, entry: BranchCacheEntry) => {
+    branchCommitsCache.current.set(branchName, entry);
     const cacheData = cacheManager.loadCache(repoPath) || {};
     cacheData.branchCommits = {
       ...cacheData.branchCommits,
-      [branchName]: commits
+      [branchName]: entry
     };
     cacheManager.saveCache(repoPath, cacheData);
   }, [repoPath]);

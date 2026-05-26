@@ -7,7 +7,9 @@ import GitAdapter, {
   StashInfo,
   StashListResponse,
   CommitFile,
-  RebaseStatus } from './GitAdapter';
+  RebaseStatus,
+  SearchQuery,
+  SearchLogResult } from './GitAdapter';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
@@ -707,11 +709,12 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
-  async log(branchName: string, maxCount: number = 100): Promise<Commit[]> {
+  async log(branchName: string, maxCount: number = 100, offset: number = 0): Promise<Commit[]> {
     const startTime = performance.now();
-    const id = this._startCommand(`git log ${branchName} --max-count=${maxCount}`, startTime);
+    const skipStr = offset > 0 ? ` --skip=${offset}` : '';
+    const id = this._startCommand(`git log ${branchName} --max-count=${maxCount}${skipStr}`, startTime);
 
-    const result = await this.git.log({
+    const options: any = {
       [branchName]: null,
       maxCount: maxCount,
       format: {
@@ -722,7 +725,12 @@ export class SimpleGitAdapter extends GitAdapter {
         author_name: '%an',
         author_email: '%ae'
       }
-    });
+    };
+    if (offset > 0) {
+      options['--skip'] = `${offset}`;
+    }
+
+    const result = await this.git.log(options);
 
     const commits = result.all.map((commit: any) => ({
       hash: commit.hash,
@@ -735,6 +743,14 @@ export class SimpleGitAdapter extends GitAdapter {
       tags: [] as string[]
     }));
 
+    await this._enrichCommits(commits, branchName);
+
+    this._endCommand(id, startTime);
+
+    return commits;
+  }
+
+  private async _enrichCommits(commits: Commit[], branchName: string): Promise<void> {
     // Get all tags and their target commits
     const tagResult = await this.git.raw(['tag', '-l', '--format=%(refname:short) %(objectname:short)']);
     const tagMap = new Map<string, string[]>();
@@ -749,35 +765,106 @@ export class SimpleGitAdapter extends GitAdapter {
       });
     }
 
-    // Map tags to commits
-    commits.forEach((commit: any) => {
+    commits.forEach((commit) => {
       const shortHash = commit.hash.substring(0, 7);
-      const tags = tagMap.get(shortHash) || [];
-      commit.tags = tags;
+      commit.tags = tagMap.get(shortHash) || [];
     });
 
-    // Check onOrigin status for all commits
+    const isRemoteBranch = branchName.startsWith('origin/');
     await Promise.all(commits.map(async (commit) => {
       try {
-        // Check if commit exists on origin branch
-        // For remote branches, we need to check against the actual remote branch name
-        // If we're loading a remote branch like "origin/feature/login", we should compare against that branch
-        const isRemoteBranch = branchName.startsWith('origin/');
         if (!isRemoteBranch) {
-          const refToCheck = isRemoteBranch ? branchName : `origin/${branchName}`;
+          const refToCheck = `origin/${branchName}`;
           const unpushedCommits = await this.git.raw(['log', `${refToCheck}..${commit.hash}`]);
-          const onOrigin = unpushedCommits.trim().length === 0;
-          commit.onOrigin = onOrigin;
+          commit.onOrigin = unpushedCommits.trim().length === 0;
         }
       } catch (error) {
-        // If remote branch doesn't exist, commit is not on origin
         commit.onOrigin = false;
       }
     }));
+  }
 
-    this._endCommand(id, startTime);
+  async getCommitCount(branchName: string): Promise<number> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git rev-list --count ${branchName}`, startTime);
+    try {
+      const result = await this.git.raw(['rev-list', '--count', branchName]);
+      this._endCommand(id, startTime);
+      const n = parseInt(result.trim(), 10);
+      return Number.isFinite(n) ? n : 0;
+    } catch (error) {
+      this._endCommand(id, startTime);
+      return 0;
+    }
+  }
 
-    return commits;
+  async searchLog(branchName: string, query: SearchQuery, maxResults: number = 500): Promise<SearchLogResult> {
+    const startTime = performance.now();
+
+    const options: any = {
+      [branchName]: null,
+      maxCount: maxResults,
+      format: {
+        hash: '%H',
+        date: '%ai',
+        message: '%s',
+        body: '%b',
+        author_name: '%an',
+        author_email: '%ae'
+      }
+    };
+
+    const queryParts: string[] = [];
+    if (query.message) {
+      options['--grep'] = query.message;
+      queryParts.push(`--grep="${query.message}"`);
+    }
+    if (query.author) {
+      options['--author'] = query.author;
+      queryParts.push(`--author="${query.author}"`);
+    }
+    if (query.dateFrom) {
+      options['--since'] = query.dateFrom;
+      queryParts.push(`--since=${query.dateFrom}`);
+    }
+    if (query.dateTo) {
+      options['--until'] = query.dateTo;
+      queryParts.push(`--until=${query.dateTo}`);
+    }
+
+    const cmdSuffix = queryParts.length ? ` ${queryParts.join(' ')}` : '';
+    const id = this._startCommand(`git log ${branchName} --max-count=${maxResults}${cmdSuffix}`, startTime);
+
+    try {
+      const result = await this.git.log(options);
+      let commits: Commit[] = result.all.map((commit: any) => ({
+        hash: commit.hash,
+        author_name: commit.author_name,
+        author_email: commit.author_email,
+        date: commit.date,
+        message: commit.message,
+        body: commit.body,
+        onOrigin: branchName.startsWith('origin/'),
+        tags: [] as string[]
+      }));
+
+      if (query.sha) {
+        const prefix = query.sha.toLowerCase();
+        commits = commits.filter(c => c.hash.toLowerCase().startsWith(prefix));
+      }
+
+      await this._enrichCommits(commits, branchName);
+
+      this._endCommand(id, startTime);
+
+      return {
+        commits,
+        truncated: result.all.length >= maxResults
+      };
+    } catch (error) {
+      this._endCommand(id, startTime);
+      throw error;
+    }
   }
 
   async getCommitFiles(commitHash: string): Promise<Array<CommitFile>> {

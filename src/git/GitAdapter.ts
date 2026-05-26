@@ -119,6 +119,19 @@ export interface Commit {
   tags: string[];
 }
 
+export interface SearchQuery {
+  message?: string;
+  author?: string;
+  sha?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface SearchLogResult {
+  commits: Commit[];
+  truncated: boolean;
+}
+
 /**
  * Abstract base class for Git operations
  * Defines the interface that all Git adapters must implement
@@ -390,8 +403,24 @@ export abstract class GitAdapter {
    * List the commit log for a branch
    * @param branchName - Name of the branch
    * @param maxCount - Maximum number of commits to retrieve
+   * @param offset - Number of commits to skip from the start (for paging)
    */
-  abstract log(branchName: string, maxCount: number): Promise<any[]>;
+  abstract log(branchName: string, maxCount: number, offset?: number): Promise<Commit[]>;
+
+  /**
+   * Count the total number of commits reachable from a branch tip.
+   * @param branchName - Name of the branch
+   */
+  abstract getCommitCount(branchName: string): Promise<number>;
+
+  /**
+   * Search the commit log of a branch using server-side git filters.
+   * `sha` is applied as a post-filter since `git log` doesn't take a SHA-prefix flag.
+   * @param branchName - Name of the branch to search
+   * @param query - Search criteria (message/author/sha/date range)
+   * @param maxResults - Maximum number of results before truncation
+   */
+  abstract searchLog(branchName: string, query: SearchQuery, maxResults?: number): Promise<SearchLogResult>;
 
   /**
    * Create a patch file from changes
