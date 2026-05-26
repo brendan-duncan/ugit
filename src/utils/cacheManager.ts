@@ -71,7 +71,7 @@ export class CacheManager {
         version: 1,
         data
       };
-      fs.writeFileSync(cacheFile, JSON.stringify(cacheData, null, 2), 'utf8');
+      fs.writeFileSync(cacheFile, JSON.stringify(cacheData), 'utf8');
     } catch (error) {
       console.error('Error saving cache:', error);
     }
