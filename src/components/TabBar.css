@@ -46,6 +46,14 @@
   font-size: 13px;
 }
 
+.tab-status {
+  display: flex;
+  gap: 6px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
 .tab-close {
   margin-left: 8px;
   background: none;

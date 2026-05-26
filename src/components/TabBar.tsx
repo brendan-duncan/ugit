@@ -13,9 +13,10 @@ interface TabBarProps {
   onTabSelect: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onTabReorder?: (tabs: Tab[]) => void;
+  tabStatus?: Record<string, { ahead: number; behind: number } | null>;
 }
 
-const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabClose, onTabReorder }) => {
+const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabClose, onTabReorder, tabStatus }) => {
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
 
@@ -67,30 +68,39 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
 
   return (
     <div className="tab-bar">
-      {tabs.map(tab => (
-        <div
-          key={tab.id}
-          className={`tab ${tab.id === activeTabId ? 'active' : ''} ${tab.id === draggedTabId ? 'dragging' : ''} ${tab.id === dragOverTabId ? 'drag-over' : ''}`}
-          onClick={() => onTabSelect(tab.id)}
-          draggable={true}
-          onDragStart={(e) => handleDragStart(e, tab.id)}
-          onDragOver={(e) => handleDragOver(e, tab.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, tab.id)}
-          onDragEnd={handleDragEnd}
-        >
-          <span className="tab-name" title={tab.path}>{tab.name}</span>
-          <button
-            className="tab-close"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTabClose(tab.id);
-            }}
+      {tabs.map(tab => {
+        const status = tabStatus?.[tab.id];
+        return (
+          <div
+            key={tab.id}
+            className={`tab ${tab.id === activeTabId ? 'active' : ''} ${tab.id === draggedTabId ? 'dragging' : ''} ${tab.id === dragOverTabId ? 'drag-over' : ''}`}
+            onClick={() => onTabSelect(tab.id)}
+            draggable={true}
+            onDragStart={(e) => handleDragStart(e, tab.id)}
+            onDragOver={(e) => handleDragOver(e, tab.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, tab.id)}
+            onDragEnd={handleDragEnd}
           >
-            ×
-          </button>
-        </div>
-      ))}
+            <span className="tab-name" title={tab.path}>{tab.name}</span>
+            {status && (status.ahead > 0 || status.behind > 0) && (
+              <span className="tab-status">
+                {status.ahead > 0 && <span className="status-ahead">↑{status.ahead}</span>}
+                {status.behind > 0 && <span className="status-behind">↓{status.behind}</span>}
+              </span>
+            )}
+            <button
+              className="tab-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTabClose(tab.id);
+              }}
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
       <div className="version-info">v{process.env.APP_VERSION}</div>
     </div>
   );
