@@ -36,9 +36,12 @@ import './RepositoryView.css';
 interface RepositoryViewProps {
   repoPath: string;
   isActiveTab: boolean;
+  onTabStatusChange?: (status: { ahead: number; behind: number } | null) => void;
 }
 
-function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
+const TAB_REMOTE_FETCH_INTERVAL_MS = 5 * 60 * 1000;
+
+function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: RepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
   const { settings, getSetting } = useSettings();
 
@@ -54,6 +57,7 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
 
   const activeSplitter = useRef<number | string | null>(null);
   const currentBranchLoadId = useRef(0);
+  const isBusyRef = useRef(false);
 
   const handleGitError = useCallback((err: Error) => {
     setError(err.message);
@@ -282,6 +286,61 @@ function RepositoryView({ repoPath, isActiveTab }: RepositoryViewProps) {
     window.addEventListener('refresh-branch-status', handleBranchStatusRefresh);
     return () => window.removeEventListener('refresh-branch-status', handleBranchStatusRefresh);
   }, [refreshBranchStatus]);
+
+  useEffect(() => {
+    isBusyRef.current = isBusy;
+  }, [isBusy]);
+
+  useEffect(() => {
+    if (loading || !gitAdapter || !currentBranch)
+      return;
+
+    let cancelled = false;
+
+    const checkRemoteStatus = async () => {
+      if (isBusyRef.current)
+        return;
+
+      try {
+        await gitAdapter.fetch('origin', ['--prune']);
+      } catch {
+        return;
+      }
+      if (cancelled)
+        return;
+
+      let status: { ahead: number; behind: number } | null = null;
+      try {
+        const { ahead, behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
+        if (ahead > 0 || behind > 0) {
+          status = { ahead, behind };
+        }
+      } catch {
+        status = null;
+      }
+      if (cancelled)
+        return;
+
+      setBranchStatus(prev => {
+        const next = { ...prev };
+        if (status) {
+          next[currentBranch] = status;
+        } else {
+          delete next[currentBranch];
+        }
+        return next;
+      });
+      onTabStatusChange?.(status);
+    };
+
+    checkRemoteStatus();
+    const intervalId = setInterval(checkRemoteStatus, TAB_REMOTE_FETCH_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [loading, gitAdapter, currentBranch, setBranchStatus, onTabStatusChange]);
 
   useEffect(() => {
     if (!loading && selectedItem == null) {

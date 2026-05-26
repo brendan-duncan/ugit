@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
@@ -37,12 +37,36 @@ function filterValidRepos(repoPaths: string[]): string[] {
   });
 }
 
+type TabStatus = { ahead: number; behind: number } | null;
+
 function App(): React.ReactElement {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [tabStatus, setTabStatus] = useState<Record<string, TabStatus>>({});
+
+  const tabStatusHandlers = useMemo(() => {
+    const handlers: Record<string, (status: TabStatus) => void> = {};
+    tabs.forEach(tab => {
+      handlers[tab.id] = (status: TabStatus) =>
+        setTabStatus(prev => {
+          const current = prev[tab.id];
+          if (
+            current === status ||
+            (current &&
+              status &&
+              current.ahead === status.ahead &&
+              current.behind === status.behind)
+          ) {
+            return prev;
+          }
+          return { ...prev, [tab.id]: status };
+        });
+    });
+    return handlers;
+  }, [tabs]);
   const { showAlert } = useAlert();
   const { settings, getSetting } = useSettings();
 
@@ -245,6 +269,14 @@ function App(): React.ReactElement {
     const newTabs = tabs.filter(tab => tab.id !== tabId);
     setTabs(newTabs);
 
+    setTabStatus(prev => {
+      if (!(tabId in prev))
+        return prev;
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+
     // If closing active tab, switch to another tab
     if (tabId === activeTabId) {
       if (newTabs.length > 0) {
@@ -356,6 +388,7 @@ function App(): React.ReactElement {
         onTabSelect={(tabId) => setActiveTabId(tabId)}
         onTabClose={closeTab}
         onTabReorder={handleTabReorder}
+        tabStatus={tabStatus}
       />
       <div className="content">
         {tabs.length === 0 ? (
@@ -370,7 +403,11 @@ function App(): React.ReactElement {
                 key={tab.id}
                 style={{ display: tab.id === activeTabId ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}
               >
-                <RepositoryView repoPath={tab.path} isActiveTab={tab.id === activeTabId} />
+                <RepositoryView
+                  repoPath={tab.path}
+                  isActiveTab={tab.id === activeTabId}
+                  onTabStatusChange={tabStatusHandlers[tab.id]}
+                />
               </div>
             ))}
           </>
