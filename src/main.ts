@@ -1,5 +1,11 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import fixPath from 'fix-path';
+
+// On macOS/Linux, GUI-launched apps don't inherit the shell's PATH, so spawned
+// processes (git, git-lfs, etc.) can't be found. fix-path runs the user's login
+// shell to recover the real PATH.
+fixPath();
 import cacheManager from './utils/cacheManager';
 import { initializeSettings } from './utils/settings';
 import { getSettingsManager } from './utils/settings';
