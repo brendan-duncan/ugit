@@ -303,8 +303,9 @@ export abstract class GitAdapter {
    * Create a stash
    * @param message - Stash message
    * @param filePaths - Optional array of file paths to stash (if not provided, stashes all changes)
+   * @param keepChanges - If true, keep the stashed changes in the working directory (re-applies the stash after creating it)
    */
-  abstract stashPush(message: string, filePaths?: string[] | null): Promise<void>;
+  abstract stashPush(message: string, filePaths?: string[] | null, keepChanges?: boolean): Promise<void>;
 
   /**
    * Apply and remove most recent stash

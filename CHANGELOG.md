@@ -1,3 +1,9 @@
+## [v0.2.0](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 1, 2026)
+
+### New Features
+
+* Stash selected files, with an option to keep the changes in the working directory or remove them.
+
 ## [v0.1.15](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.15) (May 19, 2026))
 
 ### Bug Fixes

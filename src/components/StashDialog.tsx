@@ -3,12 +3,13 @@ import './Dialog.css';
 
 interface StashDialogProps {
   onClose: () => void;
-  onStash: (message: string, stageNewFiles: boolean) => Promise<void>;
+  onStash: (message: string, stageNewFiles: boolean, keepChanges: boolean) => Promise<void>;
 }
 
 const StashDialog: React.FC<StashDialogProps> = ({ onClose, onStash }) => {
   const [message, setMessage] = useState<string>('');
   const [stageNewFiles, setStageNewFiles] = useState<boolean>(true);
+  const [keepChanges, setKeepChanges] = useState<boolean>(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -21,7 +22,7 @@ const StashDialog: React.FC<StashDialogProps> = ({ onClose, onStash }) => {
   }, [onClose]);
 
   const handleStash = (): void => {
-    onStash(message, stageNewFiles);
+    onStash(message, stageNewFiles, keepChanges);
   };
 
   return (
@@ -54,6 +55,18 @@ const StashDialog: React.FC<StashDialogProps> = ({ onClose, onStash }) => {
                 className="dialog-checkbox"
               />
               <span>Stage new files</span>
+            </label>
+          </div>
+
+          <div className="dialog-field">
+            <label className="dialog-checkbox-label" title="Create the stash but leave the changes in your local changes instead of removing them">
+              <input
+                type="checkbox"
+                checked={keepChanges}
+                onChange={(e) => setKeepChanges(e.target.checked)}
+                className="dialog-checkbox"
+              />
+              <span>Keep changes in working directory</span>
             </label>
           </div>
         </div>

@@ -902,7 +902,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
     }
   }, [gitAdapter, showConfirm, clearBranchCache, loadRepoData, refreshFileStatus, refreshRebaseStatus, setErrorWithDialog]);
 
-  const handleStash = useCallback(async (message: string, stageNewFiles: boolean) => {
+  const handleStash = useCallback(async (message: string, stageNewFiles: boolean, keepChanges: boolean) => {
     hideStashDialog();
     if (!gitAdapter)
       return;
@@ -919,7 +919,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
       }
 
       setBusyMessage('git stash push');
-      await gitAdapter.stashPush(message || `Stash created at ${new Date().toISOString()}`);
+      await gitAdapter.stashPush(message || `Stash created at ${new Date().toISOString()}`, null, keepChanges);
       await refreshFileStatus(false);
       await refreshStashes();
     } catch (error) {
@@ -1680,6 +1680,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
                 onBusyChange={setIsBusy}
                 onBusyMessageChange={setBusyMessage}
                 onCommitCreated={() => clearBranchCache(currentBranch)}
+                onStashCreated={refreshStashes}
                 pageSize={getSetting('maxCommits') || 100}
                 onLoadCommitPage={handleLoadCommitPage}
                 onSearchCommits={handleSearchCommits}

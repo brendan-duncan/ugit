@@ -26,9 +26,10 @@ interface LocalChangesPanelProps {
   onBusyChange?: (busy: boolean) => void;
   onBusyMessageChange?: (message: string) => void;
   onCommitCreated?: () => void;
+  onStashCreated?: () => Promise<void>;
 }
 
-function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated }: LocalChangesPanelProps) {
+function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, onStashCreated }: LocalChangesPanelProps) {
   const { showAlert, showConfirm } = useAlert();
   const { getSetting } = useSettings();
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
@@ -314,7 +315,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
     await performCommit(false);
   };
 
-  const handleStash = async (message: string, stageNewFiles: boolean) => {
+  const handleStash = async (message: string, stageNewFiles: boolean, keepChanges: boolean) => {
     setShowStashDialog(false);
 
     if (pendingStashFiles.length === 0)
@@ -343,12 +344,13 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         }
       }
 
-      await git.stashPush(message || 'Stashed changes', pendingStashFiles);
-      console.log(`Stashed ${pendingStashFiles.length} files`);
+      await git.stashPush(message || 'Stashed changes', pendingStashFiles, keepChanges);
+      console.log(`Stashed ${pendingStashFiles.length} files${keepChanges ? ' (kept in working directory)' : ''}`);
 
       // Clear pending files and refresh
       setPendingStashFiles([]);
       if (onRefresh) await onRefresh();
+      if (onStashCreated) await onStashCreated();
     } catch (error) {
       console.error('Error stashing:', error);
       setPendingStashFiles([]);

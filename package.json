@@ -1,6 +1,6 @@
 {
   "name": "ugit",
-  "version": "0.1.17",
+  "version": "0.2.0",
   "description": "A Git client built with Electron and React",
   "main": "dist/main.js",
   "scripts": {
@@ -61,7 +61,7 @@
     "diff2html": "^3.4.55",
     "electron-updater": "^6.7.3",
     "es-git": "^0.6.0",
-    "fix-path": "^3.0.0",
+    "fix-path": "^5.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-window": "^1.8.10",
