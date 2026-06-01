@@ -363,7 +363,7 @@ export class SimpleGitAdapter extends GitAdapter {
     return result;
   }
 
-  async stashPush(message: string, filePaths: string[] | null = null): Promise<void> {
+  async stashPush(message: string, filePaths: string[] | null = null, keepChanges: boolean = false): Promise<void> {
     const startTime = performance.now();
     if (filePaths && filePaths.length > 0) {
       const id = this._startCommand(`git stash push -m "${message}" -- ${filePaths.length} files`, startTime);
@@ -379,6 +379,18 @@ export class SimpleGitAdapter extends GitAdapter {
         await this.git.stash(['push', '-m', message]);
       } catch (error) {
         console.error(`Error pushing stash with message "${message}":`, error);
+      }
+      this._endCommand(id, startTime);
+    }
+
+    // Re-apply the stash we just created so the changes remain in the working
+    // directory. The stash entry itself is kept; this only restores the files.
+    if (keepChanges) {
+      const id = this._startCommand('git stash apply', startTime);
+      try {
+        await this.git.stash(['apply']);
+      } catch (error) {
+        console.error('Error re-applying stash to keep changes in working directory:', error);
       }
       this._endCommand(id, startTime);
     }

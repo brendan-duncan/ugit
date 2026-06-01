@@ -26,12 +26,27 @@ A stash takes your uncommitted changes (both staged and unstaged) and saves them
 1. Right-click on the **Local Changes** section in the RepoInfo panel
 2. Select **Stash Changes**
 3. Enter an optional stash message
-4. Click **Stash**
+4. Click **Save Stash**
 
-### Using Keyboard Shortcut
+### Stashing Selected Files
 
-1. Make sure you have uncommitted changes
-2. Right-click → **Stash Changes**
+You don't have to stash everything — you can stash only the files you choose.
+
+1. In the **Local Changes** panel, select one or more files (or folders) you want to stash
+2. Right-click the selection and choose **Stash**
+3. Enter an optional stash message
+4. Choose your options (see below) and click **Save Stash**
+
+Only the selected files are moved into the stash; the rest of your changes stay untouched in Local Changes.
+
+### Stash Options
+
+The stash dialog offers two options:
+
+| Option | Description |
+|--------|-------------|
+| **Stage new files** | Includes new (untracked) files in the stash. Git ignores untracked files by default, so leave this enabled if you want them stashed. |
+| **Keep changes in working directory** | Creates the stash but leaves the changes in Local Changes instead of removing them. Useful for snapshotting your work without interrupting it. When disabled (the default), the changes are removed from the working directory after stashing. |
 
 ### Auto-Stash
 
@@ -138,6 +153,8 @@ Stashes can only be deleted one at a time through the UI.
 |-------------|-------------|
 | `git stash` | Save uncommitted changes |
 | `git stash push -m "message"` | Stash with a message |
+| `git stash push -m "message" -- <files>` | Stash only the selected files |
+| `git stash push ... && git stash apply` | Stash while keeping the changes in the working directory |
 | `git stash list` | List all stashes |
 | `git stash pop` | Apply most recent stash and remove it |
 | `git stash apply` | Apply stash without removing |

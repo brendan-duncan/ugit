@@ -21,13 +21,14 @@ interface ContentViewerProps {
   onBusyChange?: (busy: boolean) => void;
   onBusyMessageChange?: (message: string) => void;
   onCommitCreated?: () => void;
+  onStashCreated?: () => Promise<void>;
   pageSize: number;
   onLoadCommitPage: (page: number) => void;
   onSearchCommits: (query: SearchQuery) => void;
   onClearCommitSearch: () => void;
 }
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, pageSize, onLoadCommitPage, onSearchCommits, onClearCommitSearch }: ContentViewerProps): React.ReactElement {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, onStashCreated, pageSize, onLoadCommitPage, onSearchCommits, onClearCommitSearch }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -57,6 +58,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           onBusyChange={onBusyChange}
           onBusyMessageChange={onBusyMessageChange}
           onCommitCreated={onCommitCreated}
+          onStashCreated={onStashCreated}
         />
       )}
       {item.type === 'stash' && selectedItem.stash && (
