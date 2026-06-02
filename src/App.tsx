@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
+import InitRepositoryDialog from './components/InitRepositoryDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
@@ -44,6 +45,9 @@ function App(): React.ReactElement {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
+  const [initRepoPath, setInitRepoPath] = useState<string | null>(null);
+  // Bumped per repo path to force the corresponding RepositoryView to reload from git.
+  const [refreshSignal, setRefreshSignal] = useState<Record<string, number>>({});
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [tabStatus, setTabStatus] = useState<Record<string, TabStatus>>({});
 
@@ -136,7 +140,7 @@ function App(): React.ReactElement {
   // Listen for events from main process
   useEffect(() => {
     const handleInitRepo = (event: any, repoPath: string) => {
-      initRepository(repoPath);
+      setInitRepoPath(repoPath);
     };
 
     const handleOpenRepo = (event: any, repoPath: string) => {
@@ -216,12 +220,25 @@ function App(): React.ReactElement {
     };
   }, [tabs, activeTabId]);
 
-  const initRepository = async (repoPath?: string) => {
+  const handleInit = async (remoteName: string, remoteUrl: string, branchName: string) => {
+    if (!initRepoPath) {
+      return;
+    }
     try {
-      const result: CloneResult = await ipcRenderer.invoke('init-repository', repoPath);
+      const result: CloneResult = await ipcRenderer.invoke('init-repository', {
+        repoPath: initRepoPath,
+        remoteName,
+        remoteUrl,
+        branchName,
+      });
 
       if (result.success && result.path) {
-        openRepository(result.path);
+        const path = result.path;
+        setInitRepoPath(null);
+        openRepository(path);
+        // Refresh the repo after initializing so the new branch/remote state is
+        // shown immediately (also covers the case where the repo tab was already open).
+        setRefreshSignal(prev => ({ ...prev, [path]: (prev[path] || 0) + 1 }));
       } else {
         showAlert(`Failed to initialize repository: ${result.error}`, 'Error');
       }
@@ -407,6 +424,7 @@ function App(): React.ReactElement {
                   repoPath={tab.path}
                   isActiveTab={tab.id === activeTabId}
                   onTabStatusChange={tabStatusHandlers[tab.id]}
+                  refreshSignal={refreshSignal[tab.path] || 0}
                 />
               </div>
             ))}
@@ -421,6 +439,13 @@ function App(): React.ReactElement {
         <CloneDialog
           onClose={() => setShowCloneDialog(false)}
           onClone={handleClone}
+        />
+      )}
+      {initRepoPath && (
+        <InitRepositoryDialog
+          repoPath={initRepoPath}
+          onClose={() => setInitRepoPath(null)}
+          onInit={handleInit}
         />
       )}
     </div>
