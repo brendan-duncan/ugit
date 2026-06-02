@@ -1,3 +1,7 @@
+## [v1.0.1](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 2, 2026)
+
+* Improve Init New Repository. Assign a branch name and a remote repository during initialization.
+
 ## [v0.2.0](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 1, 2026)
 
 ### New Features

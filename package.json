@@ -1,6 +1,6 @@
 {
   "name": "ugit",
-  "version": "0.2.0",
+  "version": "1.0.1",
   "description": "A Git client built with Electron and React",
   "main": "dist/main.js",
   "scripts": {

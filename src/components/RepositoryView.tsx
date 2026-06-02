@@ -37,11 +37,13 @@ interface RepositoryViewProps {
   repoPath: string;
   isActiveTab: boolean;
   onTabStatusChange?: (status: { ahead: number; behind: number } | null) => void;
+  // Incremented by the parent to request a reload from git (e.g. after init).
+  refreshSignal?: number;
 }
 
 const TAB_REMOTE_FETCH_INTERVAL_MS = 5 * 60 * 1000;
 
-function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: RepositoryViewProps) {
+function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: RepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
   const { settings, getSetting } = useSettings();
 
@@ -102,6 +104,18 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange }: Repository
     clearBranchCache,
     getFileStatusType
   } = useRepositoryData(repoPath, gitAdapter);
+
+  // Reload from git when the parent bumps the refresh signal (e.g. after init).
+  // Skip the initial mount value so we don't double-load on top of the mount fetch.
+  const prevRefreshSignal = useRef(refreshSignal);
+  useEffect(() => {
+    if (refreshSignal !== prevRefreshSignal.current) {
+      prevRefreshSignal.current = refreshSignal;
+      if (gitAdapter) {
+        loadRepoData(true);
+      }
+    }
+  }, [refreshSignal, gitAdapter, loadRepoData]);
 
   const {
     dialogStates,

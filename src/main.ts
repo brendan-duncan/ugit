@@ -554,13 +554,32 @@ ipcMain.handle('show-open-dialog', async (event: any, options: any) => {
 });
 
 // Init repository
-ipcMain.handle('init-repository', async (event: any, repoPath: string) => {
+ipcMain.handle('init-repository', async (event: any, options: any) => {
   try {
+    // Support both the legacy string-path call and the new options object.
+    const {
+      repoPath,
+      remoteName = 'origin',
+      remoteUrl = '',
+      branchName = 'main',
+    } = typeof options === 'string' ? { repoPath: options } as any : (options || {});
+
     // Create git adapter
     const gitAdapter = await GitFactory.createAdapter(repoPath, gitBackend);
 
-    // Initialize repository
-    await gitAdapter.init();
+    // Initialize repository with the requested branch name (defaults to 'main')
+    await gitAdapter.init((branchName && branchName.trim()) || 'main');
+
+    // Only add a remote when a URL was provided.
+    const trimmedUrl = (remoteUrl || '').trim();
+    if (trimmedUrl) {
+      await gitAdapter.addRemote((remoteName && remoteName.trim()) || 'origin', trimmedUrl);
+    }
+
+    // Drop any stale cache left over from a previous repository at this path so the
+    // freshly initialized repo loads its real branch/remote state instead of showing
+    // out-of-date values (e.g. the wrong branch name) until the first manual refresh.
+    cacheManager.clearCache(repoPath);
 
     return { success: true, path: repoPath };
   } catch (error: any) {

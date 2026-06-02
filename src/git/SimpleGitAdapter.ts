@@ -33,12 +33,17 @@ export class SimpleGitAdapter extends GitAdapter {
     this.isOpen = true;
   }
 
-  async init(): Promise<void> {
+  async init(branchName?: string): Promise<void> {
     const startTime = performance.now();
     const id = this._startCommand('git init', startTime);
     try {
       const git = simpleGit({ baseDir: this.repoPath });
       await git.init();
+      if (branchName) {
+        // Point the unborn HEAD at the requested branch. This works regardless of
+        // the git version or whether any commits exist yet.
+        await git.raw(['symbolic-ref', 'HEAD', `refs/heads/${branchName}`]);
+      }
     } catch (error) {
       console.error('Error initializing repository:', error);
     }

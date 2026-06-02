@@ -203,8 +203,9 @@ export abstract class GitAdapter {
 
   /**
    * Initialize a directory as a git repository.
+   * @param branchName - Optional initial branch name (defaults to git's configured default)
    */
-  abstract init(): Promise<void>;
+  abstract init(branchName?: string): Promise<void>;
 
   /**
    * Get repository status including current branch and file changes
