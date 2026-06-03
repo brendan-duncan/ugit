@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import BranchTree from './BranchTree';
 import RemoteList from './RemoteList';
 import StashList from './StashList';
+import WorktreeList from './WorktreeList';
 import { SelectedItem, RemoteInfo } from './types';
-import { GitAdapter, StashInfo } from '../git/GitAdapter';
+import { GitAdapter, StashInfo, WorktreeInfo } from '../git/GitAdapter';
 
 interface BranchStashPanelProps {
   branches: Array<string>;
@@ -25,12 +26,18 @@ interface BranchStashPanelProps {
   onRemoteBranchAction: (action: string, remoteName: string, branchName: string, fullName: string) => void;
   onRemoteAdded?: () => void;
   lockedPatterns?: ReadonlyArray<string>;
+  worktrees: Array<WorktreeInfo>;
+  onOpenWorktree: (worktreePath: string) => void;
+  onAddWorktree: () => void;
+  onWorktreeAction: (action: string, worktree: WorktreeInfo) => void;
 }
 
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
       onBranchSelect, stashes, onSelectStash, onStashDoubleClick, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
-      remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded, lockedPatterns }: BranchStashPanelProps) {
+      remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded, lockedPatterns,
+      worktrees, onOpenWorktree, onAddWorktree, onWorktreeAction }: BranchStashPanelProps) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
+  const [worktreesCollapsed, setWorktreesCollapsed] = useState(false);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
   const [stashesCollapsed, setStashesCollapsed] = useState(false);
 
@@ -52,10 +59,28 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           lockedPatterns={lockedPatterns}
         />
       </div>
-      {!branchesCollapsed && !remotesCollapsed && (
+      {!branchesCollapsed && !worktreesCollapsed && (
         <div
           className="splitter-handle"
           onMouseDown={() => onMouseDown(1)}
+        >
+          <div className="splitter-line"></div>
+        </div>
+      )}
+      <div className={`split-panel worktrees-panel ${worktreesCollapsed ? 'collapsed' : ''}`}>
+        <WorktreeList
+          worktrees={worktrees}
+          collapsed={worktreesCollapsed}
+          onToggleCollapse={() => setWorktreesCollapsed(!worktreesCollapsed)}
+          onOpenWorktree={onOpenWorktree}
+          onAddWorktree={onAddWorktree}
+          onWorktreeAction={onWorktreeAction}
+        />
+      </div>
+      {!worktreesCollapsed && !remotesCollapsed && (
+        <div
+          className="splitter-handle"
+          onMouseDown={() => onMouseDown(2)}
         >
           <div className="splitter-line"></div>
         </div>
@@ -76,7 +101,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
       {!remotesCollapsed && !stashesCollapsed && (
         <div
           className="splitter-handle"
-          onMouseDown={() => onMouseDown(2)}
+          onMouseDown={() => onMouseDown(3)}
         >
           <div className="splitter-line"></div>
         </div>

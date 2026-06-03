@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ipcRenderer } from 'electron';
 import GitFactory from '../git/GitFactory';
-import { GitAdapter, Commit, StashInfo, FileStatus, GitStatus } from '../git/GitAdapter';
+import { GitAdapter, Commit, StashInfo, FileStatus, GitStatus, WorktreeInfo } from '../git/GitAdapter';
 import cacheManager from '../utils/cacheManager';
 import { RunningCommand, FileInfo, RemoteInfo } from '../components/types';
 
@@ -122,6 +122,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
   const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
   const [branchStatus, setBranchStatus] = useState<{ [branchName: string]: { ahead: number; behind: number } }>({});
   const [stashes, setStashes] = useState<StashInfo[]>([]);
+  const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [usingCache, setUsingCache] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,6 +203,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
         setRemotes(cachedData.remotes || []);
         setBranchStatus(cachedData.branchStatus || {});
         setStashes(cachedData.stashes || []);
+        setWorktrees(cachedData.worktrees || []);
         setUsingCache(true);
         setLoading(false);
         return;
@@ -278,6 +280,15 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       const stashList = await gitAdapter.stashList();
       setStashes(stashList.all);
 
+      let worktreeList: WorktreeInfo[] = [];
+      try {
+        worktreeList = await gitAdapter.listWorktrees();
+        setWorktrees(worktreeList);
+      } catch {
+        setWorktrees([]);
+        worktreeList = [];
+      }
+
       const cacheData = {
         currentBranch: status.current,
         originUrl: url,
@@ -285,6 +296,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
         remotes: remotesList,
         branchStatus: statusMap,
         stashes: stashList.all,
+        worktrees: worktreeList,
         branchCommits: Object.fromEntries(branchCommitsCache.current)
       };
 
@@ -304,6 +316,21 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     const stashList = await gitAdapter.stashList();
     setStashes(stashList.all);
   }, [gitAdapter]);
+
+  const refreshWorktrees = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+    try {
+      const list = await gitAdapter.listWorktrees();
+      setWorktrees(list);
+      // Keep the on-disk cache in sync so a cold open shows the latest worktrees.
+      const cacheData = cacheManager.loadCache(repoPath) || {};
+      cacheData.worktrees = list;
+      cacheManager.saveCache(repoPath, cacheData);
+    } catch (err) {
+      console.error('Error refreshing worktrees:', err);
+    }
+  }, [gitAdapter, repoPath]);
 
   useEffect(() => {
     if (gitAdapter) {
@@ -328,6 +355,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     branchStatus,
     setBranchStatus,
     stashes,
+    worktrees,
     loading,
     usingCache,
     error,
@@ -335,6 +363,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     branchCommitsCache,
     loadRepoData,
     refreshStashes,
+    refreshWorktrees,
     updateBranchCache,
     clearBranchCache,
     getFileStatusType

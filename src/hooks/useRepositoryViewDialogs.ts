@@ -22,6 +22,7 @@ interface UseRepositoryViewDialogsResult {
     showAmendCommitDialog: boolean;
     showPullRequestDialog: boolean;
     showCheckoutCommitDialog: boolean;
+    showCreateWorktreeDialog: boolean;
   };
   pendingState: {
     pendingBranchSwitch: string | null;
@@ -39,6 +40,7 @@ interface UseRepositoryViewDialogsResult {
     commitToCheckout: string | null;
     pullRequestUrl: string;
     pullRequestBranch: string;
+    worktreePrefillBranch: string | null;
   };
   showPullDialog: () => void;
   hidePullDialog: () => void;
@@ -80,6 +82,8 @@ interface UseRepositoryViewDialogsResult {
   hidePullRequestDialog: () => void;
   showCheckoutCommitDialog: (commitHash: string) => void;
   hideCheckoutCommitDialog: () => void;
+  showCreateWorktreeDialog: (prefillBranch?: string | null) => void;
+  hideCreateWorktreeDialog: () => void;
 }
 
 export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
@@ -103,6 +107,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
   const [showAmendCommitDialog, setShowAmendCommitDialog] = useState(false);
   const [showPullRequestDialog, setShowPullRequestDialog] = useState(false);
   const [showCheckoutCommitDialog, setShowCheckoutCommitDialog] = useState(false);
+  const [showCreateWorktreeDialog, setShowCreateWorktreeDialog] = useState(false);
 
   const [pendingBranchSwitch, setPendingBranchSwitch] = useState<string | null>(null);
   const [pullingBranch, setPullingBranch] = useState<string | null>(null);
@@ -119,6 +124,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
   const [commitToCheckout, setCommitToCheckout] = useState<string | null>(null);
   const [pullRequestUrl, setPullRequestUrl] = useState<string>('');
   const [pullRequestBranch, setPullRequestBranch] = useState<string>('');
+  const [worktreePrefillBranch, setWorktreePrefillBranch] = useState<string | null>(null);
 
   const hidePullDialog = useCallback(() => setShowPullDialog(false), []);
   const hidePushDialog = useCallback(() => setShowPushDialog(null), []);
@@ -199,6 +205,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       showAmendCommitDialog,
       showPullRequestDialog,
       showCheckoutCommitDialog,
+      showCreateWorktreeDialog,
     },
     pendingState: {
       pendingBranchSwitch,
@@ -216,6 +223,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       commitToCheckout,
       pullRequestUrl,
       pullRequestBranch,
+      worktreePrefillBranch,
     },
     showPullDialog: useCallback(() => setShowPullDialog(true), []),
     hidePullDialog,
@@ -303,6 +311,14 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
     hideCheckoutCommitDialog: useCallback(() => {
       setShowCheckoutCommitDialog(false);
       setCommitToCheckout(null);
+    }, []),
+    showCreateWorktreeDialog: useCallback((prefillBranch?: string | null) => {
+      setWorktreePrefillBranch(prefillBranch || null);
+      setShowCreateWorktreeDialog(true);
+    }, []),
+    hideCreateWorktreeDialog: useCallback(() => {
+      setShowCreateWorktreeDialog(false);
+      setWorktreePrefillBranch(null);
     }, []),
   };
 }

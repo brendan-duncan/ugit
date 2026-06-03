@@ -9,7 +9,8 @@ import GitAdapter, {
   CommitFile,
   RebaseStatus,
   SearchQuery,
-  SearchLogResult } from './GitAdapter';
+  SearchLogResult,
+  WorktreeInfo } from './GitAdapter';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
@@ -1395,6 +1396,191 @@ export class SimpleGitAdapter extends GitAdapter {
 
   async rebaseSkip(): Promise<void> {
     await this._runRebaseCommand('--skip');
+  }
+
+  // Normalize a filesystem path for cross-worktree comparison. Git emits
+  // forward-slash paths in --porcelain output; this.repoPath may use the OS
+  // separator. On Windows paths are also case-insensitive.
+  private _normalizeWorktreePath(p: string): string {
+    const normalized = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, '');
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  }
+
+  async listWorktrees(): Promise<WorktreeInfo[]> {
+    const startTime = performance.now();
+    const id = this._startCommand('git worktree list --porcelain', startTime);
+    let output: string;
+    try {
+      output = await this.git.raw(['worktree', 'list', '--porcelain']);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error('Error listing worktrees:', error);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+
+    const currentPath = this._normalizeWorktreePath(this.repoPath);
+    const worktrees: WorktreeInfo[] = [];
+    let current: Partial<WorktreeInfo> & { _bare?: boolean } | null = null;
+
+    const flush = () => {
+      if (current && current.path) {
+        worktrees.push({
+          path: current.path,
+          branch: current.branch ?? null,
+          head: current.head || '',
+          isMain: worktrees.length === 0, // first record is always the main worktree
+          isCurrent: this._normalizeWorktreePath(current.path) === currentPath,
+          detached: !!current.detached,
+          locked: !!current.locked,
+          lockReason: current.lockReason,
+          prunable: !!current.prunable,
+        });
+      }
+      current = null;
+    };
+
+    for (const rawLine of output.split('\n')) {
+      const line = rawLine.replace(/\r$/, '');
+      if (line.trim() === '') {
+        flush();
+        continue;
+      }
+      const spaceIdx = line.indexOf(' ');
+      const key = spaceIdx === -1 ? line : line.slice(0, spaceIdx);
+      const value = spaceIdx === -1 ? '' : line.slice(spaceIdx + 1);
+
+      switch (key) {
+        case 'worktree':
+          flush();
+          current = { path: value };
+          break;
+        case 'HEAD':
+          if (current) current.head = value;
+          break;
+        case 'branch':
+          // value looks like 'refs/heads/feature' — strip the prefix for display.
+          if (current) current.branch = value.replace(/^refs\/heads\//, '');
+          break;
+        case 'detached':
+          if (current) current.detached = true;
+          break;
+        case 'bare':
+          if (current) current._bare = true;
+          break;
+        case 'locked':
+          if (current) {
+            current.locked = true;
+            if (value) current.lockReason = value;
+          }
+          break;
+        case 'prunable':
+          if (current) current.prunable = true;
+          break;
+      }
+    }
+    flush();
+
+    return worktrees;
+  }
+
+  async addWorktree(
+    worktreePath: string,
+    ref: string,
+    options: { newBranch?: boolean; startPoint?: string; force?: boolean } = {}
+  ): Promise<void> {
+    const args = ['worktree', 'add'];
+    if (options.force) args.push('--force');
+    if (options.newBranch) {
+      args.push('-b', ref, worktreePath);
+      if (options.startPoint) args.push(options.startPoint);
+    } else {
+      args.push(worktreePath, ref);
+    }
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      await this.git.raw(args);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error adding worktree at ${worktreePath}:`, error);
+      throw error;
+    }
+  }
+
+  async removeWorktree(worktreePath: string, force: boolean = false): Promise<void> {
+    const args = ['worktree', 'remove'];
+    if (force) args.push('--force');
+    args.push(worktreePath);
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      await this.git.raw(args);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error removing worktree ${worktreePath}:`, error);
+      throw error;
+    }
+  }
+
+  async pruneWorktrees(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git worktree prune', startTime);
+    try {
+      await this.git.raw(['worktree', 'prune']);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error('Error pruning worktrees:', error);
+      throw error;
+    }
+  }
+
+  async lockWorktree(worktreePath: string, reason?: string): Promise<void> {
+    const args = ['worktree', 'lock'];
+    if (reason) args.push('--reason', reason);
+    args.push(worktreePath);
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      await this.git.raw(args);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error locking worktree ${worktreePath}:`, error);
+      throw error;
+    }
+  }
+
+  async unlockWorktree(worktreePath: string): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git worktree unlock ${worktreePath}`, startTime);
+    try {
+      await this.git.raw(['worktree', 'unlock', worktreePath]);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error unlocking worktree ${worktreePath}:`, error);
+      throw error;
+    }
+  }
+
+  async moveWorktree(worktreePath: string, newPath: string): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git worktree move ${worktreePath} ${newPath}`, startTime);
+    try {
+      await this.git.raw(['worktree', 'move', worktreePath, newPath]);
+      this._endCommand(id, startTime);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      console.error(`Error moving worktree ${worktreePath}:`, error);
+      throw error;
+    }
   }
 }
 

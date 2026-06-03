@@ -1,0 +1,26 @@
+.dialog-sublabel {
+  display: block;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dialog-path-preview {
+  margin-top: 6px;
+  padding: 4px 6px;
+  background-color: var(--bg-tertiary);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch-exists-warning {
+  margin-top: 4px;
+  color: #e06c75;
+  font-size: 12px;
+}
