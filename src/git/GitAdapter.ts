@@ -132,6 +132,31 @@ export interface SearchLogResult {
   truncated: boolean;
 }
 
+export interface WorktreeInfo {
+  // Absolute path to the worktree's working directory.
+  path: string;
+  // Short branch name checked out in the worktree (e.g. 'main'), or null when the
+  // worktree is in a detached HEAD state.
+  branch: string | null;
+  // Commit hash the worktree's HEAD points at.
+  head: string;
+  // True for the repository's primary (main) worktree — the one holding the real
+  // .git directory. Main worktrees can't be removed with `git worktree remove`.
+  isMain: boolean;
+  // True when this worktree's path matches the adapter's repoPath (the one ugit
+  // currently has open in this view).
+  isCurrent: boolean;
+  // True when HEAD is detached rather than on a branch.
+  detached: boolean;
+  // True when the worktree is locked (protected from pruning/removal).
+  locked: boolean;
+  // Optional reason supplied when the worktree was locked.
+  lockReason?: string;
+  // True when the worktree's directory is missing/unreachable and git considers it
+  // prunable (e.g. the folder was deleted outside ugit).
+  prunable: boolean;
+}
+
 /**
  * Abstract base class for Git operations
  * Defines the interface that all Git adapters must implement
@@ -563,6 +588,58 @@ export abstract class GitAdapter {
    * Skip the current commit of an in-progress rebase.
    */
   abstract rebaseSkip(): Promise<void>;
+
+  /**
+   * List all worktrees attached to this repository, including the main worktree.
+   */
+  abstract listWorktrees(): Promise<WorktreeInfo[]>;
+
+  /**
+   * Add a new worktree at the given path.
+   * @param worktreePath - Absolute path where the new worktree directory is created
+   * @param ref - Branch name or commit to check out in the worktree
+   * @param options - newBranch: create `ref` as a new branch (git worktree add -b);
+   *                   startPoint: when creating a new branch, the commit/branch to start from;
+   *                   force: allow checking out a branch already checked out elsewhere, or
+   *                   creating the worktree in a non-empty directory
+   */
+  abstract addWorktree(
+    worktreePath: string,
+    ref: string,
+    options?: { newBranch?: boolean; startPoint?: string; force?: boolean }
+  ): Promise<void>;
+
+  /**
+   * Remove a worktree.
+   * @param worktreePath - Path of the worktree to remove
+   * @param force - Pass --force to remove a worktree with uncommitted changes or that is locked
+   */
+  abstract removeWorktree(worktreePath: string, force?: boolean): Promise<void>;
+
+  /**
+   * Prune worktree administrative entries whose directories are gone.
+   */
+  abstract pruneWorktrees(): Promise<void>;
+
+  /**
+   * Lock a worktree so it can't be pruned or removed without --force.
+   * @param worktreePath - Path of the worktree to lock
+   * @param reason - Optional human-readable reason stored with the lock
+   */
+  abstract lockWorktree(worktreePath: string, reason?: string): Promise<void>;
+
+  /**
+   * Unlock a previously locked worktree.
+   * @param worktreePath - Path of the worktree to unlock
+   */
+  abstract unlockWorktree(worktreePath: string): Promise<void>;
+
+  /**
+   * Move a worktree to a new location.
+   * @param worktreePath - Current path of the worktree
+   * @param newPath - Destination path
+   */
+  abstract moveWorktree(worktreePath: string, newPath: string): Promise<void>;
 }
 
 export default GitAdapter;

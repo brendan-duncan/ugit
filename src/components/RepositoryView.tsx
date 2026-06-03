@@ -24,12 +24,14 @@ import CreateTagFromCommitDialog from './CreateTagFromCommitDialog';
 import AmendCommitDialog from './AmendCommitDialog';
 import PullRequestDialog from './PullRequestDialog';
 import ConfirmDialog from './ConfirmDialog';
+import CreateWorktreeDialog, { CreateWorktreeParams } from './CreateWorktreeDialog';
+import { ipcRenderer } from 'electron';
 import { useGitAdapter, useRepositoryData } from '../hooks/useGit';
 import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit, RebaseStatus, SearchQuery } from "../git/GitAdapter"
+import { GitAdapter, Commit, RebaseStatus, SearchQuery, WorktreeInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
 
@@ -39,11 +41,13 @@ interface RepositoryViewProps {
   onTabStatusChange?: (status: { ahead: number; behind: number } | null) => void;
   // Incremented by the parent to request a reload from git (e.g. after init).
   refreshSignal?: number;
+  // Open a repository/worktree path as a tab (provided by App).
+  onOpenRepository?: (repoPath: string) => void;
 }
 
 const TAB_REMOTE_FETCH_INTERVAL_MS = 5 * 60 * 1000;
 
-function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: RepositoryViewProps) {
+function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0, onOpenRepository }: RepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
   const { settings, getSetting } = useSettings();
 
@@ -93,6 +97,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     branchStatus,
     setBranchStatus,
     stashes,
+    worktrees,
     loading: repoLoading,
     usingCache,
     error: repoError,
@@ -100,6 +105,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     branchCommitsCache,
     loadRepoData,
     refreshStashes,
+    refreshWorktrees,
     updateBranchCache,
     clearBranchCache,
     getFileStatusType
@@ -160,6 +166,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     hidePullRequestDialog,
     showCheckoutCommitDialog,
     hideCheckoutCommitDialog,
+    showCreateWorktreeDialog,
+    hideCreateWorktreeDialog,
   } = useRepositoryViewDialogs();
 
   const loading = gitLoading || repoLoading;
@@ -1050,6 +1058,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       case 'new-branch':
         showCreateBranchDialog(branchName);
         break;
+      case 'new-worktree':
+        showCreateWorktreeDialog(branchName);
+        break;
       case 'new-tag':
         if (gitAdapter) {
           const commits = await gitAdapter.log(branchName, 1);
@@ -1068,9 +1079,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         navigator.clipboard.writeText(branchName);
         break;
     }
-  }, [gitAdapter, currentBranch, handleBranchSwitch, handleFetchClick, showPullDialog, 
+  }, [gitAdapter, currentBranch, handleBranchSwitch, handleFetchClick, showPullDialog,
       showPushDialog, showMergeBranchDialog, showRebaseBranchDialog, showCreateBranchDialog,
-      showCreateTagFromCommitDialog, showRenameBranchDialog, showDeleteBranchDialog]);
+      showCreateTagFromCommitDialog, showRenameBranchDialog, showDeleteBranchDialog, showCreateWorktreeDialog]);
 
   const handleStashContextMenu = useCallback((action: string, stash: any, stashIndex: number) => {
     switch (action) {
@@ -1459,6 +1470,153 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, hideCheckoutCommitDialog, pendingState.commitToCheckout, clearBranchCache, loadRepoData, setErrorWithDialog]);
 
+  const handleOpenWorktree = useCallback((worktreePath: string) => {
+    onOpenRepository?.(worktreePath);
+  }, [onOpenRepository]);
+
+  const handleAddWorktree = useCallback(() => {
+    showCreateWorktreeDialog();
+  }, [showCreateWorktreeDialog]);
+
+  const handleCreateWorktree = useCallback(async (params: CreateWorktreeParams) => {
+    hideCreateWorktreeDialog();
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git worktree add ${params.worktreePath}`);
+      await gitAdapter.addWorktree(params.worktreePath, params.ref, {
+        newBranch: params.newBranch,
+        startPoint: params.startPoint,
+        force: params.force,
+      });
+      // A new branch may have been created and the worktree list changed.
+      await Promise.all([loadRepoData(true), refreshWorktrees()]);
+      // Open the freshly created worktree as its own tab.
+      onOpenRepository?.(params.worktreePath);
+    } catch (error) {
+      console.error('Error creating worktree:', error);
+      setErrorWithDialog(`Failed to create worktree: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hideCreateWorktreeDialog, loadRepoData, refreshWorktrees, onOpenRepository, setErrorWithDialog]);
+
+  const handleWorktreeAction = useCallback(async (action: string, worktree: WorktreeInfo) => {
+    if (!gitAdapter)
+      return;
+
+    switch (action) {
+      case 'open':
+        onOpenRepository?.(worktree.path);
+        break;
+      case 'reveal':
+        ipcRenderer.invoke('show-item-in-folder', worktree.path);
+        break;
+      case 'copy-path':
+        navigator.clipboard.writeText(worktree.path);
+        break;
+      case 'lock':
+        try {
+          setIsBusy(true);
+          setBusyMessage(`git worktree lock ${worktree.path}`);
+          await gitAdapter.lockWorktree(worktree.path);
+          await refreshWorktrees();
+        } catch (error) {
+          setErrorWithDialog(`Failed to lock worktree: ${(error as Error).message}`);
+        } finally {
+          setIsBusy(false);
+          setBusyMessage('');
+        }
+        break;
+      case 'unlock':
+        try {
+          setIsBusy(true);
+          setBusyMessage(`git worktree unlock ${worktree.path}`);
+          await gitAdapter.unlockWorktree(worktree.path);
+          await refreshWorktrees();
+        } catch (error) {
+          setErrorWithDialog(`Failed to unlock worktree: ${(error as Error).message}`);
+        } finally {
+          setIsBusy(false);
+          setBusyMessage('');
+        }
+        break;
+      case 'prune':
+        try {
+          setIsBusy(true);
+          setBusyMessage('git worktree prune');
+          await gitAdapter.pruneWorktrees();
+          await refreshWorktrees();
+        } catch (error) {
+          setErrorWithDialog(`Failed to prune worktrees: ${(error as Error).message}`);
+        } finally {
+          setIsBusy(false);
+          setBusyMessage('');
+        }
+        break;
+      case 'move': {
+        const result = await ipcRenderer.invoke('show-open-dialog', {
+          properties: ['openDirectory', 'createDirectory'],
+          title: 'Move Worktree To (parent folder)',
+        });
+        if (result.canceled || !result.filePaths || result.filePaths.length === 0)
+          return;
+        const parent = result.filePaths[0].replace(/[\\/]+$/, '');
+        const sep = parent.includes('\\') ? '\\' : '/';
+        const base = worktree.path.split(/[\\/]/).filter(Boolean).pop() || 'worktree';
+        const newPath = `${parent}${sep}${base}`;
+        try {
+          setIsBusy(true);
+          setBusyMessage(`git worktree move ${worktree.path} ${newPath}`);
+          await gitAdapter.moveWorktree(worktree.path, newPath);
+          await refreshWorktrees();
+        } catch (error) {
+          setErrorWithDialog(`Failed to move worktree: ${(error as Error).message}`);
+        } finally {
+          setIsBusy(false);
+          setBusyMessage('');
+        }
+        break;
+      }
+      case 'remove': {
+        const confirmed = await showConfirm(
+          `Remove the worktree at:\n${worktree.path}\n\nThe branch and its commits are kept; only this working directory is removed.`,
+          'Remove Worktree'
+        );
+        if (!confirmed)
+          return;
+        try {
+          setIsBusy(true);
+          setBusyMessage(`git worktree remove ${worktree.path}`);
+          await gitAdapter.removeWorktree(worktree.path, false);
+          await refreshWorktrees();
+        } catch (error) {
+          // A worktree with uncommitted changes or a lock can't be removed without --force.
+          const forceConfirmed = await showConfirm(
+            `Could not remove the worktree:\n${(error as Error).message}\n\nForce removal? Uncommitted changes in that worktree will be lost.`,
+            'Force Remove Worktree'
+          );
+          if (forceConfirmed) {
+            try {
+              setBusyMessage(`git worktree remove --force ${worktree.path}`);
+              await gitAdapter.removeWorktree(worktree.path, true);
+              await refreshWorktrees();
+            } catch (forceError) {
+              setErrorWithDialog(`Failed to remove worktree: ${(forceError as Error).message}`);
+            }
+          }
+        } finally {
+          setIsBusy(false);
+          setBusyMessage('');
+        }
+        break;
+      }
+    }
+  }, [gitAdapter, onOpenRepository, refreshWorktrees, showConfirm, setErrorWithDialog]);
+
   const handleCommitContextMenu = useCallback(async (action: string, commit: Commit, _currentBranch: string, tagName?: string) => {
     if (!gitAdapter) 
       return;
@@ -1669,6 +1827,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                   onRemoteAdded={() => loadRepoData(true)}
                   gitAdapter={gitAdapter}
                   lockedPatterns={getSetting('lockedBranchPatterns')}
+                  worktrees={worktrees}
+                  onOpenWorktree={handleOpenWorktree}
+                  onAddWorktree={handleAddWorktree}
+                  onWorktreeAction={handleWorktreeAction}
                 />
               </div>
             </div>
@@ -1847,6 +2009,16 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           message={`Are you sure you want to checkout commit "${pendingState.commitToCheckout?.substring(0, 7)}"? This will put you in a detached HEAD state.`}
           onConfirm={handleCheckoutCommit}
           onCancel={hideCheckoutCommitDialog}
+        />
+      )}
+      {dialogStates.showCreateWorktreeDialog && (
+        <CreateWorktreeDialog
+          onClose={hideCreateWorktreeDialog}
+          onCreate={handleCreateWorktree}
+          branches={branches}
+          currentBranch={currentBranch}
+          repoPath={repoPath}
+          prefillBranch={pendingState.worktreePrefillBranch}
         />
       )}
     </div>

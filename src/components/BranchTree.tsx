@@ -301,6 +301,9 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               <div className="context-menu-item" onClick={() => handleMenuAction('new-branch')}>
                 New Branch...
               </div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('new-worktree')}>
+                Check out in new worktree...
+              </div>
               <div className="context-menu-item" onClick={() => handleMenuAction('new-tag')}>
                 New Tag...
               </div>

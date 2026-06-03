@@ -425,6 +425,7 @@ function App(): React.ReactElement {
                   isActiveTab={tab.id === activeTabId}
                   onTabStatusChange={tabStatusHandlers[tab.id]}
                   refreshSignal={refreshSignal[tab.path] || 0}
+                  onOpenRepository={openRepository}
                 />
               </div>
             ))}
