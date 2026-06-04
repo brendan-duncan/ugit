@@ -562,9 +562,11 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                   return;
                 try {
                   setIsBusy(true);
-                  if (onBusyMessageChange) onBusyMessageChange(`git add (${unstagedFiles.length} files)`);
-                  const allPaths = unstagedFiles.map(f => f.path);
-                  await gitAdapter.add(allPaths);
+                  if (onBusyMessageChange) onBusyMessageChange(`git add -A (${unstagedFiles.length} files)`);
+                  // Stage everything in one `git add -A` rather than passing every
+                  // path on the command line — staging thousands of files otherwise
+                  // overflows the command-line length limit and hangs.
+                  await gitAdapter.addAll();
                   console.log(`Staged ${unstagedFiles.length} files`);
                   if (onRefresh) await onRefresh();
                 } catch (error) {
@@ -598,8 +600,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                 try {
                   setIsBusy(true);
                   if (onBusyMessageChange) onBusyMessageChange(`git reset (${stagedFiles.length} files)`);
-                  const allPaths = stagedFiles.map(f => f.path);
-                  await gitAdapter.reset(allPaths);
+                  // Unstage everything in one `git reset` rather than enumerating paths.
+                  await gitAdapter.resetAll();
                   console.log(`Unstaged ${stagedFiles.length} files`);
                   if (onRefresh) await onRefresh();
                 } catch (error) {
