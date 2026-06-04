@@ -424,15 +424,69 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
+  // Split a list of file paths into batches that stay under the command-line
+  // length limit (Windows CreateProcess caps the command line at ~32KB; we keep
+  // a conservative ~6000-char budget to leave room for the git command and repo
+  // path). Passing thousands of paths in a single invocation would otherwise
+  // overflow the limit and the spawn can hang or fail instead of staging.
+  private _batchFilesByLength(files: string[], maxLength: number = 6000): string[][] {
+    const batches: string[][] = [];
+    let currentBatch: string[] = [];
+    let currentLength = 0;
+
+    for (const file of files) {
+      // Add quotes and space: "file" + space = file.length + 3
+      const fileLength = file.length + 3;
+
+      if (currentLength + fileLength > maxLength && currentBatch.length > 0) {
+        batches.push(currentBatch);
+        currentBatch = [file];
+        currentLength = fileLength;
+      } else {
+        currentBatch.push(file);
+        currentLength += fileLength;
+      }
+    }
+
+    if (currentBatch.length > 0) {
+      batches.push(currentBatch);
+    }
+
+    return batches;
+  }
+
   async add(filePaths: string | string[]): Promise<void> {
     const startTime = performance.now();
     // Support both single string and array of file paths for backward compatibility
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
     const id = this._startCommand(`git add ${paths.length === 1 ? paths[0] : paths.length + ' files'}`, startTime);
     try {
-      await this.git.add(paths);
+      // Stage in batches so a huge selection (thousands of files) doesn't blow
+      // past the command-line length limit. `git add` accepts a `--` separator so
+      // paths that look like options are still treated as pathspecs.
+      const batches = this._batchFilesByLength(paths);
+      for (const batch of batches) {
+        await this.git.add(['--', ...batch]);
+      }
     } catch (error) {
       console.error('Error staging files:', error);
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+  }
+
+  // Stage every change in the working tree in a single `git add -A`. Far faster
+  // than enumerating thousands of individual paths and the right call for the
+  // "stage all" action.
+  async addAll(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git add -A', startTime);
+    try {
+      await this.git.raw(['add', '-A']);
+    } catch (error) {
+      console.error('Error staging all files:', error);
+      this._endCommand(id, startTime);
       throw error;
     }
     this._endCommand(id, startTime);
@@ -444,9 +498,25 @@ export class SimpleGitAdapter extends GitAdapter {
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
     const id = this._startCommand(`git reset HEAD ${paths.length === 1 ? paths[0] : paths.length + ' files'}`, startTime);
     try {
-      await this.git.reset(['HEAD', ...paths]);
+      const batches = this._batchFilesByLength(paths);
+      for (const batch of batches) {
+        await this.git.reset(['HEAD', '--', ...batch]);
+      }
     } catch (error) {
       console.error('Error unstaging files:', error);
+    }
+    this._endCommand(id, startTime);
+  }
+
+  // Unstage everything with a single `git reset` (mixed reset to HEAD). The right
+  // call for the "unstage all" action; avoids enumerating thousands of paths.
+  async resetAll(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git reset', startTime);
+    try {
+      await this.git.reset(['HEAD']);
+    } catch (error) {
+      console.error('Error unstaging all files:', error);
     }
     this._endCommand(id, startTime);
   }
@@ -639,34 +709,7 @@ export class SimpleGitAdapter extends GitAdapter {
       }
     }
 
-    // Helper to batch files based on command line length
-    // Windows safe limit is ~6000 characters to leave room for command and repo path
-    const batchFilesByLength = (files: string[], maxLength: number = 6000): string[][] => {
-      const batches: string[][] = [];
-      let currentBatch: string[] = [];
-      let currentLength = 0;
-
-      for (const file of files) {
-        // Add quotes and space: "file" + space = file.length + 3
-        const fileLength = file.length + 3;
-
-        if (currentLength + fileLength > maxLength && currentBatch.length > 0) {
-          // Start new batch
-          batches.push(currentBatch);
-          currentBatch = [file];
-          currentLength = fileLength;
-        } else {
-          currentBatch.push(file);
-          currentLength += fileLength;
-        }
-      }
-
-      if (currentBatch.length > 0) {
-        batches.push(currentBatch);
-      }
-
-      return batches;
-    };
+    const batchFilesByLength = (files: string[]) => this._batchFilesByLength(files);
 
     // Process new files (delete from filesystem)
     for (const filePath of newFiles) {

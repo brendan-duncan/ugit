@@ -350,10 +350,23 @@ export abstract class GitAdapter {
   abstract add(filePaths: string | string[]): Promise<void>;
 
   /**
+   * Stage every change in the working tree (git add -A). Use for "stage all"
+   * instead of enumerating individual paths — far faster and avoids hitting the
+   * command-line length limit on large working trees.
+   */
+  abstract addAll(): Promise<void>;
+
+  /**
    * Unstage files
    * @param filePaths - Path to file or array of file paths
    */
   abstract reset(filePaths: string | string[]): Promise<void>;
+
+  /**
+   * Unstage everything (git reset). Use for "unstage all" instead of enumerating
+   * individual paths.
+   */
+  abstract resetAll(): Promise<void>;
 
   /**
    * Commit staged changes
