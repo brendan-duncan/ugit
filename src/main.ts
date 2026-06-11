@@ -39,13 +39,17 @@ for (const arg of args) {
 
 // Extract a repository (directory) path passed on the command line. The Windows
 // Explorer context menu launches `ugit.exe "C:\path\to\folder"`, so we scan the
-// arguments for the first one that points at an existing directory. When packaged,
-// argv[0] is the executable; in development, argv is [electron, scriptPath, ...].
+// arguments for the first one that points at an existing directory.
+//
+// We deliberately avoid keying off positional indexes (e.g. app.isPackaged): the
+// `second-instance` event delivers the *other* process's argv, whose layout can
+// differ from this instance's (a packaged app receiving args from an `electron .`
+// launch still has a leading `.` script arg). Requiring an *absolute* directory
+// path cleanly ignores the executable path (a file), the `.` script arg (relative),
+// and any flags, regardless of how either process was launched.
 function getRepoPathFromArgs(argv: string[]): string | null {
-  const startIndex = app.isPackaged ? 1 : 2;
-  for (let i = startIndex; i < argv.length; i++) {
-    const arg = argv[i];
-    if (!arg || arg.startsWith('-')) {
+  for (const arg of argv) {
+    if (!arg || arg.startsWith('-') || !path.isAbsolute(arg)) {
       continue;
     }
     try {

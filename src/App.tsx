@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
@@ -50,6 +50,14 @@ function App(): React.ReactElement {
   const [refreshSignal, setRefreshSignal] = useState<Record<string, number>>({});
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [tabStatus, setTabStatus] = useState<Record<string, TabStatus>>({});
+
+  // Mirror the latest tabs in a ref so async IPC handlers (e.g. an "open-repository"
+  // path passed via "Open with ugit") append to the current tab set instead of a
+  // possibly stale closure that would clobber already-restored tabs.
+  const tabsRef = useRef<Tab[]>(tabs);
+  tabsRef.current = tabs;
+  // Ensures the one-time "renderer-ready" handshake is sent only once.
+  const rendererReadySent = useRef<boolean>(false);
 
   const tabStatusHandlers = useMemo(() => {
     const handlers: Record<string, (status: TabStatus) => void> = {};
@@ -200,22 +208,17 @@ function App(): React.ReactElement {
       // Refresh functionality would go here
     };
 
-    ipcRenderer.on('open-repository', handleOpenRepo);
-    ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
     ipcRenderer.on('refresh-repository', handleRefresh);
     ipcRenderer.on('fetch-repository', handleFetch);
     ipcRenderer.on('pull-repository', handlePull);
     ipcRenderer.on('push-repository', handlePush);
     ipcRenderer.on('save-stash', handleSaveStash);
 
-    // Tell the main process our listeners are ready so it can deliver any
-    // repository path passed on the command line (e.g. "Open with ugit").
-    ipcRenderer.send('renderer-ready');
-
     return () => {
       ipcRenderer.removeListener('init-repository', handleInitRepo);
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
       ipcRenderer.removeListener('show-clone-dialog', handleShowCloneDialog);
+      ipcRenderer.removeListener('show-settings-dialog', handleShowSettingsDialog);
       ipcRenderer.removeListener('refresh-repository', handleRefresh);
       ipcRenderer.removeListener('fetch-repository', handleFetch);
       ipcRenderer.removeListener('pull-repository', handlePull);
@@ -223,6 +226,17 @@ function App(): React.ReactElement {
       ipcRenderer.removeListener('save-stash', handleSaveStash);
     };
   }, [tabs, activeTabId]);
+
+  // Tell the main process our listeners are ready — but only after the saved tabs
+  // have been restored (hasLoadedRecent). This guarantees any command-line repo
+  // (from "Open with ugit") is appended to the restored tabs rather than racing
+  // ahead of them and clobbering the session. Sent exactly once.
+  useEffect(() => {
+    if (hasLoadedRecent && !rendererReadySent.current) {
+      rendererReadySent.current = true;
+      ipcRenderer.send('renderer-ready');
+    }
+  }, [hasLoadedRecent]);
 
   const handleInit = async (remoteName: string, remoteUrl: string, branchName: string) => {
     if (!initRepoPath) {
@@ -251,7 +265,7 @@ function App(): React.ReactElement {
     }
   };
 
-  const openRepository = (repoPath: string) => {
+  const openRepository = useCallback((repoPath: string) => {
     // Check if path exists before opening
     try {
       if (!fs.existsSync(repoPath)) {
@@ -264,27 +278,32 @@ function App(): React.ReactElement {
       return;
     }
 
+    // Read the current tabs from the ref rather than a captured closure so async
+    // callers (command-line "open-repository") never overwrite restored tabs.
+    const currentTabs = tabsRef.current;
+
     // Check if repository is already open
-    const existingTab = tabs.find(tab => tab.path === repoPath);
+    const existingTab = currentTabs.find(tab => tab.path === repoPath);
     if (existingTab) {
       setActiveTabId(existingTab.id);
       return;
     }
 
-    // Create new tab
+    // Create new tab with a collision-proof id (Date.now() alone collides when two
+    // opens happen within the same millisecond, producing duplicate React keys).
     const newTab: Tab = {
-      id: String(Date.now()),
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       path: repoPath,
       name: repoPath.split(/[\\/]/).pop() || repoPath
     };
 
-    setTabs([...tabs, newTab]);
+    setTabs([...currentTabs, newTab]);
     setActiveTabId(newTab.id);
 
     // Add to recent repos and update menu
     const recent = addRecentRepo(repoPath);
     ipcRenderer.send('update-recent-repos', recent);
-  };
+  }, [showAlert]);
 
   const closeTab = (tabId: string) => {
     const newTabs = tabs.filter(tab => tab.id !== tabId);
