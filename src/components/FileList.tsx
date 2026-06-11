@@ -558,17 +558,6 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
             zIndex: 1000
           }}
         >
-          {listType === 'unstaged' && onDiscardAll && (
-            <div
-              className="context-menu-item"
-              onClick={() => {
-                onDiscardAll();
-                setHeaderMenu(null);
-              }}
-            >
-              Discard All...
-            </div>
-          )}
           {onStageAll && (
             <div
               className="context-menu-item"
@@ -579,6 +568,20 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
             >
               {listType === 'unstaged' ? 'Stage All' : 'Unstage All'}
             </div>
+          )}
+          {listType === 'unstaged' && onDiscardAll && (
+            <>
+              <div className="context-menu-separator"></div>
+              <div
+                className="context-menu-item"
+                onClick={() => {
+                  onDiscardAll();
+                  setHeaderMenu(null);
+                }}
+              >
+                Discard All...
+              </div>
+            </>
           )}
         </div>
       )}
