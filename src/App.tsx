@@ -208,6 +208,10 @@ function App(): React.ReactElement {
     ipcRenderer.on('push-repository', handlePush);
     ipcRenderer.on('save-stash', handleSaveStash);
 
+    // Tell the main process our listeners are ready so it can deliver any
+    // repository path passed on the command line (e.g. "Open with ugit").
+    ipcRenderer.send('renderer-ready');
+
     return () => {
       ipcRenderer.removeListener('init-repository', handleInitRepo);
       ipcRenderer.removeListener('open-repository', handleOpenRepo);

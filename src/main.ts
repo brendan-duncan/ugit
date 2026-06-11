@@ -22,6 +22,9 @@ autoUpdater.autoInstallOnAppQuit = true; // Install when app quits
 let mainWindow: Electron.BrowserWindow | null = null;
 let recentRepos: string[] = [];
 let windowStatePath: string;
+// A repository path passed on the command line (e.g. from the Windows Explorer
+// "Open with ugit" context menu) that should be opened once the renderer is ready.
+let pendingOpenPath: string | null = null;
 
 // Parse command-line arguments for git backend selection
 // Usage: npm start -- --git-backend=simple-git
@@ -32,6 +35,28 @@ for (const arg of args) {
     gitBackend = arg.split('=')[1];
     console.log(`Using git backend: ${gitBackend}`);
   }
+}
+
+// Extract a repository (directory) path passed on the command line. The Windows
+// Explorer context menu launches `ugit.exe "C:\path\to\folder"`, so we scan the
+// arguments for the first one that points at an existing directory. When packaged,
+// argv[0] is the executable; in development, argv is [electron, scriptPath, ...].
+function getRepoPathFromArgs(argv: string[]): string | null {
+  const startIndex = app.isPackaged ? 1 : 2;
+  for (let i = startIndex; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg || arg.startsWith('-')) {
+      continue;
+    }
+    try {
+      if (fs.existsSync(arg) && fs.statSync(arg).isDirectory()) {
+        return path.resolve(arg);
+      }
+    } catch {
+      // Ignore unreadable/invalid paths and keep scanning.
+    }
+  }
+  return null;
 }
 
 interface WindowState {
@@ -358,30 +383,56 @@ app.commandLine.appendSwitch('disable-gpu-virtualization');
 app.commandLine.appendSwitch('disable-virtualized-windows');
 app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
 
-app.whenReady().then(() => {
-  // Initialize cache manager with user data path
-  cacheManager.setCacheDir(app.getPath('userData'));
+// Ensure only a single instance runs. When the user invokes "Open with ugit" on a
+// folder while ugit is already running, Windows launches a second process; the lock
+// hands the folder path to the existing instance instead of opening a new window.
+const gotTheLock = app.requestSingleInstanceLock();
 
-  // Initialize settings manager
-  initializeSettings(cacheManager);
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const repoPath = getRepoPathFromArgs(argv);
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      if (repoPath) {
+        mainWindow.webContents.send('open-repository', repoPath);
+      }
+    }
+  });
 
-  // Set window state file path
-  windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
+  app.whenReady().then(() => {
+    // Initialize cache manager with user data path
+    cacheManager.setCacheDir(app.getPath('userData'));
 
-  createWindow();
+    // Initialize settings manager
+    initializeSettings(cacheManager);
 
-  // Check for updates after window is created (only in production)
-  if (!app.isPackaged) {
-    console.log('Running in development mode, skipping update check');
-  } else {
-    // Wait a bit before checking for updates
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch((error) => {
-        console.error('Error checking for updates:', error);
-      });
-    }, 3000);
-  }
-});
+    // Set window state file path
+    windowStatePath = path.join(app.getPath('userData'), 'window-state.json');
+
+    // Capture any folder passed on the command line so it can be opened once the
+    // renderer signals it is ready (see the 'renderer-ready' handler below).
+    pendingOpenPath = getRepoPathFromArgs(process.argv);
+
+    createWindow();
+
+    // Check for updates after window is created (only in production)
+    if (!app.isPackaged) {
+      console.log('Running in development mode, skipping update check');
+    } else {
+      // Wait a bit before checking for updates
+      setTimeout(() => {
+        autoUpdater.checkForUpdates().catch((error) => {
+          console.error('Error checking for updates:', error);
+        });
+      }, 3000);
+    }
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -450,6 +501,15 @@ autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded:', info.version);
   if (mainWindow) {
     mainWindow.webContents.send('update-downloaded', { version: info.version });
+  }
+});
+
+// The renderer signals it has registered its IPC listeners. Flush any repository
+// path that was passed on the command line (e.g. via "Open with ugit").
+ipcMain.on('renderer-ready', () => {
+  if (mainWindow && pendingOpenPath) {
+    mainWindow.webContents.send('open-repository', pendingOpenPath);
+    pendingOpenPath = null;
   }
 });
 
