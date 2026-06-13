@@ -6,13 +6,15 @@ const PARENT_FOLDER_KEY = 'ugit-clone-parent-folder';
 
 interface CloneDialogProps {
   onClose: () => void;
-  onClone: (repoUrl: string, parentFolder: string, repoName: string) => Promise<void>;
+  onClone: (repoUrl: string, parentFolder: string, repoName: string, depth: number) => Promise<void>;
 }
 
 function CloneDialog({ onClose, onClone }: CloneDialogProps) {
   const [repoUrl, setRepoUrl] = useState<string>('');
   const [parentFolder, setParentFolder] = useState<string>('');
   const [repoName, setRepoName] = useState<string>('');
+  const [shallow, setShallow] = useState<boolean>(false);
+  const [depth, setDepth] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
 
   // Load saved parent folder on mount
@@ -135,9 +137,11 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
       return;
     }
 
+    const effectiveDepth = shallow && depth > 0 ? Math.floor(depth) : 0;
+
     setLoading(true);
     try {
-      await onClone(repoUrl.trim(), parentFolder.trim(), repoName.trim());
+      await onClone(repoUrl.trim(), parentFolder.trim(), repoName.trim(), effectiveDepth);
     } finally {
       setLoading(false);
     }
@@ -200,6 +204,34 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
               value={repoName}
               onChange={(e) => setRepoName(e.target.value)}
             />
+          </div>
+
+          <div className="dialog-field" style={{ display: 'block' }}>
+            <label className="dialog-checkbox-label">
+              <input
+                type="checkbox"
+                checked={shallow}
+                onChange={(e) => setShallow(e.target.checked)}
+              />
+              <span>Shallow clone</span>
+            </label>
+            {shallow && (
+              <div className="dialog-field-horizontal" style={{ marginTop: 8 }}>
+                <label htmlFor="clone-depth" style={{ marginBottom: 0 }}>Depth:</label>
+                <input
+                  id="clone-depth"
+                  type="number"
+                  min="1"
+                  max="100000"
+                  className="dialog-input"
+                  value={depth}
+                  onChange={(e) => setDepth(parseInt(e.target.value) || 1)}
+                />
+              </div>
+            )}
+            <small style={{ display: 'block', marginTop: 8, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              Fetch only the most recent commits (--depth). Leave unchecked for a full clone.
+            </small>
           </div>
         </div>
 

@@ -653,7 +653,7 @@ ipcMain.handle('init-repository', async (event: any, options: any) => {
 });
 
 // Clone repository
-ipcMain.handle('clone-repository', async (event: any, repoUrl: string, parentFolder: string, repoName: string) => {
+ipcMain.handle('clone-repository', async (event: any, repoUrl: string, parentFolder: string, repoName: string, cloneId?: string, cloneDepth?: number) => {
   try {
     const targetPath = path.join(parentFolder, repoName);
 
@@ -665,9 +665,22 @@ ipcMain.handle('clone-repository', async (event: any, repoUrl: string, parentFol
     // Create git adapter with temporary path (will be overridden by clone)
     const gitAdapter = await GitFactory.createAdapter(parentFolder, gitBackend);
 
-    // Perform clone
-    console.log(`Cloning ${repoUrl} to ${targetPath}`);
-    await gitAdapter.clone(repoUrl, parentFolder, repoName);
+    // Forward clone progress back to the tab that initiated it (if any), so the
+    // renderer can show progress without blocking the rest of the UI.
+    const onProgress = cloneId
+      ? (progress: any) => {
+          try {
+            event.sender.send('clone-progress', { cloneId, ...progress });
+          } catch (err) {
+            // Window may have been closed mid-clone; ignore.
+          }
+        }
+      : undefined;
+
+    // Perform clone (depth comes from the clone dialog; 0/undefined = full clone).
+    const depth = cloneDepth && cloneDepth > 0 ? cloneDepth : 0;
+    console.log(`Cloning ${repoUrl} to ${targetPath}${depth > 0 ? ` (depth ${depth})` : ''}`);
+    await gitAdapter.clone(repoUrl, parentFolder, repoName, onProgress, depth);
     console.log('Clone completed successfully');
 
     return {

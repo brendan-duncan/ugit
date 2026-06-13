@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
 import CloneDialog from './components/CloneDialog';
+import CloneProgressView from './components/CloneProgressView';
 import InitRepositoryDialog from './components/InitRepositoryDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import UpdateNotification from './components/UpdateNotification';
@@ -18,6 +19,16 @@ interface Tab {
   id: string;
   path: string;
   name: string;
+  // Set while a background clone is populating this tab. When cloning, `path` holds
+  // the intended target path (which may not exist on disk yet) and the tab renders
+  // a progress view instead of a RepositoryView.
+  cloning?: boolean;
+  // Clone parameters retained so a failed clone can be retried in place.
+  cloneUrl?: string;
+  cloneParentFolder?: string;
+  cloneDepth?: number;
+  // Non-null once a background clone has failed.
+  cloneError?: string | null;
 }
 
 interface CloneResult {
@@ -50,6 +61,8 @@ function App(): React.ReactElement {
   const [refreshSignal, setRefreshSignal] = useState<Record<string, number>>({});
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [tabStatus, setTabStatus] = useState<Record<string, TabStatus>>({});
+  // Live clone progress keyed by the cloning tab's id.
+  const [cloneProgress, setCloneProgress] = useState<Record<string, { stage: string; progress: number }>>({});
 
   // Mirror the latest tabs in a ref so async IPC handlers (e.g. an "open-repository"
   // path passed via "Open with ugit") append to the current tab set instead of a
@@ -91,6 +104,28 @@ function App(): React.ReactElement {
       document.body.classList.remove('light-theme');
     }
   }, [settings?.theme]);
+
+  // Receive background clone progress from the main process and route it to the
+  // owning tab by id.
+  useEffect(() => {
+    const handleCloneProgress = (
+      _event: any,
+      data: { cloneId: string; stage: string; progress: number }
+    ) => {
+      if (!data || !data.cloneId) {
+        return;
+      }
+      setCloneProgress(prev => ({
+        ...prev,
+        [data.cloneId]: { stage: data.stage, progress: data.progress },
+      }));
+    };
+
+    ipcRenderer.on('clone-progress', handleCloneProgress);
+    return () => {
+      ipcRenderer.removeListener('clone-progress', handleCloneProgress);
+    };
+  }, []);
 
   // Load recent repos and auto-open on startup
   useEffect(() => {
@@ -333,29 +368,105 @@ function App(): React.ReactElement {
     setTabs(newTabs);
   };
 
-  const handleClone = async (repoUrl: string, parentFolder: string, repoName: string): Promise<void> => {
-    try {
-      const result: CloneResult = await ipcRenderer.invoke('clone-repository', repoUrl, parentFolder, repoName);
+  // Kick off (or retry) a background clone for a specific tab. The clone runs in the
+  // main process; this tab stays interactive and the user can freely switch to other
+  // tabs while it completes. On success the tab becomes a normal RepositoryView; on
+  // failure it shows an error with a Retry action. If the tab has been closed by the
+  // time the clone resolves, the result is ignored (the clone is abandoned).
+  const startClone = useCallback((tabId: string, repoUrl: string, parentFolder: string, repoName: string, depth: number) => {
+    setCloneProgress(prev => {
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+    setTabs(prev => prev.map(tab =>
+      tab.id === tabId ? { ...tab, cloning: true, cloneError: null } : tab
+    ));
 
-      if (result.success && result.path) {
-        // Close dialog and open the cloned repository
-        setShowCloneDialog(false);
-        openRepository(result.path);
-      } else {
-        // Show error message
-        showAlert(`Clone failed: ${result.error}`, 'Error');
-      }
-    } catch (error) {
-      showAlert(`Clone failed: ${(error as Error).message}`, 'Error');
+    ipcRenderer.invoke('clone-repository', repoUrl, parentFolder, repoName, tabId, depth)
+      .then((result: CloneResult) => {
+        setCloneProgress(prev => {
+          const next = { ...prev };
+          delete next[tabId];
+          return next;
+        });
+        if (result.success && result.path) {
+          const clonedPath = result.path;
+          setTabs(prev => prev.map(tab =>
+            tab.id === tabId
+              ? { ...tab, cloning: false, cloneError: null, path: clonedPath }
+              : tab
+          ));
+          // Record the freshly cloned repo so it survives restarts.
+          const recent = addRecentRepo(clonedPath);
+          ipcRenderer.send('update-recent-repos', recent);
+        } else {
+          setTabs(prev => prev.map(tab =>
+            tab.id === tabId
+              ? { ...tab, cloning: false, cloneError: result.error || 'Clone failed' }
+              : tab
+          ));
+        }
+      })
+      .catch((error: unknown) => {
+        setCloneProgress(prev => {
+          const next = { ...prev };
+          delete next[tabId];
+          return next;
+        });
+        setTabs(prev => prev.map(tab =>
+          tab.id === tabId
+            ? { ...tab, cloning: false, cloneError: (error as Error).message }
+            : tab
+        ));
+      });
+  }, []);
+
+  const handleClone = async (repoUrl: string, parentFolder: string, repoName: string, depth: number): Promise<void> => {
+    // Compute the intended target path so the tab can be matched/deduped immediately.
+    // Use the parent folder's own separator so the path matches what the main process
+    // (path.join) produces on this platform.
+    const sep = parentFolder.includes('\\') ? '\\' : '/';
+    const normalizedParent = parentFolder.replace(/[\\/]+$/, '');
+    const targetPath = `${normalizedParent}${sep}${repoName}`;
+
+    // If a tab for this target already exists, just activate it rather than starting
+    // a second clone into the same location.
+    const existingTab = tabsRef.current.find(tab => tab.path === targetPath);
+    if (existingTab) {
+      setActiveTabId(existingTab.id);
+      setShowCloneDialog(false);
+      return;
     }
+
+    const tabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const newTab: Tab = {
+      id: tabId,
+      path: targetPath,
+      name: repoName,
+      cloning: true,
+      cloneUrl: repoUrl,
+      cloneParentFolder: parentFolder,
+      cloneDepth: depth,
+      cloneError: null,
+    };
+
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(tabId);
+    setShowCloneDialog(false);
+
+    startClone(tabId, repoUrl, parentFolder, repoName, depth);
   };
 
   // Save open tabs to recent repos when tabs change
   useEffect(() => {
     if (hasLoadedRecent) {
-      if (tabs.length > 0) {
+      // Exclude tabs that are still cloning (or whose clone failed): their target
+      // path may not exist on disk yet, so they must not pollute the recent list.
+      const persistableTabs = tabs.filter(tab => !tab.cloning && !tab.cloneError);
+      if (persistableTabs.length > 0) {
         // Set recent repos to exactly match current tabs (most recent first), filtering out invalid paths
-        const tabPaths = tabs.map(tab => tab.path).reverse();
+        const tabPaths = persistableTabs.map(tab => tab.path).reverse();
         const validPaths = filterValidRepos(tabPaths);
         const recent = setRecentRepos(validPaths);
         ipcRenderer.send('update-recent-repos', recent);
@@ -371,7 +482,9 @@ function App(): React.ReactElement {
   useEffect(() => {
     if (activeTabId !== null && tabs.length > 0) {
       const activeTab = tabs.find(tab => tab.id === activeTabId);
-      if (activeTab) {
+      // Don't persist a still-cloning/failed tab as the active path — it may not exist
+      // on disk yet and would fail to restore on next launch.
+      if (activeTab && !activeTab.cloning && !activeTab.cloneError) {
         localStorage.setItem(ACTIVE_TAB_KEY, activeTab.path);
       }
     }
@@ -384,6 +497,11 @@ function App(): React.ReactElement {
 
     const checkTabValidity = () => {
       const invalidTabs = tabs.filter(tab => {
+        // A cloning tab's target path may not exist yet, and a failed-clone tab keeps
+        // a Retry affordance — never auto-close either.
+        if (tab.cloning || tab.cloneError) {
+          return false;
+        }
         try {
           return !fs.existsSync(tab.path);
         } catch (error) {
@@ -443,13 +561,28 @@ function App(): React.ReactElement {
                 key={tab.id}
                 style={{ display: tab.id === activeTabId ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}
               >
-                <RepositoryView
-                  repoPath={tab.path}
-                  isActiveTab={tab.id === activeTabId}
-                  onTabStatusChange={tabStatusHandlers[tab.id]}
-                  refreshSignal={refreshSignal[tab.path] || 0}
-                  onOpenRepository={openRepository}
-                />
+                {tab.cloning || tab.cloneError ? (
+                  <CloneProgressView
+                    repoName={tab.name}
+                    repoUrl={tab.cloneUrl || ''}
+                    progress={cloneProgress[tab.id]}
+                    error={tab.cloneError}
+                    onRetry={() => {
+                      if (tab.cloneUrl && tab.cloneParentFolder) {
+                        startClone(tab.id, tab.cloneUrl, tab.cloneParentFolder, tab.name, tab.cloneDepth || 0);
+                      }
+                    }}
+                    onClose={() => closeTab(tab.id)}
+                  />
+                ) : (
+                  <RepositoryView
+                    repoPath={tab.path}
+                    isActiveTab={tab.id === activeTabId}
+                    onTabStatusChange={tabStatusHandlers[tab.id]}
+                    refreshSignal={refreshSignal[tab.path] || 0}
+                    onOpenRepository={openRepository}
+                  />
+                )}
               </div>
             ))}
           </>

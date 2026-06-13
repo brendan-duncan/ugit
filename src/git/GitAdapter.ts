@@ -19,6 +19,16 @@ export interface RenamedFileStatus {
    to: string;
 }
 
+// Progress event emitted while a clone (or other transfer) is in flight.
+export interface CloneProgress {
+  // The git operation, e.g. 'clone', 'receiving', 'resolving'.
+  method: string;
+  // The current stage, e.g. 'receiving objects', 'resolving deltas'.
+  stage: string;
+  // Completion percentage for the current stage (0-100).
+  progress: number;
+}
+
 export interface GitStatus {
   notAdded: string[];
   conflicted: string[];
@@ -475,8 +485,16 @@ export abstract class GitAdapter {
    * @param repoUrl - Repository URL to clone
    * @param parentFolder - Parent directory where repository should be cloned
    * @param repoName - Name of the directory to create
+   * @param onProgress - Optional callback invoked with transfer progress events
+   * @param depth - Optional shallow-clone depth; 0/undefined performs a full clone
    */
-  abstract clone(repoUrl: string, parentFolder: string, repoName: string): Promise<void>;
+  abstract clone(
+    repoUrl: string,
+    parentFolder: string,
+    repoName: string,
+    onProgress?: (progress: CloneProgress) => void,
+    depth?: number
+  ): Promise<void>;
 
   /**
    * Execute raw git command (fallback for operations not in the abstraction)

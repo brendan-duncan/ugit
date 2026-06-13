@@ -10,7 +10,8 @@ import GitAdapter, {
   RebaseStatus,
   SearchQuery,
   SearchLogResult,
-  WorktreeInfo } from './GitAdapter';
+  WorktreeInfo,
+  CloneProgress } from './GitAdapter';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
@@ -1018,18 +1019,35 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
-  async clone(repoUrl: string, parentFolder: string, repoName: string): Promise<void> {
+  async clone(
+    repoUrl: string,
+    parentFolder: string,
+    repoName: string,
+    onProgress?: (progress: CloneProgress) => void,
+    depth?: number
+  ): Promise<void> {
     const startTime = performance.now();
-    const id = this._startCommand(`git clone ${repoUrl} ${parentFolder}/${repoName}`, startTime);
+    // A positive depth performs a shallow clone.
+    const cloneOptions = depth && depth > 0 ? ['--depth', String(Math.floor(depth))] : [];
+    const commandLabel = `git clone ${cloneOptions.join(' ')}${cloneOptions.length ? ' ' : ''}${repoUrl} ${parentFolder}/${repoName}`;
+    const id = this._startCommand(commandLabel, startTime);
     // Clone into specific folder within parent directory
     const localFolder = parentFolder + "/" + repoName;
-    const git = simpleGit();
+    const git = simpleGit({
+      progress: onProgress
+        ? ({ method, stage, progress }) => onProgress({ method, stage, progress })
+        : undefined,
+    });
     try {
-      await git.clone(repoUrl, localFolder);
+      await git.clone(repoUrl, localFolder, cloneOptions);
     } catch (error) {
       console.error(`Error cloning repository from ${repoUrl} to ${localFolder}:`, error);
+      // Rethrow so the caller can surface the failure to the user. Previously this was
+      // swallowed, which made a failed clone falsely report success.
+      throw error;
+    } finally {
+      this._endCommand(id, startTime);
     }
-    this._endCommand(id, startTime);
   }
 
   async raw(args: string[]): Promise<string> {

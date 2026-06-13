@@ -1,3 +1,14 @@
+## [v1.3.0](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 
+
+### New Features
+
+* Cloning a repository now runs in the background in its own tab. Other repository tabs stay usable while a large clone runs, switching tabs no longer interrupts it, and the clone tab shows live progress (with a Retry action if it fails).
+* Added a "Shallow clone" option with a configurable depth to the Clone dialog, applied per clone.
+
+### Bug Fixes
+
+* A failed clone no longer reports success silently.
+
 ## [v1.0.1](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 2, 2026)
 
 * Improve Init New Repository. Assign a branch name and a remote repository during initialization.
