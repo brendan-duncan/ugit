@@ -5,6 +5,8 @@ interface Tab {
   id: string;
   name: string;
   path: string;
+  cloning?: boolean;
+  cloneError?: string | null;
 }
 
 interface TabBarProps {
@@ -82,6 +84,8 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
             onDrop={(e) => handleDrop(e, tab.id)}
             onDragEnd={handleDragEnd}
           >
+            {tab.cloning && <span className="tab-clone-spinner" title="Cloning…">⟳</span>}
+            {tab.cloneError && <span className="tab-clone-error" title={tab.cloneError}>⚠</span>}
             <span className="tab-name" title={tab.path}>{tab.name}</span>
             {status && (status.ahead > 0 || status.behind > 0) && (
               <span className="tab-status">
