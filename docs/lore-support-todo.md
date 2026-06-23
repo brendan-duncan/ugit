@@ -151,6 +151,23 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
   (textarea → BOM-free temp file → `--view`). Live-verified: sparse clone materializes only
   the included paths; read/write round-trips BOM-free.
 
+### History depth + correctness + links/layers + auth — DONE
+- **Correctness**: delete rows (D), move-as-add, binary diff (`parseDiff` binary flag; view
+  shows the binary/empty message). Validated.
+- **History depth**: `revisionInfo` (revision detail via `info --delta`), revision-to-revision
+  diff (`diff --source/--target`), `amend`, `revert`, `cherryPick` — all conflict-capable.
+  Conflict handling generalized to an operation (merge/revert/cherry-pick): `status.merge.
+  operation` + `conflictResolve(op,…)` / `conflictAbort(op)`. Panel: history rows are clickable
+  (revision detail with changed files + per-file rev diff) and have Amend (latest) / Revert /
+  Pick actions; the merge banner is operation-aware.
+- **Links & layers**: `parseLinkList`/`parseLayerList` + `linkAdd`/`linkRemove`/`layerAdd`/
+  `layerRemove`; panel Links/Layers sidebar sections with inline add forms + Remove.
+- **Auth**: `loreAuthInfo` + a token-login form (token-type + token) and identity display in
+  the Lore dialog (browser login too). UNTESTED against a secured server (dev server runs
+  auth-disabled).
+- Validated: 15 new parser assertions + a live run exercising amend/revert/cherry-pick/
+  revisionInfo and link/layer add→list→remove. tsc/webpack/build:main clean.
+
 ### Merge & conflict resolution — DONE
 - Parsers (validated, 14 assertions): `parseMergeResult` + status `Pending merge`/`Changes in
   conflict:` handling (strips the `(M)!` annotation, routes to `status.conflicted`, sets

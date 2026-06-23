@@ -382,6 +382,67 @@ M  f.txt (M)!
 **Conflict markers** written to the file (diff3 style): `<<<<<<< ours` / `||||||| original`
 / `=======` / `>>>>>>> theirs`. `lore diff` shows them as added lines.
 
+## delete / move status rows, binary diff
+
+- Delete: `D f.txt` under `Changes not staged for commit:` (summary `Tracked changes: 1 deleted`).
+- Move (`stage move <from> <to>` after physically moving the file on disk): the new path shows
+  as an **add** (`A sub/`, `A sub/m2.txt`) — no dedicated move/rename row. The stage line
+  reports `… 1 files (… 1 moved)`.
+- Binary diff:
+  ```
+  bin.dat
+  Binary files differ
+  ```
+  → `parseDiff` emits `{ path, binary: true, hunks: '' }`; `normalizeLoreDiffForRenderer` skips
+  it so the view shows the "no textual diff — new or binary file" message.
+
+## revision info --delta (revision detail)
+
+```
+Revision  : 2
+Signature : <hash>
+Parent    : <hash>
+Branch    : <hash>
+Date      : …
+    rev3 binary
+
+M bin.dat
+```
+The trailing `<CODE> <path>` rows are the revision's changed files (`parseRevisionDetail`).
+
+## amend / revert / cherry-pick
+
+- `revision amend <MSG>` → prints a revision block ending `Amend succeeded` (changes the
+  latest commit's MESSAGE only).
+- `revision revert <sig>` and `revision cherry-pick <sig>` behave like a merge: clean →
+  `Committed reverted/cherry-picked repository state N -> <hash>` (auto-commit); conflict →
+  `Files in conflict:` + a `Pending revert`/`Pending cherry-pick` status. Resolve with
+  `revision <revert|cherry-pick> resolve mine|theirs <paths>`, abort with `… abort`.
+  (`parseMergeResult` handles all three; status `Pending <op>` → `status.merge.operation`.)
+
+## link list / layer list (populated)
+
+```
+Link <id>
+  Link path: vendor (node 2)
+  Source path: / (node 0)
+  Branch: main (<hash>)
+  Revision: <hash>
+  Flags: None (0x0)
+```
+`link add <link_path> <link_url> <source_path>`; `link remove <link_path>`.
+```
+Repository                Revision                Paths
+<id>                      <hash>                  / -> overlay
+```
+`layer add <path> <repository> <source_path>`; `layer remove <path> [repository]`.
+
+## auth
+
+`auth info [user-id]` → identity (empty on the auth-disabled dev server). `auth list` →
+stored identities (empty). `login [url] --token-type <eg1|api-key|lore> --token <t>` for
+non-interactive login (UNTESTED against a secured server).
+
 ## OPEN / to investigate
 - Capture `D` (delete), move, and copy rows in status, and the corresponding diff output.
 - Capture `sync` when the local branch is BEHIND (a real pull), and `push` to a protected
