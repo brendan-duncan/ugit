@@ -46,6 +46,11 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [newBranchName, setNewBranchName] = useState('');
   const [editingView, setEditingView] = useState(false);
   const [viewDraft, setViewDraft] = useState('');
+  const [revDetail, setRevDetail] = useState<import('../lore').LoreRevisionDetail | null>(null);
+  const [showAddLink, setShowAddLink] = useState(false);
+  const [linkForm, setLinkForm] = useState({ path: '', url: '', src: '/' });
+  const [showAddLayer, setShowAddLayer] = useState(false);
+  const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/' });
   const [leftWidth, setLeftWidth] = useState<number>(28);
   const draggingSplitter = useRef(false);
 
@@ -97,6 +102,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   }, [refresh, showAlert]);
 
   const onSelectFile = useCallback(async (file: LoreFileChange) => {
+    setRevDetail(null);
     setSelectedPath(file.path);
     setDiffText('');
     setDiffLoading(true);
@@ -108,6 +114,31 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       setDiffLoading(false);
     }
   }, [client, showAlert]);
+
+  const onSelectRevision = useCallback(async (rev: { signature: string }) => {
+    setSelectedPath(null);
+    setRevDetail(null);
+    try {
+      setRevDetail(await client!.revisionInfo(rev.signature));
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Lore revision error');
+    }
+  }, [client, showAlert]);
+
+  // Diff a file as it changed in the detailed revision (revision vs its parent).
+  const onSelectRevFile = useCallback(async (path: string) => {
+    if (!revDetail) return;
+    setSelectedPath(path);
+    setDiffText('');
+    setDiffLoading(true);
+    try {
+      setDiffText(await client!.diffText([path], revDetail.revision.parent, revDetail.revision.signature));
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Lore diff error');
+    } finally {
+      setDiffLoading(false);
+    }
+  }, [client, revDetail, showAlert]);
 
   const doSync = () => runAction(async () => {
     const r = await client!.sync();
@@ -135,6 +166,19 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const doLock = (path: string) => runAction(async () => { await client!.lockAcquire([path]); });
   const doUnlock = (path: string) => runAction(async () => { await client!.lockRelease([path]); });
 
+  const doLinkAdd = () => runAction(async () => {
+    if (!linkForm.path.trim() || !linkForm.url.trim()) throw new Error('Link mount path and repository URL are required');
+    await client!.linkAdd(linkForm.path.trim(), linkForm.url.trim(), linkForm.src.trim() || '/');
+    setLinkForm({ path: '', url: '', src: '/' }); setShowAddLink(false);
+  });
+  const doLinkRemove = (linkPath: string) => runAction(async () => { await client!.linkRemove(linkPath); });
+  const doLayerAdd = () => runAction(async () => {
+    if (!layerForm.path.trim() || !layerForm.repo.trim()) throw new Error('Layer mount path and repository are required');
+    await client!.layerAdd(layerForm.path.trim(), layerForm.repo.trim(), layerForm.src.trim() || '/');
+    setLayerForm({ path: '', repo: '', src: '/' }); setShowAddLayer(false);
+  });
+  const doLayerRemove = (path: string, repo?: string) => runAction(async () => { await client!.layerRemove(path, repo); });
+
   const doSwitchBranch = (name: string) => { if (name !== status?.branch) runAction(async () => { await client!.switchBranch(name); }); };
   const doMerge = (branch: string) => runAction(async () => {
     const r = await client!.mergeStart(branch);
@@ -145,8 +189,23 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       'Lore merge',
     );
   });
-  const doResolve = (path: string, side: 'mine' | 'theirs') => runAction(async () => { await client!.mergeResolve([path], side); });
-  const doMergeAbort = () => runAction(async () => { await client!.mergeAbort(); });
+  const op = status?.merge?.operation ?? 'merge';
+  const doResolve = (path: string, side: 'mine' | 'theirs') => runAction(async () => { await client!.conflictResolve(op, [path], side); });
+  const doMergeAbort = () => runAction(async () => { await client!.conflictAbort(op); });
+  const doRevert = (sig: string) => runAction(async () => {
+    const r = await client!.revert(sig);
+    showAlert(r.committed ? 'Revert committed.' : `Revert stopped with ${r.conflicted.length} conflict(s) — resolve, then commit.`, 'Lore revert');
+  });
+  const doCherryPick = (sig: string) => runAction(async () => {
+    const r = await client!.cherryPick(sig);
+    showAlert(r.committed ? 'Cherry-pick committed.' : `Cherry-pick stopped with ${r.conflicted.length} conflict(s) — resolve, then commit.`, 'Lore cherry-pick');
+  });
+  const doAmend = () => runAction(async () => {
+    const msg = commitMessage.trim();
+    if (!msg) throw new Error('Enter the new commit message in the box, then Amend.');
+    await client!.amend(msg);
+    setCommitMessage('');
+  });
   const doCreateBranch = () => runAction(async () => {
     const name = newBranchName.trim();
     if (!name) throw new Error('Branch name is required');
@@ -355,13 +414,59 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                 )}
               </div>
 
-              {(links.length > 0 || layers.length > 0) && (
-                <div className="lore-sidebar-section">
-                  <div className="lore-section-header"><span>Composition</span></div>
-                  {links.length > 0 && <div className="lore-empty">Links: {links.length}</div>}
-                  {layers.length > 0 && <div className="lore-empty">Layers: {layers.length}</div>}
+              <div className="lore-sidebar-section">
+                <div className="lore-section-header">
+                  <span>Links {links.length ? `(${links.length})` : ''}</span>
+                  {!showAddLink && <button className="lore-mini-btn" disabled={busy} onClick={() => setShowAddLink(true)}>+ Link</button>}
                 </div>
-              )}
+                {showAddLink && (
+                  <div style={{ padding: '4px 10px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <input className="lore-new-branch-input" placeholder="mount path (e.g. vendor)" value={linkForm.path} onChange={(e) => setLinkForm({ ...linkForm, path: e.target.value })} />
+                    <input className="lore-new-branch-input" placeholder="lore://host:port/repo" value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} />
+                    <input className="lore-new-branch-input" placeholder="source path (default /)" value={linkForm.src} onChange={(e) => setLinkForm({ ...linkForm, src: e.target.value })} />
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="lore-mini-btn" disabled={busy} onClick={doLinkAdd}>Add</button>
+                      <button className="lore-mini-btn" onClick={() => setShowAddLink(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {links.map(l => (
+                  <div key={l.id} className="lore-row always-actions" title={`${l.linkPath} ← ${l.sourcePath}${l.revision ? ` @ ${l.revision.slice(0, 8)}` : ''}`}>
+                    <span className="lore-row-name">{l.linkPath} ← {l.sourcePath}</span>
+                    <span className="lore-row-actions">
+                      <button className="lore-mini-btn" disabled={busy} onClick={() => doLinkRemove(l.linkPath)}>Remove</button>
+                    </span>
+                  </div>
+                ))}
+                {!links.length && !showAddLink && <div className="lore-empty">no links</div>}
+              </div>
+
+              <div className="lore-sidebar-section">
+                <div className="lore-section-header">
+                  <span>Layers {layers.length ? `(${layers.length})` : ''}</span>
+                  {!showAddLayer && <button className="lore-mini-btn" disabled={busy} onClick={() => setShowAddLayer(true)}>+ Layer</button>}
+                </div>
+                {showAddLayer && (
+                  <div style={{ padding: '4px 10px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <input className="lore-new-branch-input" placeholder="mount path (e.g. overlay)" value={layerForm.path} onChange={(e) => setLayerForm({ ...layerForm, path: e.target.value })} />
+                    <input className="lore-new-branch-input" placeholder="repository id or name" value={layerForm.repo} onChange={(e) => setLayerForm({ ...layerForm, repo: e.target.value })} />
+                    <input className="lore-new-branch-input" placeholder="source path (default /)" value={layerForm.src} onChange={(e) => setLayerForm({ ...layerForm, src: e.target.value })} />
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="lore-mini-btn" disabled={busy} onClick={doLayerAdd}>Add</button>
+                      <button className="lore-mini-btn" onClick={() => setShowAddLayer(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {layers.map((l, i) => (
+                  <div key={`${l.repository}:${i}`} className="lore-row always-actions" title={`${l.paths} @ ${l.revision.slice(0, 8)}`}>
+                    <span className="lore-row-name">{l.paths}</span>
+                    <span className="lore-row-actions">
+                      <button className="lore-mini-btn" disabled={busy} onClick={() => doLayerRemove(l.paths.split('->').pop()!.trim(), l.repository)}>Remove</button>
+                    </span>
+                  </div>
+                ))}
+                {!layers.length && !showAddLayer && <div className="lore-empty">no layers</div>}
+              </div>
             </div>
 
             <div className="horizontal-splitter-handle" onMouseDown={onSplitterDown}>
@@ -372,12 +477,15 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
             <div className="repo-content-viewer" style={{ width: `${100 - leftWidth}%`, display: 'flex', flexDirection: 'column' }}>
               {status.merge?.inProgress && (
                 <div className="lore-merge-banner">
-                  <span>Merging — incoming <code>{status.merge.incoming?.slice(0, 8)}</code></span>
+                  <span>
+                    {{ merge: 'Merging', revert: 'Reverting', 'cherry-pick': 'Cherry-picking' }[status.merge.operation]}
+                    {status.merge.incoming ? <> — incoming <code>{status.merge.incoming.slice(0, 8)}</code></> : null}
+                  </span>
                   <span>{status.conflicted.length > 0
                     ? `${status.conflicted.length} conflict(s) to resolve`
                     : 'conflicts resolved — Commit to finish'}</span>
                   <span style={{ flex: 1 }} />
-                  <button className="lore-mini-btn" disabled={busy} onClick={doMergeAbort}>Abort merge</button>
+                  <button className="lore-mini-btn" disabled={busy} onClick={doMergeAbort}>Abort {status.merge.operation}</button>
                 </div>
               )}
               <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
@@ -429,21 +537,57 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                 </div>
 
                 <div className="lore-detail-col">
-                  <div className="lore-detail-header">{selectedPath ? `Diff: ${selectedPath}` : 'Diff'}</div>
+                  <div className="lore-detail-header">
+                    {selectedPath ? `Diff: ${selectedPath}`
+                      : revDetail ? `Revision ${revDetail.revision.number}`
+                      : 'Diff'}
+                    {selectedPath && revDetail && (
+                      <button className="lore-mini-btn" style={{ marginLeft: 8 }} onClick={() => setSelectedPath(null)}>← revision</button>
+                    )}
+                  </div>
                   <div className="lore-diff-area">
-                    {!selectedPath ? (
-                      <div className="lore-empty">Select a file to view its diff.</div>
-                    ) : diffLoading ? (
-                      <div className="lore-empty">Loading diff…</div>
+                    {selectedPath ? (
+                      diffLoading ? <div className="lore-empty">Loading diff…</div> : <LoreDiffView diff={diffText} />
+                    ) : revDetail ? (
+                      <div style={{ padding: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                          <div>{revDetail.revision.message}</div>
+                          <div style={{ fontFamily: 'monospace' }}>sig {revDetail.revision.signature.slice(0, 12)}</div>
+                          {revDetail.revision.parent && <div style={{ fontFamily: 'monospace' }}>parent {revDetail.revision.parent.slice(0, 12)}</div>}
+                          <div>{revDetail.revision.date}</div>
+                        </div>
+                        <div className="lore-changes-group-header"><span>Changed files ({revDetail.files.length})</span></div>
+                        {revDetail.files.length ? revDetail.files.map(f => (
+                          <div key={f.path} className="lore-row" onClick={() => onSelectRevFile(f.path)}>
+                            <span className="lore-code" style={{ color: changeColor(f.code) }}>{f.code}</span>
+                            <span className="lore-row-name" title={f.path}>{f.path}</span>
+                          </div>
+                        )) : <div className="lore-empty">no file changes</div>}
+                      </div>
                     ) : (
-                      <LoreDiffView diff={diffText} />
+                      <div className="lore-empty">Select a file to view its diff, or a revision below.</div>
                     )}
                   </div>
                   <div className="lore-history-area">
                     <div className="lore-detail-header">History</div>
-                    {history.length ? history.map(h => (
-                      <div key={h.number} className="lore-history-row">
-                        <span className="lore-history-num">{h.number}</span>{h.message}
+                    {history.length ? history.map((h, idx) => (
+                      <div
+                        key={h.signature}
+                        className={`lore-history-row lore-row ${revDetail?.revision.signature === h.signature ? 'selected' : ''}`}
+                        onClick={() => onSelectRevision(h)}
+                        title="Show revision detail"
+                      >
+                        <span className="lore-history-num">{h.number}</span>
+                        <span className="lore-row-name">{h.message}</span>
+                        <span className="lore-row-actions">
+                          {idx === 0 && (
+                            <button className="lore-mini-btn" disabled={busy || !commitMessage.trim()} onClick={(e) => { e.stopPropagation(); doAmend(); }} title="Amend latest message (type new message in the commit box)">Amend</button>
+                          )}
+                          <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doRevert(h.signature); }} title="Revert this revision">Revert</button>
+                          {idx !== 0 && (
+                            <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doCherryPick(h.signature); }} title="Cherry-pick this revision">Pick</button>
+                          )}
+                        </span>
                       </div>
                     )) : <div className="lore-empty">no revisions</div>}
                   </div>

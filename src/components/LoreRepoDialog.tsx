@@ -3,6 +3,7 @@ import { ipcRenderer } from 'electron';
 import {
   createLoreRepository,
   loreLogin,
+  loreAuthInfo,
   resolveLoreBin,
   isLoreAuthError,
 } from '../lore';
@@ -44,6 +45,17 @@ function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoD
   const [loading, setLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<string[]>([]);
   const [authHint, setAuthHint] = useState<boolean>(false);
+  const [showLogin, setShowLogin] = useState<boolean>(false);
+  const [tokenType, setTokenType] = useState<string>('eg1');
+  const [token, setToken] = useState<string>('');
+  const [identity, setIdentity] = useState<string>('');
+
+  // Best-effort: show the current auth identity (empty when auth is disabled / not signed in).
+  useEffect(() => {
+    let cancelled = false;
+    loreAuthInfo(resolveLoreBin()).then(info => { if (!cancelled) setIdentity(info.trim()); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const savedFolder = localStorage.getItem(PARENT_FOLDER_KEY);
@@ -119,13 +131,18 @@ function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoD
     }
   };
 
-  const doLogin = async () => {
+  const doLogin = async (opts: { token?: string; tokenType?: string } = {}) => {
     setLoading(true);
     setProgress([]);
     try {
+      const bin = resolveLoreBin();
       const base = serverUrl.trim().replace(/\/+$/, '');
-      await loreLogin(resolveLoreBin(), base, {}, (line) => setProgress(prev => [...prev.slice(-200), line]));
+      await loreLogin(bin, base, opts, (line) => setProgress(prev => [...prev.slice(-200), line]));
       setAuthHint(false);
+      setShowLogin(false);
+      setToken('');
+      const info = await loreAuthInfo(bin);
+      setIdentity(info.trim());
     } catch (err) {
       onError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -242,24 +259,57 @@ function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoD
           {authHint && (
             <div className="dialog-field" style={{ display: 'block', color: '#e0a030' }}>
               <small>
-                This looks like an authentication error. Try <strong>Login</strong> to authenticate
+                This looks like an authentication error. Use <strong>Login</strong> to authenticate
                 with the server, then retry. (The local dev server has auth disabled.)
               </small>
             </div>
           )}
+
+          <div className="dialog-field" style={{ display: 'block', borderTop: '1px solid var(--border-color)', paddingTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <small style={{ color: 'var(--text-secondary)' }}>
+                Auth: {identity ? identity.split('\n')[0] : 'not signed in (dev server has auth disabled)'}
+              </small>
+              <span style={{ flex: 1 }} />
+              <button className="dialog-button" onClick={() => setShowLogin(s => !s)} disabled={loading || !serverUrl.trim()}>
+                {showLogin ? 'Hide login' : 'Login…'}
+              </button>
+            </div>
+            {showLogin && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="dialog-field-horizontal">
+                  <select className="dialog-input" value={tokenType} onChange={(e) => setTokenType(e.target.value)} style={{ maxWidth: 130 }}>
+                    <option value="eg1">eg1</option>
+                    <option value="api-key">api-key</option>
+                    <option value="lore">lore</option>
+                  </select>
+                  <input
+                    className="dialog-input"
+                    type="password"
+                    placeholder="token (for non-interactive login)"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="dialog-button" disabled={loading || !token.trim()} onClick={() => doLogin({ token: token.trim(), tokenType })}>
+                    Login with token
+                  </button>
+                  <button className="dialog-button" disabled={loading} onClick={() => doLogin({})} title="Opens a browser to authenticate">
+                    Browser login
+                  </button>
+                </div>
+                <small style={{ color: 'var(--text-secondary)' }}>
+                  Token login is UNTESTED against a secured server (the dev server runs auth-disabled).
+                </small>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="dialog-footer">
           <button className="dialog-button dialog-button-primary" onClick={submit} disabled={!isValid || loading}>
             {loading ? (mode === 'create' ? 'Creating...' : 'Cloning...') : (mode === 'create' ? 'Create' : 'Clone')}
-          </button>
-          <button
-            className="dialog-button"
-            onClick={doLogin}
-            disabled={loading || !serverUrl.trim()}
-            title="Authenticate the CLI with the server (lore login)"
-          >
-            Login
           </button>
           <button className="dialog-button dialog-button-cancel" onClick={onClose}>
             Cancel
