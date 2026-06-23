@@ -243,6 +243,25 @@ a richer sparse `.lore/view` editor, background-tab clone (reuse CloneProgressVi
 commit/refresh into the app toolbar/menu, auth against a secured server + token-login dialog,
 and the still-missing fixtures (delete/move rows, merge/conflict, binary diff).
 
+### Git-panel parity actions — DONE
+Ported the applicable git-panel actions to the Lore panel (context menus + repo "…" menu):
+- **Clipboard**: Copy path / full path (files), Copy signature / info (revisions), Copy branch
+  name, Copy local path / server URL (repo).
+- **Discard** (`reset <paths>`) on unstaged files; **Clean working directory** (delete
+  untracked); **Reset to Server** (`sync --reset`).
+- **Repository maintenance**: Run GC (`repository gc`), List Instances (`repository instance
+  list`).
+- **Branch context menu**: Switch, Merge, Push, **Protect/Unprotect** (`branch protect/
+  unprotect`, server-side — branch must be pushed), **Archive** (`branch archive`, the
+  reversible delete; not the current branch), Copy name.
+- **Revision context menu** (history + graph): Sync to revision (`sync <rev>`), Reset branch to
+  here (`branch reset`), New branch from here (`branch create` + `branch reset`), Cherry-pick,
+  Revert, Amend (latest), Copy signature/info.
+- **Ignore submenu**: file / `*.ext` / folder / custom-pattern (window.prompt).
+- Replaced the remaining per-row buttons (branch Merge, history Amend/Revert/Pick) with the
+  "…"/right-click context menu for a clean, item-only tree.
+- Not ported (N/A to Lore): Git LFS, rebase, multiple remotes, tags, PR/hosting links, stash.
+
 ## Backlog / ideas
 
 - **Stash / shelf (ugit-level).** Lore has NO native stash/shelve (verified, 0.8.3). Note:

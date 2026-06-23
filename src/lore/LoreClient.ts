@@ -249,6 +249,20 @@ export class LoreClient {
     return parseBranchSwitch(stdout);
   }
 
+  /** Reset a branch's local latest pointer to a revision (defaults to the current branch). */
+  async branchReset(revision: string, branch?: string): Promise<void> {
+    const argv = ['branch', 'reset', revision];
+    if (branch) argv.push('--branch', branch);
+    await this.run(argv);
+  }
+
+  /** Protect a branch from direct pushes. */
+  async branchProtect(branch: string): Promise<void> { await this.run(['branch', 'protect', branch]); }
+  /** Remove push protection from a branch. */
+  async branchUnprotect(branch: string): Promise<void> { await this.run(['branch', 'unprotect', branch]); }
+  /** Archive a branch (Lore's reversible "delete"). */
+  async branchArchive(branch: string): Promise<void> { await this.run(['branch', 'archive', branch]); }
+
   /**
    * Merge `branch` INTO the current branch. Auto-commits when there are no conflicts; otherwise
    * stops with a pending merge (resolve conflicts, then commit). `message` sets the merge
@@ -408,9 +422,45 @@ export class LoreClient {
     return parsePushResult((await this.run(argv)).stdout);
   }
 
-  /** Synchronize working state to the latest remote revision (pull-forward or no-op). */
-  async sync(): Promise<LoreSyncResult> {
-    return parseSyncResult((await this.run(['sync'])).stdout);
+  /**
+   * Synchronize working state. With no options, pulls the latest remote revision. Pass
+   * `revision` to sync to a specific revision, and `reset` to discard local modifications
+   * to match the incoming revision (used by "Reset to server").
+   */
+  async sync(opts: { revision?: string; reset?: boolean } = {}): Promise<LoreSyncResult> {
+    const argv = ['sync'];
+    if (opts.revision) argv.push(opts.revision);
+    if (opts.reset) argv.push('--reset');
+    return parseSyncResult((await this.run(argv)).stdout);
+  }
+
+  /** Discard local changes to the given paths (revert to the committed revision). */
+  async discard(paths: string[]): Promise<void> {
+    if (paths.length === 0) return;
+    await this.run(['reset', ...paths]);
+  }
+
+  /** Run a full garbage-collection pass on the local store. */
+  async gc(): Promise<void> { await this.run(['repository', 'gc']); }
+
+  /** List registered instances (working copies) of this repository. Raw text. */
+  async instances(): Promise<string> {
+    return (await this.run(['repository', 'instance', 'list'], { skip: true })).stdout;
+  }
+  /** Prune stale instance entries. */
+  async pruneInstances(): Promise<string> {
+    return (await this.run(['repository', 'instance', 'prune'])).stdout;
+  }
+
+  /** The repository's server URL, read from .lore/config.toml (or null if not found). */
+  serverUrl(): string | null {
+    try {
+      const txt = fs.readFileSync(path.join(this.repoPath, '.lore', 'config.toml'), 'utf8');
+      const m = txt.match(/lore:\/\/[^\s"']+/);
+      return m ? m[0] : null;
+    } catch {
+      return null;
+    }
   }
 
   // --- Lore-native: file locks (Perforce-style exclusive checkout) ---

@@ -9,6 +9,7 @@ interface LoreRevisionGraphProps {
   remoteHead?: string;
   selectedSignature?: string;
   onSelect: (rev: LoreRevision) => void;
+  onContextMenu?: (e: React.MouseEvent, rev: LoreRevision) => void;
 }
 
 const ROW_H = 30;
@@ -23,7 +24,7 @@ const LANE_COLORS = ['#6ea8fe', '#7ee787', '#e0a030', '#c792ea', '#56d4dd', '#f4
  * revision NUMBER on each node and an explicit local-HEAD / remote-HEAD sync boundary — the
  * thing that matters in a centralized system. Layout is computed by the pure computeGraphLayout.
  */
-function LoreRevisionGraph({ revisions, localHead, remoteHead, selectedSignature, onSelect }: LoreRevisionGraphProps) {
+function LoreRevisionGraph({ revisions, localHead, remoteHead, selectedSignature, onSelect, onContextMenu }: LoreRevisionGraphProps) {
   const layout = useMemo(() => computeGraphLayout(revisions), [revisions]);
   const { rows, edges, laneCount } = layout;
 
@@ -65,6 +66,7 @@ function LoreRevisionGraph({ revisions, localHead, remoteHead, selectedSignature
             className={`lore-row ${selectedSignature === r.rev.signature ? 'selected' : ''}`}
             style={{ height: ROW_H, boxSizing: 'border-box' }}
             onClick={() => onSelect(r.rev)}
+            onContextMenu={(e) => onContextMenu?.(e, r.rev)}
             title={`revision ${r.rev.number} · ${r.rev.signature.slice(0, 12)}`}
           >
             <span className="lore-history-num">{r.rev.number}</span>

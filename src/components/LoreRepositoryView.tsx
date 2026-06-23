@@ -10,6 +10,7 @@ import LoreChangeTree from './LoreChangeTree';
 import LoreMediaView from './LoreMediaView';
 import LoreContextMenu, { LoreMenuItem } from './LoreContextMenu';
 import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
+import { clipboard } from 'electron';
 import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
@@ -226,19 +227,27 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     e.preventDefault();
     if (!isDir && !selection.has(path)) { setSelection(new Set([path])); anchorRef.current = path; onSelectFilePath(path); }
     const targets = isDir ? [path] : ((selection.has(path) && selection.size > 1) ? Array.from(selection) : [path]);
+    const ext = path.includes('.') ? path.split('.').pop() : '';
     const items: LoreMenuItem[] = [
       { label: 'Show in File Explorer', onClick: () => showInExplorer(absPath(path)) },
       { label: 'Open in Editor', onClick: () => openInEditor(absPath(path)) },
+      { label: 'Copy Path', onClick: () => clipboard.writeText(path) },
+      { label: 'Copy Full Path', onClick: () => clipboard.writeText(absPath(path)) },
       { separator: true },
     ];
     if (isDir) {
       items.push({ label: 'Ignore folder', onClick: () => doIgnore(path, true) });
     } else {
-      items.push({ label: `${staged ? 'Unstage' : 'Stage'}${targets.length > 1 ? ` (${targets.length})` : ''}`, onClick: () => runAction(async () => { staged ? await client!.unstage(targets) : await client!.stage(targets); }) });
+      const n = targets.length > 1 ? ` (${targets.length})` : '';
+      items.push({ label: `${staged ? 'Unstage' : 'Stage'}${n}`, onClick: () => runAction(async () => { staged ? await client!.unstage(targets) : await client!.stage(targets); }) });
       items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire(targets); }) });
       items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease(targets); }) });
-      items.push({ label: `Ignore${targets.length > 1 ? ` (${targets.length})` : ''}`, onClick: () => runAction(async () => { targets.forEach(p => client!.addToIgnore(p)); }) });
-      if (!staged) items.push({ separator: true }, { label: `Delete${targets.length > 1 ? ` (${targets.length})` : ''}`, danger: true, onClick: () => doDeleteMany(targets) });
+      if (!staged) items.push({ label: `Discard${n}`, onClick: () => runAction(async () => { await client!.discard(targets); }) });
+      items.push({ separator: true });
+      items.push({ label: `Ignore file${n}`, onClick: () => runAction(async () => { targets.forEach(p => client!.addToIgnore(p)); }) });
+      if (ext) items.push({ label: `Ignore *.${ext}`, onClick: () => runAction(async () => { client!.addToIgnore(`*.${ext}`); }) });
+      items.push({ label: 'Ignore custom pattern…', onClick: () => { const p = window.prompt('Ignore pattern (.loreignore):'); if (p && p.trim()) runAction(async () => { client!.addToIgnore(p.trim()); }); } });
+      if (!staged) items.push({ separator: true }, { label: `Delete${n}`, danger: true, onClick: () => doDeleteMany(targets) });
     }
     setMenu({ x: e.clientX, y: e.clientY, items });
   }, [selection, onSelectFilePath, client]);
@@ -246,9 +255,12 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   // Context menu for a Files-tree row.
   const onFileTreeContextMenu = useCallback((e: React.MouseEvent, path: string, isDir: boolean) => {
     e.preventDefault();
+    const ext = path.includes('.') ? path.split('.').pop() : '';
     const items: LoreMenuItem[] = [
       { label: 'Show in File Explorer', onClick: () => showInExplorer(absPath(path)) },
       { label: 'Open in Editor', onClick: () => openInEditor(absPath(path)) },
+      { label: 'Copy Path', onClick: () => clipboard.writeText(path) },
+      { label: 'Copy Full Path', onClick: () => clipboard.writeText(absPath(path)) },
       { separator: true },
     ];
     if (isDir) {
@@ -256,19 +268,82 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     } else {
       items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire([path]); }) });
       items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease([path]); }) });
-      items.push({ label: 'Ignore', onClick: () => doIgnore(path, false) });
+      items.push({ label: 'Ignore file', onClick: () => doIgnore(path, false) });
+      if (ext) items.push({ label: `Ignore *.${ext}`, onClick: () => runAction(async () => { client!.addToIgnore(`*.${ext}`); }) });
+      items.push({ label: 'Ignore custom pattern…', onClick: () => { const p = window.prompt('Ignore pattern (.loreignore):'); if (p && p.trim()) runAction(async () => { client!.addToIgnore(p.trim()); }); } });
     }
     setMenu({ x: e.clientX, y: e.clientY, items });
   }, [client]);
 
+  const doGc = () => runAction(async () => { await client!.gc(); showAlert('Garbage collection complete.', 'Repository GC'); });
+  const doInstances = async () => { const out = await client!.instances(); showAlert(out.trim() || 'No registered instances.', 'Instances'); };
+  const doResetToServer = () => runAction(async () => {
+    const ok = await showConfirm('Reset to server: discard ALL local modifications and sync to the latest remote revision?', 'Reset to server');
+    if (!ok) return;
+    await client!.sync({ reset: true });
+  });
+  const doClean = () => runAction(async () => {
+    const untracked = (status?.unstaged ?? []).filter(f => f.code.toUpperCase().startsWith('A') && !f.path.endsWith('/')).map(f => f.path);
+    if (!untracked.length) { showAlert('No untracked files to clean.', 'Clean working directory'); return; }
+    const ok = await showConfirm(`Delete ${untracked.length} untracked file(s) from the working tree?`, 'Clean working directory');
+    if (!ok) return;
+    untracked.forEach(p => client!.deleteWorkingFile(p));
+  });
+
   // Repository "…" menu.
   const onRepoMenu = (e: React.MouseEvent) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const url = client?.serverUrl();
     setMenu({ x: r.left, y: r.bottom + 2, items: [
       { label: 'Open in File Explorer', onClick: () => showInExplorer(repoPath) },
       { label: 'Open in Editor', onClick: () => openInEditor(repoPath) },
       { label: 'Open in Console', onClick: () => openInConsole(repoPath) },
+      { label: 'Copy Local Path', onClick: () => clipboard.writeText(repoPath) },
+      { label: 'Copy Server URL', disabled: !url, onClick: () => url && clipboard.writeText(url) },
+      { separator: true },
+      { label: 'Run Garbage Collection', onClick: doGc },
+      { label: 'List Instances…', onClick: doInstances },
+      { label: 'Clean Working Directory…', onClick: doClean },
+      { separator: true },
+      { label: 'Reset to Server…', danger: true, onClick: doResetToServer },
     ] });
+  };
+
+  // Branch row context menu.
+  const onBranchMenu = (e: React.MouseEvent, branch: string) => {
+    e.preventDefault();
+    const isCurrent = branch === status?.branch;
+    const items: LoreMenuItem[] = [];
+    if (!isCurrent) items.push(
+      { label: 'Switch to Branch', onClick: () => doSwitchBranch(branch) },
+      { label: `Merge into ${status?.branch}`, onClick: () => doMerge(branch) },
+    );
+    items.push({ label: 'Push', onClick: () => runAction(async () => { await client!.push(branch); }) });
+    items.push({ separator: true });
+    items.push({ label: 'Protect', onClick: () => runAction(async () => { await client!.branchProtect(branch); }) });
+    items.push({ label: 'Unprotect', onClick: () => runAction(async () => { await client!.branchUnprotect(branch); }) });
+    if (!isCurrent) items.push({ label: 'Archive', danger: true, onClick: () => runAction(async () => { await client!.branchArchive(branch); }) });
+    items.push({ separator: true });
+    items.push({ label: 'Copy Branch Name', onClick: () => clipboard.writeText(branch) });
+    setMenu({ x: e.clientX, y: e.clientY, items });
+  };
+
+  // Revision (history / graph) context menu.
+  const onRevisionMenu = (e: React.MouseEvent, rev: { signature: string; number: number; message: string }, isLatest: boolean) => {
+    e.preventDefault();
+    const items: LoreMenuItem[] = [
+      { label: 'Sync to This Revision', onClick: () => runAction(async () => { await client!.sync({ revision: rev.signature }); }) },
+      { label: 'Reset Branch to Here…', danger: true, onClick: () => runAction(async () => { const ok = await showConfirm(`Reset ${status?.branch} to revision ${rev.number}?`, 'Reset branch'); if (ok) await client!.branchReset(rev.signature); }) },
+      { label: 'New Branch from Here…', onClick: () => { const name = window.prompt('New branch name:'); if (name && name.trim()) runAction(async () => { await client!.createBranch(name.trim()); await client!.branchReset(rev.signature, name.trim()); }); } },
+      { separator: true },
+      { label: 'Cherry-pick', onClick: () => doCherryPick(rev.signature) },
+      { label: 'Revert', onClick: () => doRevert(rev.signature) },
+    ];
+    if (isLatest) items.push({ label: 'Amend Message…', onClick: () => { const m = window.prompt('New commit message:', rev.message); if (m && m.trim()) runAction(async () => { await client!.amend(m.trim()); }); } });
+    items.push({ separator: true });
+    items.push({ label: 'Copy Signature', onClick: () => clipboard.writeText(rev.signature) });
+    items.push({ label: 'Copy Info', onClick: () => clipboard.writeText(`revision ${rev.number}\n${rev.signature}\n${rev.message}`) });
+    setMenu({ x: e.clientX, y: e.clientY, items });
   };
 
   const onSelectRevision = useCallback(async (rev: { signature: string }) => {
@@ -443,12 +518,6 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     const r = await client!.cherryPick(sig);
     showAlert(r.committed ? 'Cherry-pick committed.' : `Cherry-pick stopped with ${r.conflicted.length} conflict(s) — resolve, then commit.`, 'Lore cherry-pick');
   });
-  const doAmend = () => runAction(async () => {
-    const msg = commitMessage.trim();
-    if (!msg) throw new Error('Enter the new commit message in the box, then Amend.');
-    await client!.amend(msg);
-    setCommitMessage('');
-  });
   const doCreateBranch = () => runAction(async () => {
     const name = newBranchName.trim();
     if (!name) throw new Error('Branch name is required');
@@ -585,21 +654,12 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     key={b.name}
                     className={`lore-row ${b.name === status.branch ? 'current' : ''}`}
                     onClick={() => doSwitchBranch(b.name)}
+                    onContextMenu={(e) => onBranchMenu(e, b.name)}
                     title={b.name === status.branch ? 'Current branch' : 'Switch to this branch'}
                   >
                     <span className="lore-row-name">{b.name}</span>
-                    {b.name !== status.branch && !status.merge?.inProgress && (
-                      <span className="lore-row-actions">
-                        <button
-                          className="lore-mini-btn"
-                          disabled={busy}
-                          onClick={(e) => { e.stopPropagation(); doMerge(b.name); }}
-                          title={`Merge ${b.name} into ${status.branch}`}
-                        >
-                          Merge
-                        </button>
-                      </span>
-                    )}
+                    <button className="lore-row-menu" disabled={busy} title="Branch actions"
+                      onClick={(e) => { e.stopPropagation(); onBranchMenu(e, b.name); }}>⋯</button>
                   </div>
                 ))}
                 {!branches?.local.length && <div className="lore-empty">no branches</div>}
@@ -737,6 +797,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       remoteHead={status.remote.signature}
                       selectedSignature={revDetail?.revision.signature}
                       onSelect={(rev) => { onSelectRevision(rev); }}
+                      onContextMenu={(e, rev) => onRevisionMenu(e, rev, rev.signature === status.local.signature)}
                     />
                   </div>
                 </div>
@@ -919,19 +980,13 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                         key={h.signature}
                         className={`lore-history-row lore-row ${revDetail?.revision.signature === h.signature ? 'selected' : ''}`}
                         onClick={() => onSelectRevision(h)}
+                        onContextMenu={(e) => onRevisionMenu(e, h, idx === 0)}
                         title="Show revision detail"
                       >
                         <span className="lore-history-num">{h.number}</span>
                         <span className="lore-row-name">{h.message}</span>
-                        <span className="lore-row-actions">
-                          {idx === 0 && (
-                            <button className="lore-mini-btn" disabled={busy || !commitMessage.trim()} onClick={(e) => { e.stopPropagation(); doAmend(); }} title="Amend latest message (type new message in the commit box)">Amend</button>
-                          )}
-                          <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doRevert(h.signature); }} title="Revert this revision">Revert</button>
-                          {idx !== 0 && (
-                            <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doCherryPick(h.signature); }} title="Cherry-pick this revision">Pick</button>
-                          )}
-                        </span>
+                        <button className="lore-row-menu" disabled={busy} title="Revision actions"
+                          onClick={(e) => { e.stopPropagation(); onRevisionMenu(e, h, idx === 0); }}>⋯</button>
                       </div>
                     )) : <div className="lore-empty">no revisions</div>}
                   </div>
