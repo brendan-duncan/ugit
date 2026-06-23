@@ -468,6 +468,33 @@ exactly this (compose file → `<op> resolve <path>`).
   parent is the NEXT (older) entry in sequence (no `Parent :` lines). `parseHistory` therefore
   reconstructs `parents = [sequential-next, …merge]`. (This is what the revision graph needs.)
 
+## repository tree / file info / file history (Lore-centric views)
+
+`repository dump` (full tree; `--path`/`--max-depth` to scope):
+```
+Repository <id>
+Revision <hash>
+Revision  : 2
+Tree: hash <hash> size 24
+src/ id 3 parent 0 sibling 2 mode 00 size 12 flags 0 child 5
+src/util.txt id 5 parent 3 sibling 4 mode 00 size 6 flags 1 addr <addr>
+...
+```
+Per entry: `<path> id N parent N sibling N mode M size <bytes> flags <0=dir|1=file> [child N|addr]`.
+`parseTreeDump` keeps path/size/isDir.
+
+`file info <path>`:
+```
+Path:    src/main.txt
+Type:    file
+Size:    6
+Hash:    <hash>
+Status:  -
+```
+
+`file history <path>` (per-asset timeline): a change-code line (`M` / `A src/main.txt`) then a
+revision block (Revision/Signature/Address/Branch/Date/message), newest first.
+
 ## OPEN / to investigate
 - Capture `D` (delete), move, and copy rows in status, and the corresponding diff output.
 - Capture `sync` when the local branch is BEHIND (a real pull), and `push` to a protected

@@ -168,6 +168,21 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
 - Validated: 15 new parser assertions + a live run exercising amend/revert/cherry-pick/
   revisionInfo and link/layer add→list→remove. tsc/webpack/build:main clean.
 
+### Lore-centric reframe (phase 1) — DONE
+Shed git metaphors while keeping the chrome/polish:
+- **Sync gauge** in the toolbar: `local rev ⇄ remote rev` colored by sync state — foregrounds
+  the centralized system's heartbeat.
+- **Repository tree** (toolbar **Files** toggle): the working set as a sparse view of the repo
+  (`repository dump`) — nested tree with file **sizes**, inline **lock owners**, and dirty/
+  staged/conflict **status markers** on rows. Perforce-style depot/workspace tree, not a git
+  changed-files list.
+- **Per-file (asset) history**: selecting a tree file shows `file info` (size/hash/status), its
+  `file history` timeline (click a revision → that revision's diff of the file), and the diff.
+- Parsers: `parseTreeDump`/`parseFileInfo`/`parseFileHistory` (+ client `tree`/`fileInfo`/
+  `fileHistory`). Validated: 15 parser assertions + live tree/info/history.
+- Next phases: lazy tree expansion via `--path`/`--max-depth` for huge repos; binary asset
+  previews/thumbnails; make the tree the default view.
+
 ### Interactive merge resolver + revision graph — DONE
 - **Interactive 3-way resolver** (`LoreMergeResolver`): parses Lore's diff3 markers
   (`conflictParser`: ours/base/theirs), per-conflict choice (ours/theirs/both/base) + manual

@@ -5,6 +5,8 @@ import { LoreFileChange } from '../lore';
 import LoreDiffView from './LoreDiffView';
 import LoreMergeResolver from './LoreMergeResolver';
 import LoreRevisionGraph from './LoreRevisionGraph';
+import LoreRepositoryTree from './LoreRepositoryTree';
+import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
 
@@ -32,7 +34,7 @@ function changeColor(code: string): string {
  */
 function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: LoreRepositoryViewProps) {
   const { showAlert } = useAlert();
-  const { client, status, history, branches, locks, links, layers, graph, view, isLoading, error, commandState, refresh } = useLore({
+  const { client, status, history, branches, locks, links, layers, graph, tree, view, isLoading, error, commandState, refresh } = useLore({
     repoPath,
     onError: (err) => showAlert(err.message, 'Lore error'),
   });
@@ -55,6 +57,16 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/' });
   const [resolvingPath, setResolvingPath] = useState<string | null>(null);
   const [showGraph, setShowGraph] = useState(false);
+  const [showTree, setShowTree] = useState(false);
+  const [treeFile, setTreeFile] = useState<LoreTreeNode | null>(null);
+  const [fileInfo, setFileInfo] = useState<LoreFileInfo | null>(null);
+  const [fileHist, setFileHist] = useState<LoreFileHistoryEntry[]>([]);
+
+  const lockOwners = new Map(locks.map(l => [l.path, l.owner]));
+  const statusByPath = new Map<string, string>();
+  status?.unstaged.forEach(f => statusByPath.set(f.path, f.code));
+  status?.staged.forEach(f => statusByPath.set(f.path, f.code));
+  status?.conflicted.forEach(f => statusByPath.set(f.path, '!'));
   const [leftWidth, setLeftWidth] = useState<number>(28);
   const draggingSplitter = useRef(false);
 
@@ -128,6 +140,46 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       showAlert(err instanceof Error ? err.message : String(err), 'Lore revision error');
     }
   }, [client, showAlert]);
+
+  const onSelectTreeFile = useCallback(async (node: LoreTreeNode) => {
+    setTreeFile(node);
+    setSelectedPath(node.path);
+    setRevDetail(null);
+    setDiffText('');
+    setFileInfo(null);
+    setFileHist([]);
+    setDiffLoading(true);
+    try {
+      const [info, hist, diff] = await Promise.all([
+        client!.fileInfo(node.path),
+        client!.fileHistory(node.path),
+        client!.diffText([node.path]),
+      ]);
+      setFileInfo(info);
+      setFileHist(hist);
+      setDiffText(diff);
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Lore file error');
+    } finally {
+      setDiffLoading(false);
+    }
+  }, [client, showAlert]);
+
+  // Diff a file at a specific point in its history (revision vs the previous one).
+  const onSelectFileHistory = useCallback(async (idx: number) => {
+    if (!treeFile) return;
+    const cur = fileHist[idx];
+    const prev = fileHist[idx + 1];
+    setSelectedPath(treeFile.path);
+    setDiffLoading(true);
+    try {
+      setDiffText(await client!.diffText([treeFile.path], prev?.signature, cur.signature));
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Lore diff error');
+    } finally {
+      setDiffLoading(false);
+    }
+  }, [client, treeFile, fileHist, showAlert]);
 
   // Diff a file as it changed in the detailed revision (revision vs its parent).
   const onSelectRevFile = useCallback(async (path: string) => {
@@ -301,11 +353,23 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           <span className="toolbar-button-icon">🌿</span>
           <span className="toolbar-button-label">Branch</span>
         </button>
-        <button className={`toolbar-button ${showGraph ? 'active' : ''}`} onClick={() => setShowGraph(g => !g)}>
+        <button className={`toolbar-button ${showTree ? 'active' : ''}`} onClick={() => { setShowTree(t => !t); setShowGraph(false); }}>
+          <span className="toolbar-button-icon">🗂</span>
+          <span className="toolbar-button-label">Files</span>
+        </button>
+        <button className={`toolbar-button ${showGraph ? 'active' : ''}`} onClick={() => { setShowGraph(g => !g); setShowTree(false); }}>
           <span className="toolbar-button-icon">🕸</span>
           <span className="toolbar-button-label">Graph</span>
         </button>
         <div className="toolbar-separator" />
+        {status && (
+          <div className={`lore-sync-gauge ${status.syncState}`} title={`local revision ${status.local.number}, remote revision ${status.remote.number} (${status.syncState})`}>
+            <span className="lore-sync-num">{status.local.number}</span>
+            <span className="lore-sync-arrow">{ahead > 0 && behind > 0 ? '⇄' : ahead > 0 ? '↑' : behind > 0 ? '↓' : '='}</span>
+            <span className="lore-sync-num">{status.remote.number}</span>
+            <span className="lore-sync-state">{status.syncState}</span>
+          </div>
+        )}
         {commandState.length > 0 &&
           <div className="toolbar-status"><span className="toolbar-busy-spinner" title={lastCommand}>↻</span></div>}
       </div>
@@ -511,6 +575,46 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       selectedSignature={revDetail?.revision.signature}
                       onSelect={(rev) => { onSelectRevision(rev); }}
                     />
+                  </div>
+                </div>
+              ) : showTree ? (
+                <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
+                  <div className="lore-changes-col" style={{ width: '50%' }}>
+                    <div className="lore-changes-group-header"><span>Repository tree ({tree.length})</span></div>
+                    <div className="lore-changes-scroll">
+                      <LoreRepositoryTree
+                        nodes={tree}
+                        lockOwners={lockOwners}
+                        statusByPath={statusByPath}
+                        selectedPath={treeFile?.path ?? null}
+                        onSelect={onSelectTreeFile}
+                      />
+                    </div>
+                  </div>
+                  <div className="lore-detail-col">
+                    <div className="lore-detail-header">{treeFile ? treeFile.path : 'File'}</div>
+                    {treeFile && fileInfo && (
+                      <div className="lore-file-meta">
+                        size <code>{fileInfo.size}</code> · status <code>{fileInfo.status || '-'}</code>
+                        {fileInfo.hash && <> · hash <code>{fileInfo.hash.slice(0, 12)}</code></>}
+                        {lockOwners.has(treeFile.path) && <> · 🔒 <code>{lockOwners.get(treeFile.path)}</code></>}
+                      </div>
+                    )}
+                    <div className="lore-diff-area">
+                      {!treeFile ? <div className="lore-empty">Select a file to see its info, history, and diff.</div>
+                        : diffLoading ? <div className="lore-empty">Loading…</div>
+                        : <LoreDiffView diff={diffText} />}
+                    </div>
+                    <div className="lore-history-area">
+                      <div className="lore-detail-header">File history{treeFile ? `: ${treeFile.name}` : ''}</div>
+                      {fileHist.length ? fileHist.map((h, i) => (
+                        <div key={`${h.signature}:${i}`} className="lore-history-row lore-row" onClick={() => onSelectFileHistory(i)} title="Diff this revision of the file">
+                          <span className="lore-code" style={{ color: changeColor(h.change) }}>{h.change}</span>
+                          <span className="lore-history-num">{h.number}</span>
+                          <span className="lore-row-name">{h.message}</span>
+                        </div>
+                      )) : <div className="lore-empty">{treeFile ? 'no history' : 'select a file'}</div>}
+                    </div>
                   </div>
                 </div>
               ) : (

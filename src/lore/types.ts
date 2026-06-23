@@ -198,6 +198,38 @@ export interface LoreLock {
   date?: string;
 }
 
+/** A node in the repository tree (from `repository dump`). */
+export interface LoreTreeNode {
+  /** Full path relative to repo root (e.g. "src/util.txt"). Dirs keep a trailing slash off. */
+  path: string;
+  /** Basename. */
+  name: string;
+  isDir: boolean;
+  /** Size in bytes (directories report their subtree size). */
+  size: number;
+}
+
+/** File metadata (from `file info`). */
+export interface LoreFileInfo {
+  path: string;
+  type: string;
+  size: number;
+  hash?: string;
+  /** Status char (e.g. '-' clean, 'M', 'A'). */
+  status?: string;
+}
+
+/** One entry in a file's history (from `file history`): how it changed at a revision. */
+export interface LoreFileHistoryEntry {
+  /** Change code for this revision (A/M/D…). */
+  change: string;
+  number: number;
+  signature: string;
+  address?: string;
+  date: string;
+  message: string;
+}
+
 /** Per-conflict resolution choice in the interactive resolver. */
 export type ConflictChoice = 'ours' | 'theirs' | 'both-ot' | 'both-to' | 'base';
 

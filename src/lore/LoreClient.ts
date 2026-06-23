@@ -31,6 +31,9 @@ import {
   parseRevisionDetail,
   parseLinkList,
   parseLayerList,
+  parseTreeDump,
+  parseFileInfo,
+  parseFileHistory,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -47,6 +50,9 @@ import {
   LoreRevisionDetail,
   LoreLink,
   LoreLayer,
+  LoreTreeNode,
+  LoreFileInfo,
+  LoreFileHistoryEntry,
 } from './types';
 
 /** Map an operation to its CLI command prefix for resolve/abort. */
@@ -295,6 +301,26 @@ export class LoreClient {
   /** Move/rename a file (record after the file has been moved on disk). */
   async stageMove(from: string, to: string): Promise<void> {
     await this.run(['stage', 'move', from, to]);
+  }
+
+  // --- Lore-centric: repository tree + per-file (asset) history ---
+
+  /** The repository tree (from `repository dump`). `path`/`maxDepth` scope it for lazy loading. */
+  async tree(path?: string, maxDepth?: number): Promise<LoreTreeNode[]> {
+    const argv = ['repository', 'dump'];
+    if (path) argv.push('--path', path);
+    if (maxDepth != null) argv.push('--max-depth', String(maxDepth));
+    return parseTreeDump((await this.run(argv, { skip: true })).stdout);
+  }
+
+  /** Metadata for a single file/dir (from `file info`). */
+  async fileInfo(path: string): Promise<LoreFileInfo | null> {
+    return parseFileInfo((await this.run(['file', 'info', path], { skip: true })).stdout);
+  }
+
+  /** Revision history of a single file/asset (from `file history`), newest first. */
+  async fileHistory(path: string): Promise<LoreFileHistoryEntry[]> {
+    return parseFileHistory((await this.run(['file', 'history', path], { skip: true })).stdout);
   }
 
   /** Read a working-tree file's text content (relative path). */

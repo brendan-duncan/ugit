@@ -22,6 +22,9 @@ import {
   LoreRevisionDetail,
   LoreLink,
   LoreLayer,
+  LoreTreeNode,
+  LoreFileInfo,
+  LoreFileHistoryEntry,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -305,13 +308,85 @@ export function parseLayerList(text: string): LoreLayer[] {
 }
 
 /**
- * Parse full `lore history` (default) → list of revision blocks (newest first).
- *
- * `history` prints the first-parent chain implicitly via ORDER (each entry's primary parent is
- * the next, older entry) and annotates only the *additional* parent of a merge via a single
- * `Merge : <hash>` line — unlike `revision info`, which lists both parents. So we reconstruct
- * each revision's parents = [sequential-next (primary), …merge parents]. This keeps the graph
- * edges correct.
+ * Parse `lore repository dump` into tree nodes. Each entry line looks like:
+ *   src/util.txt id 5 parent 3 sibling 4 mode 00 size 6 flags 1 addr <hash>
+ *   src/ id 3 parent 0 sibling 2 mode 00 size 12 flags 0 child 5
+ * `flags 0` = directory, `flags 1` = file. Header lines (Repository/Revision/Tree:) are skipped.
+ */
+export function parseTreeDump(text: string): LoreTreeNode[] {
+  const nodes: LoreTreeNode[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+$/, '');
+    if (!line) continue;
+    const m = line.match(/^(\S.*?)\s+id\s+\d+\s+parent\s+\d+\s+sibling\s+\d+\s+mode\s+\S+\s+size\s+(\d+)\s+flags\s+(\d+)\b/);
+    if (!m) continue;
+    let p = m[1];
+    const isDir = m[3] === '0' || p.endsWith('/');
+    if (p.endsWith('/')) p = p.slice(0, -1);
+    nodes.push({ path: p, name: p.split('/').pop() || p, isDir, size: parseInt(m[2], 10) });
+  }
+  return nodes;
+}
+
+/** Parse `lore file info` (Key: value lines) into file metadata. */
+export function parseFileInfo(text: string): LoreFileInfo | null {
+  const get = (key: string) => {
+    const m = text.match(new RegExp(`^${key}\\s*:\\s*(.+)$`, 'mi'));
+    return m ? m[1].trim() : undefined;
+  };
+  const path = get('Path');
+  if (!path) return null;
+  return {
+    path,
+    type: get('Type') ?? '',
+    size: parseInt(get('Size') ?? '0', 10),
+    hash: get('Hash'),
+    status: get('Status'),
+  };
+}
+
+/**
+ * Parse `lore file history` → per-file entries. Each entry is a change-code line (e.g. "M" or
+ * "A src/main.txt") followed by a revision block (Revision/Signature/Address/Branch/Date/msg).
+ */
+export function parseFileHistory(text: string): LoreFileHistoryEntry[] {
+  const lines = text.split(/\r?\n/);
+  const entries: LoreFileHistoryEntry[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    while (i < lines.length && !lines[i].trim()) i++; // skip blanks between entries
+    if (i >= lines.length) break;
+
+    // Optional leading change-code line ("M", "A src/main.txt") — not a "Key: value" field.
+    let change = '?';
+    if (!/^Revision\s*:/.test(lines[i]) && /^[A-Z]/.test(lines[i].trim()) && !/:\s/.test(lines[i])) {
+      change = lines[i].trim().split(/\s+/)[0];
+      i++;
+    }
+    // The revision block runs until the next blank line (the message is indented, not blank).
+    const block: string[] = [];
+    while (i < lines.length && lines[i].trim() !== '') block.push(lines[i++]);
+
+    const rev = parseRevisionBlock(block);
+    if (rev) {
+      const addrLine = block.map(l => l.match(/^Address\s*:\s*(\S+)/)).find(Boolean);
+      entries.push({
+        change,
+        number: rev.number,
+        signature: rev.signature,
+        address: addrLine ? addrLine[1] : undefined,
+        date: rev.date,
+        message: rev.message,
+      });
+    }
+  }
+  return entries;
+}
+
+/**
+ * Parse full `lore history` (default) → revision blocks (newest first). `history` prints the
+ * first-parent chain implicitly via ORDER and annotates only a merge's *additional* parent via
+ * a single `Merge : <hash>` line (unlike `revision info`). So parents = [sequential-next, …merge].
  */
 export function parseHistory(text: string): LoreRevision[] {
   const blocks: string[][] = [];

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LoreClient, resolveLoreBin, LoreStatus, LoreBranches, LoreLock, LoreRevision, LoreLink, LoreLayer } from '../lore';
+import { LoreClient, resolveLoreBin, LoreStatus, LoreBranches, LoreLock, LoreRevision, LoreLink, LoreLayer, LoreTreeNode } from '../lore';
 import { RunningCommand } from '../components/types';
 
 interface UseLoreOptions {
@@ -17,6 +17,8 @@ interface UseLoreResult {
   layers: LoreLayer[];
   /** Revisions unioned across all local branches, for the revision graph. */
   graph: LoreRevision[];
+  /** The repository tree (sparse view), for the file browser. */
+  tree: LoreTreeNode[];
   /** Active sparse view filter (.lore/view), or null for a full checkout. */
   view: string | null;
   isLoading: boolean;
@@ -39,6 +41,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
   const [links, setLinks] = useState<LoreLink[]>([]);
   const [layers, setLayers] = useState<LoreLayer[]>([]);
   const [graph, setGraph] = useState<LoreRevision[]>([]);
+  const [tree, setTree] = useState<LoreTreeNode[]>([]);
   const [view, setView] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +79,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     try {
       setIsLoading(true);
       setError(null);
-      const [st, hist, brs, lks, lnk, lyr, gr, vw] = await Promise.all([
+      const [st, hist, brs, lks, lnk, lyr, gr, tr, vw] = await Promise.all([
         c.status({ scan: true }),
         c.history(),
         c.branchList(),
@@ -84,6 +87,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
         c.links(),
         c.layers(),
         c.graphRevisions(),
+        c.tree(),
         c.readView(),
       ]);
       setStatus(st);
@@ -93,6 +97,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
       setLinks(lnk);
       setLayers(lyr);
       setGraph(gr);
+      setTree(tr);
       setView(vw);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load Lore repository';
@@ -108,5 +113,5 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     if (client) load();
   }, [client, load]);
 
-  return { client, status, history, branches, locks, links, layers, graph, view, isLoading, error, commandState, refresh: load };
+  return { client, status, history, branches, locks, links, layers, graph, tree, view, isLoading, error, commandState, refresh: load };
 }

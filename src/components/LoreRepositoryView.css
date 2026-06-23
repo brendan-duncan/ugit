@@ -239,3 +239,20 @@
   background: var(--bg-tertiary); color: var(--text-secondary);
 }
 .lore-chip.active { background: var(--accent-color); color: var(--text-highlight); }
+
+/* Toolbar sync gauge — the Lore-centric "local rev <-> remote rev" heartbeat. */
+.lore-sync-gauge {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: auto; padding: 2px 12px;
+  border-radius: 12px; background: var(--bg-tertiary);
+  font-size: 12px; white-space: nowrap;
+}
+.lore-sync-num { font-family: monospace; font-weight: 700; }
+.lore-sync-arrow { color: var(--text-secondary); font-weight: 700; }
+.lore-sync-state { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+.lore-sync-gauge.in-sync .lore-sync-arrow, .lore-sync-gauge.in-sync .lore-sync-state { color: var(--success-color); }
+.lore-sync-gauge.ahead .lore-sync-arrow, .lore-sync-gauge.ahead .lore-sync-state,
+.lore-sync-gauge.behind .lore-sync-arrow, .lore-sync-gauge.behind .lore-sync-state,
+.lore-sync-gauge.diverged .lore-sync-arrow, .lore-sync-gauge.diverged .lore-sync-state { color: var(--warning-color); }
+.lore-file-meta { font-size: 12px; color: var(--text-secondary); padding: 6px 10px; }
+.lore-file-meta code { color: var(--text-primary); }
