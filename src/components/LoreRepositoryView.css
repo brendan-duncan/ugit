@@ -256,6 +256,10 @@
 .lore-sync-gauge.diverged .lore-sync-arrow, .lore-sync-gauge.diverged .lore-sync-state { color: var(--warning-color); }
 .lore-file-meta { font-size: 12px; color: var(--text-secondary); padding: 6px 10px; }
 .lore-file-meta code { color: var(--text-primary); }
+.lore-file-content {
+  margin: 0; padding: 8px 10px; font-family: monospace; font-size: 12px;
+  white-space: pre; overflow: auto; color: var(--text-primary); tab-size: 4;
+}
 
 /* Active view-mode toolbar button (Changes / Files / Graph). */
 .toolbar-button.active {

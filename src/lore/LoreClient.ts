@@ -333,6 +333,21 @@ export class LoreClient {
     fs.writeFileSync(path.join(this.repoPath, relPath), content, { encoding: 'utf8' });
   }
 
+  /**
+   * Append a gitignore-style pattern to `.loreignore` (created if needed), deduped and BOM-free.
+   * For a file pass its path; for a folder pass `<path>/`.
+   */
+  addToIgnore(pattern: string): void {
+    const file = path.join(this.repoPath, '.loreignore');
+    let content = '';
+    try { content = fs.readFileSync(file, 'utf8'); } catch { /* no .loreignore yet */ }
+    if (content.charCodeAt(0) === 0xfeff) content = content.slice(1); // strip any BOM
+    if (content.split(/\r?\n/).includes(pattern)) return; // already ignored
+    if (content && !content.endsWith('\n')) content += '\n';
+    content += pattern + '\n';
+    fs.writeFileSync(file, content, { encoding: 'utf8' });
+  }
+
   /** Heuristic: does the file look binary? (a NUL byte in the first 8 KB). */
   isProbablyBinary(relPath: string): boolean {
     try {
@@ -348,6 +363,11 @@ export class LoreClient {
     } catch {
       return false;
     }
+  }
+
+  /** Delete a working-tree file from disk (relative path). */
+  deleteWorkingFile(relPath: string): void {
+    fs.rmSync(path.join(this.repoPath, relPath), { force: true });
   }
 
   /** Read a working-tree file as base64 (for asset/image previews). Null if missing/too big. */

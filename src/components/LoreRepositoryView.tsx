@@ -6,6 +6,7 @@ import LoreDiffView from './LoreDiffView';
 import LoreMergeResolver from './LoreMergeResolver';
 import LoreRevisionGraph from './LoreRevisionGraph';
 import LoreRepositoryTree from './LoreRepositoryTree';
+import LoreChangeTree from './LoreChangeTree';
 import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
@@ -47,7 +48,7 @@ function formatBytes(n: number): string {
  * (toolbar, resizable sidebar, content viewer) so Lore tabs feel consistent with git tabs.
  */
 function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: LoreRepositoryViewProps) {
-  const { showAlert } = useAlert();
+  const { showAlert, showConfirm } = useAlert();
   const { client, status, history, branches, locks, links, layers, graph, tree, view, isLoading, error, commandState, refresh } = useLore({
     repoPath,
     onError: (err) => showAlert(err.message, 'Lore error'),
@@ -77,6 +78,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [fileHist, setFileHist] = useState<LoreFileHistoryEntry[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileBinary, setFileBinary] = useState<boolean>(false);
+  const [fileContent, setFileContent] = useState<string | null>(null);
+  // Files view shows the file content by default; clicking a history revision shows its diff.
+  const [historyDiff, setHistoryDiff] = useState<boolean>(false);
   const [treeNodes, setTreeNodes] = useState<LoreTreeNode[]>([]);
   const [loadedDirs, setLoadedDirs] = useState<Set<string>>(new Set());
 
@@ -138,19 +142,29 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     }
   }, [refresh, showAlert]);
 
-  const onSelectFile = useCallback(async (file: LoreFileChange) => {
+  const onSelectFilePath = useCallback(async (filePath: string) => {
     setRevDetail(null);
-    setSelectedPath(file.path);
+    setSelectedPath(filePath);
     setDiffText('');
     setDiffLoading(true);
     try {
-      setDiffText(await client!.diffText([file.path]));
+      setDiffText(await client!.diffText([filePath]));
     } catch (err) {
       showAlert(err instanceof Error ? err.message : String(err), 'Lore diff error');
     } finally {
       setDiffLoading(false);
     }
   }, [client, showAlert]);
+  const onSelectFile = useCallback((file: LoreFileChange) => onSelectFilePath(file.path), [onSelectFilePath]);
+
+  const doIgnore = (p: string, isDir: boolean) => runAction(async () => { client!.addToIgnore(isDir ? `${p}/` : p); });
+  const stagePath = (p: string) => runAction(async () => { await client!.stage([p]); });
+  const unstagePath = (p: string) => runAction(async () => { await client!.unstage([p]); });
+  const doDelete = (p: string) => runAction(async () => {
+    const ok = await showConfirm(`Delete "${p}" from the working tree? This removes the file from disk.`, 'Delete file');
+    if (!ok) return;
+    client!.deleteWorkingFile(p);
+  });
 
   const onSelectRevision = useCallback(async (rev: { signature: string }) => {
     setSelectedPath(null);
@@ -177,6 +191,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     }
   }, [client, loadedDirs, showAlert]);
 
+  // Files view: show a FULL FILE VIEW (image preview / binary card / text content) plus the
+  // asset's history. Each lookup is best-effort so an untracked (never-committed) file — which
+  // has no `file history` — still opens cleanly instead of erroring.
   const onSelectTreeFile = useCallback(async (node: LoreTreeNode) => {
     setTreeFile(node);
     setSelectedPath(node.path);
@@ -186,29 +203,30 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setFileHist([]);
     setPreviewUrl(null);
     setFileBinary(false);
+    setFileContent(null);
+    setHistoryDiff(false);
     setDiffLoading(true);
     try {
       const mime = imageMime(node.path);
       if (mime) {
         const b64 = client!.readWorkingFileBase64(node.path);
         setPreviewUrl(b64 ? `data:${mime};base64,${b64}` : null);
+      } else if (client!.isProbablyBinary(node.path)) {
+        setFileBinary(true);
       } else {
-        setFileBinary(client!.isProbablyBinary(node.path));
+        try { setFileContent(client!.readWorkingFile(node.path)); } catch { setFileContent(''); }
       }
-      const [info, hist, diff] = await Promise.all([
-        client!.fileInfo(node.path),
-        client!.fileHistory(node.path),
-        mime ? Promise.resolve('') : client!.diffText([node.path]),
+      // Best-effort metadata; ignore failures (e.g. no history for an untracked file).
+      const [info, hist] = await Promise.all([
+        client!.fileInfo(node.path).catch(() => null),
+        client!.fileHistory(node.path).catch(() => []),
       ]);
       setFileInfo(info);
       setFileHist(hist);
-      setDiffText(diff);
-    } catch (err) {
-      showAlert(err instanceof Error ? err.message : String(err), 'Lore file error');
     } finally {
       setDiffLoading(false);
     }
-  }, [client, showAlert]);
+  }, [client]);
 
   // Diff a file at a specific point in its history (revision vs the previous one).
   const onSelectFileHistory = useCallback(async (idx: number) => {
@@ -216,6 +234,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     const cur = fileHist[idx];
     const prev = fileHist[idx + 1];
     setSelectedPath(treeFile.path);
+    setHistoryDiff(true);
     setDiffLoading(true);
     try {
       setDiffText(await client!.diffText([treeFile.path], prev?.signature, cur.signature));
@@ -323,8 +342,6 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   });
 
   const stageAll = () => runAction(async () => { await client!.stage((status?.unstaged ?? []).map(f => f.path)); });
-  const stageOne = (file: LoreFileChange) => runAction(async () => { await client!.stage([file.path]); });
-  const unstageOne = (file: LoreFileChange) => runAction(async () => { await client!.unstage([file.path]); });
   const doCommit = () => runAction(async () => {
     const msg = commitMessage.trim()
       || (status?.merge?.inProgress ? `Merge ${status.merge.incoming?.slice(0, 8) ?? ''}`.trim() : '');
@@ -332,35 +349,6 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     await client!.commit(msg);
     setCommitMessage('');
   });
-
-  const renderFileRow = (file: LoreFileChange, staged: boolean) => (
-    <div
-      key={`${file.section}:${file.path}`}
-      className={`lore-row ${selectedPath === file.path ? 'selected' : ''}`}
-      onClick={() => onSelectFile(file)}
-    >
-      <span className="lore-code" style={{ color: changeColor(file.code) }}>{file.code}</span>
-      {lockedPaths.has(file.path) && <span title="Locked" style={{ color: 'var(--warning-color)' }}>🔒</span>}
-      <span className="lore-row-name" title={file.path}>{file.path}</span>
-      <span className="lore-row-actions">
-        <button
-          className="lore-mini-btn"
-          disabled={working}
-          onClick={(e) => { e.stopPropagation(); lockedPaths.has(file.path) ? doUnlock(file.path) : doLock(file.path); }}
-          title={lockedPaths.has(file.path) ? 'Release lock' : 'Lock for edit'}
-        >
-          {lockedPaths.has(file.path) ? 'Unlock' : 'Lock'}
-        </button>
-        <button
-          className="lore-mini-btn"
-          disabled={working}
-          onClick={(e) => { e.stopPropagation(); staged ? unstageOne(file) : stageOne(file); }}
-        >
-          {staged ? 'Unstage' : 'Stage'}
-        </button>
-      </span>
-    </div>
-  );
 
   if (error && !status) {
     return (
@@ -639,6 +627,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                         onSelect={onSelectTreeFile}
                         loadedDirs={loadedDirs}
                         onExpand={loadDir}
+                        onIgnore={doIgnore}
+                        busy={busy}
                       />
                     </div>
                   </div>
@@ -652,9 +642,16 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       </div>
                     )}
                     <div className="lore-diff-area">
-                      {!treeFile ? <div className="lore-empty">Select a file to see its info, history, and diff.</div>
+                      {!treeFile ? <div className="lore-empty">Select a file to see its content and history.</div>
                         : diffLoading ? <div className="lore-empty">Loading…</div>
-                        : previewUrl ? (
+                        : historyDiff ? (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 4 }}>
+                              <button className="lore-mini-btn" onClick={() => setHistoryDiff(false)}>← file</button>
+                            </div>
+                            <LoreDiffView diff={diffText} />
+                          </>
+                        ) : previewUrl ? (
                           <div style={{ padding: 10, textAlign: 'center' }}>
                             <img src={previewUrl} alt={treeFile.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }} />
                           </div>
@@ -676,7 +673,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                               Content-defined chunking — no text diff. Use the history below to see when it changed.
                             </div>
                           </div>
-                        ) : <LoreDiffView diff={diffText} />}
+                        ) : (
+                          <pre className="lore-file-content">{fileContent ?? ''}</pre>
+                        )}
                     </div>
                     <div className="lore-history-area">
                       <div className="lore-detail-header">File history{treeFile ? `: ${treeFile.name}` : ''}</div>
@@ -718,10 +717,20 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       <span>Changes not staged</span>
                       <button className="lore-mini-btn" onClick={stageAll} disabled={busy || !status.unstaged.length}>Stage all</button>
                     </div>
-                    {status.unstaged.length ? status.unstaged.map(f => renderFileRow(f, false)) : <div className="lore-empty">none</div>}
+                    <LoreChangeTree
+                      changes={status.unstaged} staged={false} busy={busy}
+                      selectedPath={selectedPath} onSelect={onSelectFilePath}
+                      lockedPaths={lockedPaths} onLock={doLock} onUnlock={doUnlock}
+                      onStageToggle={stagePath} onIgnore={doIgnore} onDelete={doDelete}
+                    />
 
                     <div className="lore-changes-group-header"><span>Staged for commit</span></div>
-                    {status.staged.length ? status.staged.map(f => renderFileRow(f, true)) : <div className="lore-empty">none</div>}
+                    <LoreChangeTree
+                      changes={status.staged} staged={true} busy={busy}
+                      selectedPath={selectedPath} onSelect={onSelectFilePath}
+                      lockedPaths={lockedPaths} onLock={doLock} onUnlock={doUnlock}
+                      onStageToggle={unstagePath} onIgnore={doIgnore}
+                    />
                   </div>
                   <div className="lore-commit-box">
                     <textarea
