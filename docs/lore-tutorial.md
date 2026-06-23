@@ -77,7 +77,7 @@ Say you have `D:\games\MyGame` full of source and assets and no version control 
 
 Now teammates can clone `lore://<server>/MyGame` and you're all working against the same repo.
 
-> Large/binary assets (`.uasset`, textures, etc.) are committed like anything else — Lore chunks
+> Large/binary assets (textures, geometry, etc.) are committed like anything else — Lore chunks
 > them content-addressably. You don't need LFS or special config.
 
 ---
