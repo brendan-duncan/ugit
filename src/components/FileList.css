@@ -303,3 +303,16 @@
 .context-menu-submenu-content .context-menu-item {
   justify-content: flex-start;
 }
+
+.file-lfs-badge {
+  margin-left: 6px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.5px;
+  border-radius: 3px;
+  color: #fff;
+  background-color: #6f42c1;
+  flex-shrink: 0;
+}

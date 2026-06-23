@@ -1177,6 +1177,45 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
+  async getLfsTrackPatterns(): Promise<string[]> {
+    try {
+      const attributesPath = path.join(this.repoPath, '.gitattributes');
+      const content = await fs.readFile(attributesPath, 'utf8');
+      const patterns: string[] = [];
+      for (const rawLine of content.split('\n')) {
+        const line = rawLine.trim();
+        // An LFS rule looks like: `*.psd filter=lfs diff=lfs merge=lfs -text`.
+        if (!line || line.startsWith('#') || !/\bfilter=lfs\b/.test(line))
+          continue;
+        // The pattern is the first whitespace-delimited token. It may be quoted
+        // when it contains spaces.
+        const match = line.match(/^"([^"]+)"|^(\S+)/);
+        const pattern = match ? (match[1] ?? match[2]) : null;
+        if (pattern)
+          patterns.push(pattern);
+      }
+      return patterns;
+    } catch (error) {
+      // No .gitattributes (or unreadable) means nothing is tracked.
+      return [];
+    }
+  }
+
+  async getFileSizes(filePaths: string[]): Promise<Record<string, number>> {
+    const sizes: Record<string, number> = {};
+    await Promise.all(filePaths.map(async (relPath) => {
+      try {
+        const absPath = path.join(this.repoPath, relPath);
+        const stat = await fs.stat(absPath);
+        sizes[relPath] = stat.isFile() ? stat.size : 0;
+      } catch (error) {
+        // Deleted or unreadable files contribute no size.
+        sizes[relPath] = 0;
+      }
+    }));
+    return sizes;
+  }
+
   async addToGitignore(pattern: string): Promise<void> {
     const startTime = performance.now();
     const id = this._startCommand('add to .gitignore', startTime);

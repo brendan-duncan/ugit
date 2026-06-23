@@ -16,6 +16,8 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [pushAllTags, setPushAllTags] = useState<boolean>(false);
   const [maxCommits, setMaxCommits] = useState<number>(100);
   const [externalEditor, setExternalEditor] = useState<string>('code');
+  const [lfsWarnEnabled, setLfsWarnEnabled] = useState<boolean>(true);
+  const [lfsWarnThresholdMB, setLfsWarnThresholdMB] = useState<number>(100);
   const [isSaving, setIsSaving] = useState(false);
 
   // Update local state when settings load
@@ -26,6 +28,8 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       setPushAllTags(settings.pushAllTags);
       setMaxCommits(settings.maxCommits);
       setExternalEditor(settings.externalEditor);
+      setLfsWarnEnabled(settings.lfsWarnEnabled);
+      setLfsWarnThresholdMB(settings.lfsWarnThresholdMB);
     }
   }, [settings]);
 
@@ -56,6 +60,8 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       await updateSetting('pushAllTags', pushAllTags);
       await updateSetting('maxCommits', maxCommits);
       await updateSetting('externalEditor', externalEditor);
+      await updateSetting('lfsWarnEnabled', lfsWarnEnabled);
+      await updateSetting('lfsWarnThresholdMB', lfsWarnThresholdMB);
 
       onClose();
     } catch (err) {
@@ -167,6 +173,38 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
                 placeholder="trunk, main, */staging"
               />
               <small>Use * as wildcard, comma-separated (e.g. "trunk, */staging" locks trunk and 6000.0/staging).</small>
+            </div>
+
+            <div className="setting-group">
+              <label htmlFor="lfsWarnEnabled" className="checkbox-label">
+                <input
+                  id="lfsWarnEnabled"
+                  type="checkbox"
+                  checked={lfsWarnEnabled}
+                  onChange={(e) => setLfsWarnEnabled(e.target.checked)}
+                />
+                <span>Warn about large files not tracked by Git LFS</span>
+              </label>
+              <small>Before committing, flag staged files at or above the size below that aren't already tracked by Git LFS.</small>
+            </div>
+
+            <div className="setting-group half-width">
+              <label htmlFor="lfsWarnThresholdMB">
+                Large File Warning Size
+              </label>
+              <div className="input-with-unit">
+                <input
+                  id="lfsWarnThresholdMB"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={lfsWarnThresholdMB}
+                  onChange={(e) => setLfsWarnThresholdMB(parseInt(e.target.value) || 100)}
+                  disabled={!lfsWarnEnabled}
+                />
+                <span className="unit">MB</span>
+              </div>
+              <small>GitHub warns at 50 MB and rejects pushes over 100 MB.</small>
             </div>
           </div>
 

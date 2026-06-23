@@ -4,11 +4,13 @@ import DiffViewer from './DiffViewer';
 import StashDialog from './StashDialog';
 import PullCommitDialog from './PullCommitDialog';
 import StashConflictDialog from './StashConflictDialog';
+import LfsWarningDialog, { LargeFile } from './LfsWarningDialog';
 import { GitAdapter } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import { useAlert } from '../contexts/AlertContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { isBranchLocked } from '../utils/settings';
+import { matchesAnyLfsPattern, suggestLfsPattern } from '../utils/lfs';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
@@ -42,8 +44,22 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const [showStashDialog, setShowStashDialog] = useState<boolean>(false);
   const [showPullCommitDialog, setShowPullCommitDialog] = useState<boolean>(false);
   const [showStashConflictDialog, setShowStashConflictDialog] = useState<boolean>(false);
+  const [showLfsWarningDialog, setShowLfsWarningDialog] = useState<boolean>(false);
+  const [lfsWarningFiles, setLfsWarningFiles] = useState<Array<LargeFile>>([]);
   const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
+  const [lfsPatterns, setLfsPatterns] = useState<Array<string>>([]);
   const activeSplitter = useRef<string | null>(null);
+
+  // Keep the set of LFS track patterns fresh so file rows can be badged and the
+  // commit gate can tell what's already covered. Re-reading .gitattributes when
+  // the file lists change is cheap (a single small file read).
+  React.useEffect(() => {
+    let cancelled = false;
+    gitAdapter.getLfsTrackPatterns()
+      .then(p => { if (!cancelled) setLfsPatterns(p); })
+      .catch(() => { if (!cancelled) setLfsPatterns([]); });
+    return () => { cancelled = true; };
+  }, [gitAdapter, unstagedFiles, stagedFiles]);
 
   // Notify parent component when busy state changes
   React.useEffect(() => {
@@ -155,6 +171,41 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
     setSelectedFile({ file, listType });
   };
 
+  // Find staged files at/above the configured size that aren't already tracked
+  // by Git LFS. Returns an empty list when the feature is disabled or on error,
+  // so the commit is never blocked by a failed size check.
+  const findUntrackedLargeFiles = async (): Promise<Array<LargeFile>> => {
+    if (!getSetting('lfsWarnEnabled'))
+      return [];
+    const paths = stagedFiles.map(f => f.path);
+    if (paths.length === 0)
+      return [];
+
+    const thresholdMB = getSetting('lfsWarnThresholdMB') || 100;
+    const thresholdBytes = thresholdMB * 1024 * 1024;
+    try {
+      const [sizes, patterns] = await Promise.all([
+        gitAdapter.getFileSizes(paths),
+        gitAdapter.getLfsTrackPatterns()
+      ]);
+      return stagedFiles
+        .filter(f => (sizes[f.path] || 0) >= thresholdBytes && !matchesAnyLfsPattern(f.path, patterns))
+        .map(f => ({ path: f.path, size: sizes[f.path] || 0, suggestedPattern: suggestLfsPattern(f.path) }));
+    } catch (err) {
+      console.warn('LFS large-file check failed, allowing commit:', err);
+      return [];
+    }
+  };
+
+  // Translate a raw LFS command failure into actionable guidance.
+  const describeLfsError = (error: any): string => {
+    const msg = error?.message || String(error);
+    if (/not a git command|lfs[^a-z].*not found|command not found|is not recognized/i.test(msg)) {
+      return 'Git LFS does not appear to be installed on your system. Install it from https://git-lfs.com and try again.';
+    }
+    return `Failed to set up Git LFS: ${msg}`;
+  };
+
   const handleCommit = async () => {
     if (!commitMessage.trim() || stagedFiles.length === 0 || isBusy) {
       return;
@@ -169,6 +220,62 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       return;
     }
 
+    // Warn about large, un-tracked files before touching the remote, so the
+    // user can move them into LFS before they ever land in a commit.
+    const largeFiles = await findUntrackedLargeFiles();
+    if (largeFiles.length > 0) {
+      setLfsWarningFiles(largeFiles);
+      setShowLfsWarningDialog(true);
+      return;
+    }
+
+    await proceedWithRemoteCheck();
+  };
+
+  // Re-stage the flagged files into LFS, then continue the commit.
+  const handleLfsTrackAndCommit = async () => {
+    setShowLfsWarningDialog(false);
+    const files = lfsWarningFiles;
+    try {
+      setIsBusy(true);
+      const git = gitAdapter;
+
+      // Ensure LFS is set up in this repo (idempotent if already installed).
+      const initialized = await git.isLfsInitialized();
+      if (!initialized) {
+        if (onBusyMessageChange) onBusyMessageChange('git lfs install');
+        await git.lfsInstall();
+      }
+
+      const patterns = Array.from(new Set(files.map(f => f.suggestedPattern)));
+      for (const pattern of patterns) {
+        if (onBusyMessageChange) onBusyMessageChange(`git lfs track "${pattern}"`);
+        await git.lfsTrack(pattern);
+      }
+
+      // Re-stage the files plus .gitattributes so the LFS pointers (not the raw
+      // blobs) are what gets committed.
+      if (onBusyMessageChange) onBusyMessageChange('git add (LFS)');
+      await git.add(['.gitattributes', ...files.map(f => f.path)]);
+      if (onRefresh) await onRefresh();
+    } catch (error: any) {
+      console.error('Error setting up Git LFS:', error);
+      if (onError) onError(describeLfsError(error));
+      return;
+    } finally {
+      setIsBusy(false);
+      if (onBusyMessageChange) onBusyMessageChange('');
+    }
+
+    await proceedWithRemoteCheck();
+  };
+
+  const handleLfsCommitAnyway = async () => {
+    setShowLfsWarningDialog(false);
+    await proceedWithRemoteCheck();
+  };
+
+  const proceedWithRemoteCheck = async () => {
     // Actively check the remote for new commits before committing, so we don't
     // create a divergent history that requires a merge. We fetch first because
     // the cached branchStatus may be stale.
@@ -505,6 +612,44 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
           }
           break;
 
+        case 'lfs-track-file':
+        case 'lfs-track-extension': {
+          const fileName = clickedItem.split('/').pop() || clickedItem;
+          let lfsPattern: string;
+          if (action === 'lfs-track-extension') {
+            const ext = fileName.includes('.') ? fileName.split('.').pop() : '';
+            if (!ext) {
+              showAlert('This file has no extension to track. Use "Track Only" instead.');
+              break;
+            }
+            lfsPattern = `*.${ext}`;
+          } else {
+            lfsPattern = clickedItem;
+          }
+
+          try {
+            const initialized = await git.isLfsInitialized();
+            if (!initialized) {
+              if (onBusyMessageChange) onBusyMessageChange('git lfs install');
+              await git.lfsInstall();
+            }
+            if (onBusyMessageChange) onBusyMessageChange(`git lfs track "${lfsPattern}"`);
+            await git.lfsTrack(lfsPattern);
+
+            // Re-stage .gitattributes always; re-stage the file itself only if it
+            // was already staged, so its LFS pointer is what gets committed.
+            const toStage = listType === 'staged' ? ['.gitattributes', clickedItem] : ['.gitattributes'];
+            await git.add(toStage);
+            showAlert(`Now tracking "${lfsPattern}" with Git LFS.`);
+            if (onRefresh)
+              await onRefresh();
+          } catch (lfsError: any) {
+            console.error('Error tracking file with Git LFS:', lfsError);
+            showAlert(describeLfsError(lfsError), 'Git LFS');
+          }
+          break;
+        }
+
         default:
           console.warn(`Unknown context menu action: ${action}`);
       }
@@ -537,6 +682,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               selectedFile={selectedFile}
               repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
+              lfsPatterns={lfsPatterns}
               onDiscardAll={async () => {
                 const confirmed = await showConfirm(
                   `Are you sure you want to discard ${unstagedFiles.length} file(s)? This cannot be undone.`
@@ -594,6 +740,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               selectedFile={selectedFile}
               repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
+              lfsPatterns={lfsPatterns}
               onStageAll={async () => {
                 if (stagedFiles.length === 0)
                   return;
@@ -711,6 +858,17 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       {showStashConflictDialog && (
         <StashConflictDialog
           onClose={() => setShowStashConflictDialog(false)}
+        />
+      )}
+
+      {/* Large-file LFS Warning Dialog */}
+      {showLfsWarningDialog && (
+        <LfsWarningDialog
+          files={lfsWarningFiles}
+          thresholdMB={getSetting('lfsWarnThresholdMB') || 100}
+          onClose={() => setShowLfsWarningDialog(false)}
+          onTrackAndCommit={handleLfsTrackAndCommit}
+          onCommitAnyway={handleLfsCommitAnyway}
         />
       )}
 

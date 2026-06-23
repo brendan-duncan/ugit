@@ -6,6 +6,10 @@ export interface AppSettings {
   maxCommits: number;
   externalEditor: string;
   theme: 'dark' | 'light';
+  /** Warn before committing large files that aren't tracked by Git LFS. */
+  lfsWarnEnabled: boolean;
+  /** Size (in MB) at or above which a staged file triggers the LFS warning. */
+  lfsWarnThresholdMB: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -15,7 +19,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   pushAllTags: false,
   maxCommits: 100,
   externalEditor: 'code',
-  theme: 'dark'
+  theme: 'dark',
+  lfsWarnEnabled: true,
+  lfsWarnThresholdMB: 100
 };
 
 /**
@@ -171,7 +177,9 @@ export class SettingsManager {
       (data.pushAllTags === undefined || typeof data.pushAllTags === 'boolean') &&
       (data.maxCommits === undefined || typeof data.maxCommits === 'number') &&
       (data.externalEditor === undefined || typeof data.externalEditor === 'string') &&
-      (data.theme === undefined || data.theme === 'dark' || data.theme === 'light')
+      (data.theme === undefined || data.theme === 'dark' || data.theme === 'light') &&
+      (data.lfsWarnEnabled === undefined || typeof data.lfsWarnEnabled === 'boolean') &&
+      (data.lfsWarnThresholdMB === undefined || typeof data.lfsWarnThresholdMB === 'number')
     );
   }
 

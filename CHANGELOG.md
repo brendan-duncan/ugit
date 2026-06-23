@@ -1,4 +1,18 @@
-## [v1.3.0](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 
+## [v1.4.0](https://github.com/brendan-duncan/ugit/releases/tag/v1.4.0) (June 22, 2026)
+
+### New Features
+
+* Large files are now flagged before they're committed. Staging a file at or above a configurable size (default 100 MB) that isn't already tracked by Git LFS will prompt you when you commit, with a one-click "Track & Commit" that runs `git lfs track`, re-stages the files and `.gitattributes`, and continues the commit.
+* Right-click a file in the Staged or Unstaged list to track it with Git LFS — either all files of that extension (e.g. `*.psd`) or just that one file. Git LFS is installed automatically if it isn't set up yet.
+* Files tracked by Git LFS now show an "LFS" badge in the file lists.
+* Added "Warn about large files not tracked by Git LFS" and a "Large File Warning Size" threshold to Preferences.
+
+### Improvements
+
+* The Git LFS "Add Track Pattern" action now uses a proper dialog with pattern suggestions instead of a plain text prompt.
+* When Git LFS isn't installed on the system, LFS actions now show an actionable message with the install link instead of failing silently.
+
+## [v1.3.0](https://github.com/brendan-duncan/ugit/releases/tag/v1.3.0) (June )
 
 ### New Features
 

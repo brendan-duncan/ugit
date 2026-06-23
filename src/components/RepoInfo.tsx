@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DropdownMenu, DropdownItem, DropdownSeparator, DropdownSubmenu } from './DropdownMenu';
 import EditOriginDialog from './EditOriginDialog';
+import LfsTrackDialog from './LfsTrackDialog';
 import GitAdapter from '../git/GitAdapter';
 import { useAlert } from '../contexts/AlertContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -38,6 +39,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isLfsInitialized, setIsLfsInitialized] = useState(false);
+  const [showLfsTrackDialog, setShowLfsTrackDialog] = useState(false);
   const isSelected = selectedItem && selectedItem.type === 'local-changes';
 
   // Extract repository directory name from the full path
@@ -180,20 +182,20 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
     }
   };
 
-  const handleLfsTrackPattern = () => {
-    const pattern = prompt('Enter file pattern to track (e.g., *.psd, *.bin):');
-    if (pattern) {
-      gitAdapter?.lfsTrack(pattern)
-        .then(() => {
-          showAlert(`Now tracking "${pattern}" with Git LFS.\n\nDon't forget to commit the updated .gitattributes file.`);
-        })
-        .catch((error: any) => {
-          console.error('Error tracking pattern:', error);
-          if (onError) {
-            onError(`Failed to track pattern: ${error?.message || 'Unknown error'}`);
-          }
-        });
-    }
+  const handleLfsTrackPattern = (pattern: string) => {
+    setShowLfsTrackDialog(false);
+    if (!pattern)
+      return;
+    gitAdapter?.lfsTrack(pattern)
+      .then(() => {
+        showAlert(`Now tracking "${pattern}" with Git LFS.\n\nDon't forget to commit the updated .gitattributes file.`);
+      })
+      .catch((error: any) => {
+        console.error('Error tracking pattern:', error);
+        if (onError) {
+          onError(`Failed to track pattern: ${error?.message || 'Unknown error'}`);
+        }
+      });
   };
 
   const handleLfsStatus = async () => {
@@ -371,7 +373,7 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
             </DropdownSubmenu>
           ) : (
             <DropdownSubmenu label="Git LFS">
-              <DropdownItem onClick={handleLfsTrackPattern}>
+              <DropdownItem onClick={() => setShowLfsTrackDialog(true)}>
                 Add Track Pattern...
               </DropdownItem>
               <DropdownSeparator />
@@ -467,6 +469,15 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           onClose={() => setShowEditOriginDialog(false)}
           onEditOrigin={handleEditOriginDialog}
           currentOriginUrl={originUrl}
+        />
+      )}
+
+      {/* Git LFS Track Pattern Dialog */}
+      {showLfsTrackDialog && (
+        <LfsTrackDialog
+          suggestions={['*.psd', '*.bin', '*.zip', '*.mp4', '*.png']}
+          onClose={() => setShowLfsTrackDialog(false)}
+          onTrack={handleLfsTrackPattern}
         />
       )}
     </div>

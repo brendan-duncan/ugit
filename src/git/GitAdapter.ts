@@ -551,6 +551,18 @@ export abstract class GitAdapter {
   abstract lfsUninstall(): Promise<void>;
 
   /**
+   * Get the patterns currently tracked by Git LFS (parsed from .gitattributes).
+   */
+  abstract getLfsTrackPatterns(): Promise<string[]>;
+
+  /**
+   * Get the on-disk size in bytes of one or more working-tree files.
+   * @param filePaths - Repo-relative file paths
+   * @returns Map of repo-relative path to size in bytes (0 if missing/unreadable)
+   */
+  abstract getFileSizes(filePaths: string[]): Promise<Record<string, number>>;
+
+  /**
    * Merge a branch into the current branch
    * @param branchName - Name of the branch to merge into current branch
    */

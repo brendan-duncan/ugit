@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { FixedSizeList, ListChildComponentProps } from 'react-window';
 import { FileInfo } from './types';
+import { matchesAnyLfsPattern } from '../utils/lfs';
 import './FileList.css';
 
 // Build tree structure from flat file list
@@ -49,6 +50,8 @@ interface FileListProps {
   onContextMenu: (action: string, items: any[], clickedItem: string, contextRepoPath: string, listType: string) => Promise<void>;
   onDiscardAll?: () => Promise<void>;
   onStageAll?: () => Promise<void>;
+  /** Git LFS track patterns (from .gitattributes) used to badge tracked files. */
+  lfsPatterns?: Array<string>;
 }
 
 // Flat row representation derived from the tree + expansion state. Replacing
@@ -62,7 +65,7 @@ type Row =
 const RENDER_CAP = 500;
 const ROW_HEIGHT = 32;
 
-function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu, onDiscardAll, onStageAll }: FileListProps) {
+function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu, onDiscardAll, onStageAll, lfsPatterns = [] }: FileListProps) {
   const [dragOver, setDragOver] = useState<boolean>(false);
   const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
   const [selectedItems, setSelectedItems] = useState(new Set<string>());
@@ -481,6 +484,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
     const file = row.file;
     const isFileSelected = selectedItems.has(file.path);
     const fileName = file.path.split('/').pop();
+    const isLfsTracked = matchesAnyLfsPattern(file.path, lfsPatterns);
     return (
       <div
         key={`file-${file.path}`}
@@ -497,6 +501,7 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
       >
         <span className={`file-status ${file.status === 'conflict' ? 'conflict' : ''}`}>{getStatusIcon(file.status)}</span>
         <span className="file-path">{fileName}</span>
+        {isLfsTracked && <span className="file-lfs-badge" title="Tracked by Git LFS">LFS</span>}
       </div>
     );
   };
@@ -666,6 +671,35 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
           <div className="context-menu-item" onClick={() => handleMenuAction('save-as-patch')}>
             Save as Patch
           </div>
+          {contextMenu.items.length === 1 && contextMenu.items[0].type === 'file' && !matchesAnyLfsPattern(contextMenu.clickedItem, lfsPatterns) && (
+            <>
+              <div className="context-menu-separator"></div>
+              <div className="context-menu-submenu">
+                <div className="context-menu-item context-menu-submenu-header">
+                  Track with Git LFS
+                  <span className="context-menu-submenu-arrow">▶</span>
+                </div>
+                <div className="context-menu-submenu-content">
+                  {(() => {
+                    const fileName = contextMenu.clickedItem.split('/').pop();
+                    const fileExt = fileName.includes('.') ? fileName.split('.').pop() : '';
+                    return (
+                      <>
+                        {fileExt && (
+                          <div className="context-menu-item" onClick={() => handleMenuAction('lfs-track-extension')}>
+                            Track All .{fileExt} Files
+                          </div>
+                        )}
+                        <div className="context-menu-item" onClick={() => handleMenuAction('lfs-track-file')}>
+                          Track Only '{fileName}'
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </>
+          )}
           {listType === 'unstaged' && (
             <>
               <div className="context-menu-separator"></div>
