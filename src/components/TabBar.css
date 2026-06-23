@@ -38,19 +38,18 @@
   border-bottom: 2px solid var(--accent-color);
 }
 
-/* Lore repositories get a distinct violet accent so they're easy to tell apart from git tabs. */
+/* Lore repositories get a bold violet fill so they stand out clearly from git tabs. */
 .tab.lore {
-  --lore-color: #a071f5;
-  border-left: 3px solid var(--lore-color);
-  background-color: color-mix(in srgb, var(--lore-color) 10%, var(--bg-tertiary));
+  --lore-color: #9d4edd;
+  background-color: color-mix(in srgb, var(--lore-color) 32%, var(--bg-tertiary));
 }
 
 .tab.lore:hover {
-  background-color: color-mix(in srgb, var(--lore-color) 18%, var(--border-color));
+  background-color: color-mix(in srgb, var(--lore-color) 42%, var(--bg-tertiary));
 }
 
 .tab.lore.active {
-  background-color: color-mix(in srgb, var(--lore-color) 14%, var(--bg-primary));
+  background-color: color-mix(in srgb, var(--lore-color) 50%, var(--bg-primary));
   border-bottom-color: var(--lore-color);
 }
 

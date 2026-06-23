@@ -70,8 +70,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [showAddLayer, setShowAddLayer] = useState(false);
   const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/' });
   const [resolvingPath, setResolvingPath] = useState<string | null>(null);
-  const [showGraph, setShowGraph] = useState(false);
-  const [showTree, setShowTree] = useState(false);
+  // Default to the Lore-centric repository tree; Changes (commit flow) and Graph are toggles.
+  const [viewMode, setViewMode] = useState<'changes' | 'files' | 'graph'>('files');
   const [treeFile, setTreeFile] = useState<LoreTreeNode | null>(null);
   const [fileInfo, setFileInfo] = useState<LoreFileInfo | null>(null);
   const [fileHist, setFileHist] = useState<LoreFileHistoryEntry[]>([]);
@@ -398,11 +398,15 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           <span className="toolbar-button-icon">🌿</span>
           <span className="toolbar-button-label">Branch</span>
         </button>
-        <button className={`toolbar-button ${showTree ? 'active' : ''}`} onClick={() => { setShowTree(t => !t); setShowGraph(false); }}>
+        <button className={`toolbar-button ${viewMode === 'changes' ? 'active' : ''}`} onClick={() => setViewMode('changes')}>
+          <span className="toolbar-button-icon">✎</span>
+          <span className="toolbar-button-label">Changes</span>
+        </button>
+        <button className={`toolbar-button ${viewMode === 'files' ? 'active' : ''}`} onClick={() => setViewMode('files')}>
           <span className="toolbar-button-icon">🗂</span>
           <span className="toolbar-button-label">Files</span>
         </button>
-        <button className={`toolbar-button ${showGraph ? 'active' : ''}`} onClick={() => { setShowGraph(g => !g); setShowTree(false); }}>
+        <button className={`toolbar-button ${viewMode === 'graph' ? 'active' : ''}`} onClick={() => setViewMode('graph')}>
           <span className="toolbar-button-icon">🕸</span>
           <span className="toolbar-button-label">Graph</span>
         </button>
@@ -605,12 +609,12 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   <button className="lore-mini-btn" disabled={busy} onClick={doMergeAbort}>Abort {status.merge.operation}</button>
                 </div>
               )}
-              {showGraph ? (
+              {viewMode === 'graph' ? (
                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                   <div className="lore-detail-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span>Revision graph ({graph.length})</span>
                     <span style={{ flex: 1 }} />
-                    <button className="lore-mini-btn" onClick={() => setShowGraph(false)}>Close</button>
+                    <button className="lore-mini-btn" onClick={() => setViewMode('changes')}>Close</button>
                   </div>
                   <div style={{ height: 'calc(100% - 30px)' }}>
                     <LoreRevisionGraph
@@ -622,7 +626,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     />
                   </div>
                 </div>
-              ) : showTree ? (
+              ) : viewMode === 'files' ? (
                 <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
                   <div className="lore-changes-col" style={{ width: '50%' }}>
                     <div className="lore-changes-group-header"><span>Repository tree</span></div>
