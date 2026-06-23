@@ -32,7 +32,7 @@ export interface LoreFileChange {
 }
 
 /** Local-vs-remote sync relationship, parsed from the status sync line. */
-export type LoreSyncState = 'in-sync' | 'ahead' | 'behind' | 'diverged' | 'unknown';
+export type LoreSyncState = 'in-sync' | 'ahead' | 'behind' | 'diverged' | 'no-remote' | 'unknown';
 
 export interface LoreStatus {
   /** Repository ID from the first status line. */
@@ -93,6 +93,50 @@ export interface LoreBranchRef {
 export interface LoreBranches {
   local: LoreBranchRef[];
   remote: string[];
+}
+
+export interface LorePushedRevision {
+  number: number;
+  signature: string;
+  branch: string;
+}
+
+export interface LorePushResult {
+  /** Revisions confirmed pushed (one per `Pushed revision N -> hash to branch B` line). */
+  pushed: LorePushedRevision[];
+  /** Fragment count from the `Pushed N fragment(s), …` summary, if present. */
+  fragments?: number;
+  /** Byte summary string (e.g. "227.00 bytes"), if present. */
+  bytes?: string;
+  raw: string;
+}
+
+export interface LoreSyncResult {
+  /** True when already up to date (no revision pulled). */
+  upToDate: boolean;
+  branch?: string;
+  /** Revision synced to, when it pulled forward. */
+  toRevision?: LoreRevisionRef;
+  raw: string;
+}
+
+/** Result of a branch create/switch. */
+export interface LoreBranchOpResult {
+  branch: string;
+  signature?: string;
+  raw: string;
+}
+
+/** A file lock (Perforce-style exclusive checkout). */
+export interface LoreLock {
+  /** Locked path, relative to the repo root. */
+  path: string;
+  /** Lock owner identity, or '<unknown>' when the server has no identity (auth disabled). */
+  owner: string;
+  /** Branch the lock is held on (from `lock query`), as a branch id. */
+  branch?: string;
+  /** Acquisition date string (from `lock status`). */
+  date?: string;
 }
 
 /** Options shared by most Lore CLI invocations. */

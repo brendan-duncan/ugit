@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LoreClient, resolveLoreBin, LoreStatus } from '../lore';
+import { LoreClient, resolveLoreBin, LoreStatus, LoreBranches, LoreLock } from '../lore';
 import { RunningCommand } from '../components/types';
 
 interface UseLoreOptions {
@@ -11,10 +11,14 @@ interface UseLoreResult {
   client: LoreClient | null;
   status: LoreStatus | null;
   history: Array<{ number: number; message: string }>;
+  branches: LoreBranches | null;
+  locks: LoreLock[];
+  links: string[];
+  layers: string[];
   isLoading: boolean;
   error: string | null;
   commandState: RunningCommand[];
-  /** Reload status (with --scan) and history. */
+  /** Reload status (with --scan), history, branches, locks, links, layers. */
   refresh: () => Promise<void>;
 }
 
@@ -26,6 +30,10 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
   const [client, setClient] = useState<LoreClient | null>(null);
   const [status, setStatus] = useState<LoreStatus | null>(null);
   const [history, setHistory] = useState<Array<{ number: number; message: string }>>([]);
+  const [branches, setBranches] = useState<LoreBranches | null>(null);
+  const [locks, setLocks] = useState<LoreLock[]>([]);
+  const [links, setLinks] = useState<string[]>([]);
+  const [layers, setLayers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
@@ -62,12 +70,20 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     try {
       setIsLoading(true);
       setError(null);
-      const [st, hist] = await Promise.all([
+      const [st, hist, brs, lks, lnk, lyr] = await Promise.all([
         c.status({ scan: true }),
         c.historyOneline(),
+        c.branchList(),
+        c.locks(),
+        c.links(),
+        c.layers(),
       ]);
       setStatus(st);
       setHistory(hist);
+      setBranches(brs);
+      setLocks(lks);
+      setLinks(lnk);
+      setLayers(lyr);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load Lore repository';
       setError(message);
@@ -82,5 +98,5 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     if (client) load();
   }, [client, load]);
 
-  return { client, status, history, isLoading, error, commandState, refresh: load };
+  return { client, status, history, branches, locks, links, layers, isLoading, error, commandState, refresh: load };
 }

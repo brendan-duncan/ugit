@@ -13,6 +13,10 @@ import {
   LoreFileDiff,
   LoreRevisionRef,
   LoreBranches,
+  LorePushResult,
+  LoreSyncResult,
+  LoreBranchOpResult,
+  LoreLock,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -32,6 +36,7 @@ function syncStateFromLine(line: string): LoreSyncState {
   const l = line.toLowerCase();
   if (l.includes('in sync')) return 'in-sync';
   if (l.includes('diverged')) return 'diverged';
+  if (l.includes('does not exist')) return 'no-remote';
   if (l.includes('ahead')) return 'ahead';
   if (l.includes('behind')) return 'behind';
   return 'unknown';
@@ -91,6 +96,11 @@ export function parseStatus(text: string): LoreStatus {
     }
     if (line.startsWith('Remote revision')) {
       status.remote = refFrom(line.match(REVISION_RE));
+      continue;
+    }
+    if (line.startsWith('Remote branch')) {
+      // e.g. "Remote branch does not exist" → no remote ref, syncState 'no-remote'.
+      status.syncState = syncStateFromLine(line);
       continue;
     }
     if (line.startsWith('Local branch')) {
@@ -277,6 +287,121 @@ export function parseDiff(text: string): LoreFileDiff[] {
     }
   }
   return files;
+}
+
+/** Parse `lore push` output into the revisions pushed + fragment/byte summary. */
+export function parsePushResult(text: string): LorePushResult {
+  const pushed: LorePushResult['pushed'] = [];
+  let fragments: number | undefined;
+  let bytes: string | undefined;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    // "Pushed revision 2 -> <hash> to branch feature"
+    const rev = line.match(/^Pushed revision\s+(\d+)\s*->\s*([0-9a-fA-F]{64})\s+to branch\s+(.+)$/);
+    if (rev) { pushed.push({ number: parseInt(rev[1], 10), signature: rev[2], branch: rev[3].trim() }); continue; }
+    // "Pushed 1 fragment(s), 227.00 bytes"
+    const frag = line.match(/^Pushed\s+(\d+)\s+fragment\(s\),\s+(.+)$/);
+    if (frag) { fragments = parseInt(frag[1], 10); bytes = frag[2].trim(); }
+  }
+  return { pushed, fragments, bytes, raw: text };
+}
+
+/** Parse `lore sync` output: either a pull-forward or an already-up-to-date no-op. */
+export function parseSyncResult(text: string): LoreSyncResult {
+  let branch: string | undefined;
+  let toRevision: LoreRevisionRef | undefined;
+  let upToDate = false;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    // "Already on branch main latest revision 2 -> <hash>"
+    const already = line.match(/^Already on branch\s+(\S+)\s+latest\s+revision\s+(\d+)\s*->\s*([0-9a-fA-F]{64})/);
+    if (already) { upToDate = true; branch = already[1]; toRevision = { number: parseInt(already[2], 10), signature: already[3] }; continue; }
+    // "Synchronizing to revision 2 -> <hash>"
+    const sync = line.match(/^Synchronizing to revision\s+(\d+)\s*->\s*([0-9a-fA-F]{64})/);
+    if (sync) { toRevision = { number: parseInt(sync[1], 10), signature: sync[2] }; continue; }
+    const onBranch = line.match(/^On branch\s+(\S+)/);
+    if (onBranch && !branch) branch = onBranch[1];
+  }
+  return { upToDate, branch, toRevision, raw: text };
+}
+
+/** Parse `lore branch create <name>` → "Created branch <name> at revision <hash>". */
+export function parseBranchCreate(text: string): LoreBranchOpResult {
+  const m = text.match(/Created branch\s+(\S+)\s+at revision\s+([0-9a-fA-F]{64})/);
+  return { branch: m ? m[1] : '', signature: m ? m[2] : undefined, raw: text };
+}
+
+/** Parse `lore branch switch <name>` → final "Switched to branch <name> revision <hash>". */
+export function parseBranchSwitch(text: string): LoreBranchOpResult {
+  // Use the LAST match so the "Switched to branch …" line wins over "Switching branch to …".
+  const re = /Switched to branch\s+(\S+)\s+revision\s+([0-9a-fA-F]{64})/g;
+  let m: RegExpExecArray | null;
+  let last: RegExpExecArray | null = null;
+  while ((m = re.exec(text)) !== null) last = m;
+  return { branch: last ? last[1] : '', signature: last ? last[2] : undefined, raw: text };
+}
+
+/**
+ * Parse `lore lock query` / `lock status` output into locks. Handles both row shapes:
+ *   "<path> by <owner> on branch <hash>"   (query)
+ *   "<path> by <owner> on <date>"          (status)
+ * Header lines ("Locks found:", "Files locked for edit:") are skipped; empty list → [].
+ */
+export function parseLocks(text: string): LoreLock[] {
+  const locks: LoreLock[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const lower = line.toLowerCase();
+    if (lower.startsWith('locks found') || lower.startsWith('files locked') ||
+        lower.startsWith('no locks') || lower.startsWith('lock ')) continue;
+    const m = line.match(/^(.+?)\s+by\s+(.+?)\s+on\s+(.+)$/);
+    if (!m) continue;
+    const [, path, owner, rest] = m;
+    const branchMatch = rest.match(/^branch\s+(\S+)/);
+    locks.push({
+      path: path.trim(),
+      owner: owner.trim(),
+      branch: branchMatch ? branchMatch[1] : undefined,
+      date: branchMatch ? undefined : rest.trim(),
+    });
+  }
+  return locks;
+}
+
+/**
+ * Parse `lore lock acquire` / `lock release` output → the affected paths (the lines after the
+ * "… on files:" header).
+ */
+export function parseLockAffectedPaths(text: string): string[] {
+  const paths: string[] = [];
+  let inList = false;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (/on files:\s*$/i.test(line)) { inList = true; continue; }
+    if (inList) paths.push(line);
+  }
+  return paths;
+}
+
+/**
+ * Parse `lore link list` / `lore layer list` into entry strings. The "No links…/No layers"
+ * sentinels parse to an empty list. NOTE: the populated row format is not yet captured
+ * (needs a repo with links/layers) — rows are returned verbatim for now.
+ */
+export function parseSimpleList(text: string): string[] {
+  const out: string[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const lower = line.toLowerCase();
+    if (lower.startsWith('no links') || lower.startsWith('no layers')) continue;
+    // Skip obvious headers like "Links:" / "Layers:".
+    if (/^(links|layers)\b.*:?$/i.test(line)) continue;
+    out.push(line);
+  }
+  return out;
 }
 
 /**

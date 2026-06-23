@@ -4,6 +4,13 @@
 export * from './types';
 export * from './loreProcess';
 export * from './loreParsers';
-export { LoreClient, createLoreRepository } from './LoreClient';
+export {
+  LoreClient,
+  createLoreRepository,
+  cloneLoreRepository,
+  cloneLoreRepositoryStreaming,
+  loreLogin,
+  loreAuthList,
+} from './LoreClient';
 export type { LoreClientOptions, LoreCommandStateCallback } from './LoreClient';
 export { resolveLoreBin } from './resolveLoreBin';

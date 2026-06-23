@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 
 /** Result of running the lore CLI once. */
 export interface LoreProcessResult {
@@ -64,4 +64,61 @@ export function runLore(params: RunLoreParams): Promise<LoreProcessResult> {
       }
     });
   });
+}
+
+export interface RunLoreStreamingParams extends RunLoreParams {
+  /** Called with each line emitted on stdout/stderr as it arrives (progress reporting). */
+  onLine?: (line: string) => void;
+}
+
+/**
+ * Run the lore CLI streaming its output line-by-line via `onLine` (for long operations like
+ * clone, where the user wants live progress). Resolves with the full captured output.
+ */
+export function runLoreStreaming(params: RunLoreStreamingParams): Promise<LoreProcessResult> {
+  const { bin, cwd, argv, throwOnError = true, onLine } = params;
+  const fullArgs = [...argv, ...ALWAYS_ARGS];
+  return new Promise((resolve, reject) => {
+    const child = spawn(bin, fullArgs, { cwd, windowsHide: true });
+    let stdout = '';
+    let stderr = '';
+    let stdoutBuf = '';
+    let stderrBuf = '';
+
+    const pump = (chunk: string, which: 'out' | 'err') => {
+      if (which === 'out') stdout += chunk; else stderr += chunk;
+      let buf = which === 'out' ? stdoutBuf + chunk : stderrBuf + chunk;
+      const lines = buf.split(/\r?\n/);
+      buf = lines.pop() ?? ''; // keep the trailing partial line
+      if (which === 'out') stdoutBuf = buf; else stderrBuf = buf;
+      if (onLine) for (const line of lines) if (line.trim()) onLine(line);
+    };
+
+    child.stdout?.on('data', d => pump(d.toString(), 'out'));
+    child.stderr?.on('data', d => pump(d.toString(), 'err'));
+    child.on('error', err => reject(err));
+    child.on('close', (code) => {
+      // flush any trailing partial lines
+      if (onLine) {
+        if (stdoutBuf.trim()) onLine(stdoutBuf);
+        if (stderrBuf.trim()) onLine(stderrBuf);
+      }
+      const exitCode = code ?? 0;
+      const result: LoreProcessResult = { stdout, stderr, exitCode };
+      if (exitCode !== 0 && throwOnError) {
+        reject(new LoreCommandError(fullArgs, exitCode, stdout, stderr));
+      } else {
+        resolve(result);
+      }
+    });
+  });
+}
+
+/**
+ * Heuristic: does this CLI error text indicate an authentication/authorization problem?
+ * Used to surface a "run lore login" hint. (Heuristic only — confirm against a secured
+ * server; the local dev server runs with auth disabled.)
+ */
+export function isLoreAuthError(message: string): boolean {
+  return /\b(unauthor(i[sz]ed|ised)|authenticat|forbidden|permission denied|401|403|not logged in|login required|invalid token|expired token)\b/i.test(message);
 }
