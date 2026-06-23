@@ -18,6 +18,10 @@ import {
   LoreBranchOpResult,
   LoreLock,
   LoreMergeResult,
+  LoreOperation,
+  LoreRevisionDetail,
+  LoreLink,
+  LoreLayer,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -110,9 +114,14 @@ export function parseStatus(text: string): LoreStatus {
       status.syncState = syncStateFromLine(line);
       continue;
     }
-    if (line.startsWith('Pending merge')) {
-      const inc = line.match(/incoming revision\s+([0-9a-fA-F]{64})/);
-      status.merge = { inProgress: true, incoming: inc ? inc[1] : undefined };
+    const pending = line.match(/^Pending\s+(merge|revert|cherry-pick)/i);
+    if (pending) {
+      const inc = line.match(/(?:incoming revision|revision)\s+([0-9a-fA-F]{64})/);
+      status.merge = {
+        inProgress: true,
+        operation: pending[1].toLowerCase() as LoreOperation,
+        incoming: inc ? inc[1] : undefined,
+      };
       continue;
     }
     if (line.startsWith('No tracked changes')) {
@@ -217,6 +226,80 @@ export function parseHistoryOneline(text: string): Array<{ number: number; messa
   return out;
 }
 
+/**
+ * Parse `lore revision info --delta` → the revision block plus its changed files (the
+ * `<CODE> <path>` rows printed after the block).
+ */
+export function parseRevisionDetail(text: string): LoreRevisionDetail | null {
+  const lines = text.split(/\r?\n/);
+  const revision = parseRevisionBlock(lines);
+  if (!revision) return null;
+  const files: LoreFileChange[] = [];
+  let sawMessage = false;
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    // Changed-file rows come after the indented message; match "<CODE> <path>".
+    if (/^ {4}\S/.test(rawLine)) { sawMessage = true; continue; }
+    if (!sawMessage) continue;
+    const row = line.match(/^([A-Z]{1,2})\s+(.+?)\s*$/);
+    if (row) {
+      const code = row[1];
+      files.push({ path: row[2], change: changeTypeFromCode(code), code, section: 'staged' });
+    }
+  }
+  return { revision, files };
+}
+
+/**
+ * Parse `lore link list`:
+ *   Link <id>
+ *     Link path: vendor (node 2)
+ *     Source path: / (node 0)
+ *     Branch: main (<hash>)
+ *     Revision: <hash>
+ *     Flags: None (0x0)
+ */
+export function parseLinkList(text: string): LoreLink[] {
+  const links: LoreLink[] = [];
+  let current: LoreLink | null = null;
+  const push = () => { if (current) { links.push(current); current = null; } };
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (/^no links/i.test(line)) continue;
+    // Header is "Link <hexid>" (the indented "Link path:" field must NOT match).
+    const head = line.match(/^Link\s+([0-9a-fA-F]{6,})\s*$/);
+    if (head) { push(); current = { id: head[1], linkPath: '', sourcePath: '' }; continue; }
+    if (!current) continue;
+    let m;
+    if ((m = line.match(/^Link path:\s*(.+?)(?:\s*\(node.*\))?$/i))) current.linkPath = m[1].trim();
+    else if ((m = line.match(/^Source path:\s*(.+?)(?:\s*\(node.*\))?$/i))) current.sourcePath = m[1].trim();
+    else if ((m = line.match(/^Branch:\s*(\S+)\s*(?:\(([0-9a-fA-F]+)\))?/i))) { current.branch = m[1]; current.branchId = m[2]; }
+    else if ((m = line.match(/^Revision:\s*([0-9a-fA-F]+)/i))) current.revision = m[1];
+  }
+  push();
+  return links;
+}
+
+/**
+ * Parse `lore layer list` (a table):
+ *   Repository                Revision                Paths
+ *   <id>                      <hash>                  / -> overlay
+ */
+export function parseLayerList(text: string): LoreLayer[] {
+  const layers: LoreLayer[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (/^no layers/i.test(line)) continue;
+    if (/^repository\s+revision\s+paths/i.test(line)) continue; // header
+    // <id> <hash> <paths...>
+    const m = line.match(/^(\S+)\s+([0-9a-fA-F]+)\s+(.+)$/);
+    if (m) layers.push({ repository: m[1], revision: m[2], paths: m[3].trim() });
+  }
+  return layers;
+}
+
 /** Parse full `lore history` (default) → list of revision blocks (newest first). */
 export function parseHistory(text: string): LoreRevision[] {
   const blocks: string[][] = [];
@@ -274,6 +357,15 @@ export function parseDiff(text: string): LoreFileDiff[] {
   const files: LoreFileDiff[] = [];
   let i = 0;
   while (i < lines.length) {
+    // Binary file: a bare path line followed by "Binary files differ".
+    if (/^Binary files .*differ/i.test(lines[i].trim()) && i > 0) {
+      const path = lines[i - 1].trim();
+      if (path && !path.startsWith('---') && !path.startsWith('+++')) {
+        files.push({ path, hunks: '', binary: true });
+      }
+      i++;
+      continue;
+    }
     if (lines[i].startsWith('--- ')) {
       const minus = lines[i];
       const plus = lines[i + 1] ?? '';
@@ -364,7 +456,8 @@ export function parseMergeResult(text: string): LoreMergeResult {
       counts = { updated: +m[1], deleted: +m[2], merged: +m[3], conflicted: +m[4] };
       continue;
     }
-    if (/^Committed merged repository state/.test(line)) { committed = true; continue; }
+    // "Committed merged/reverted/cherry-picked repository state …" → auto-committed.
+    if (/^Committed .*repository state/.test(line)) { committed = true; continue; }
     if (/^Files in conflict:/i.test(line)) { inConflictList = true; continue; }
     if (inConflictList && line) conflicted.push(line);
   }
@@ -457,6 +550,7 @@ export function parseSimpleList(text: string): string[] {
 export function normalizeLoreDiffForRenderer(text: string): string {
   const files = parseDiff(text);
   return files
+    .filter(f => !f.binary && f.hunks.trim())
     .map(f =>
       `diff --lore a/${f.path} b/${f.path}\n` +
       `--- a/${f.path}\n` +

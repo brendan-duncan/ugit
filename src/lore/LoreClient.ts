@@ -27,8 +27,10 @@ import {
   parseBranchCreate,
   parseBranchSwitch,
   parseLocks,
-  parseSimpleList,
   parseMergeResult,
+  parseRevisionDetail,
+  parseLinkList,
+  parseLayerList,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -41,7 +43,18 @@ import {
   LoreBranchOpResult,
   LoreLock,
   LoreMergeResult,
+  LoreOperation,
+  LoreRevisionDetail,
+  LoreLink,
+  LoreLayer,
 } from './types';
+
+/** Map an operation to its CLI command prefix for resolve/abort. */
+const OP_PREFIX: Record<LoreOperation, string[]> = {
+  'merge': ['branch', 'merge'],
+  'revert': ['revision', 'revert'],
+  'cherry-pick': ['revision', 'cherry-pick'],
+};
 
 /** Notified when a lore command starts/ends, for the busy/timing UI (mirrors GitAdapter). */
 export interface LoreCommandStateCallback {
@@ -176,18 +189,20 @@ export class LoreClient {
    * @param paths optional path filter; omit for the whole tree.
    * @param sourceRevision optional base revision signature (defaults to current revision).
    */
-  async diff(paths?: string[], sourceRevision?: string): Promise<LoreFileDiff[]> {
+  async diff(paths?: string[], sourceRevision?: string, targetRevision?: string): Promise<LoreFileDiff[]> {
     const argv = ['diff'];
     if (sourceRevision) argv.push('--source', sourceRevision);
+    if (targetRevision) argv.push('--target', targetRevision);
     if (paths && paths.length) argv.push(...paths);
     const { stdout } = await this.run(argv);
     return parseDiff(stdout);
   }
 
   /** Same as diff() but returns renderer-ready unified diff text for diff2html. */
-  async diffText(paths?: string[], sourceRevision?: string): Promise<string> {
+  async diffText(paths?: string[], sourceRevision?: string, targetRevision?: string): Promise<string> {
     const argv = ['diff'];
     if (sourceRevision) argv.push('--source', sourceRevision);
+    if (targetRevision) argv.push('--target', targetRevision);
     if (paths && paths.length) argv.push(...paths);
     const { stdout } = await this.run(argv);
     return normalizeLoreDiffForRenderer(stdout);
@@ -224,17 +239,47 @@ export class LoreClient {
     return parseMergeResult((await this.run(argv)).stdout);
   }
 
-  /** Resolve conflicted paths during a merge, optionally taking 'mine' or 'theirs' wholesale. */
-  async mergeResolve(paths: string[], side?: 'mine' | 'theirs'): Promise<void> {
-    const argv = ['branch', 'merge', 'resolve'];
+  /**
+   * Resolve conflicted paths for a pending operation (merge/revert/cherry-pick), optionally
+   * taking 'mine' or 'theirs' wholesale. The operation comes from `status.merge.operation`.
+   */
+  async conflictResolve(operation: LoreOperation, paths: string[], side?: 'mine' | 'theirs'): Promise<void> {
+    const argv = [...OP_PREFIX[operation], 'resolve'];
     if (side) argv.push(side);
     argv.push(...paths);
     await this.run(argv);
   }
 
-  /** Abort an in-progress merge, restoring the pre-merge state. */
-  async mergeAbort(): Promise<void> {
-    await this.run(['branch', 'merge', 'abort']);
+  /** Abort a pending operation (merge/revert/cherry-pick), restoring the pre-operation state. */
+  async conflictAbort(operation: LoreOperation): Promise<void> {
+    await this.run([...OP_PREFIX[operation], 'abort']);
+  }
+
+  /** Revert a revision from the current state. Auto-commits when there are no conflicts. */
+  async revert(revision: string): Promise<LoreMergeResult> {
+    return parseMergeResult((await this.run(['revision', 'revert', revision])).stdout);
+  }
+
+  /** Cherry-pick a revision onto the current state. Auto-commits when there are no conflicts. */
+  async cherryPick(revision: string): Promise<LoreMergeResult> {
+    return parseMergeResult((await this.run(['revision', 'cherry-pick', revision])).stdout);
+  }
+
+  /** Amend the latest commit's message. */
+  async amend(message: string): Promise<LoreCommitResult | null> {
+    return parseCommitResult((await this.run(['revision', 'amend', message])).stdout);
+  }
+
+  /** Revision detail (message + changed files) via `revision info --delta`. */
+  async revisionInfo(revision?: string): Promise<LoreRevisionDetail | null> {
+    const argv = ['revision', 'info', '--delta'];
+    if (revision) argv.push(revision);
+    return parseRevisionDetail((await this.run(argv, { skip: true })).stdout);
+  }
+
+  /** Move/rename a file (record after the file has been moved on disk). */
+  async stageMove(from: string, to: string): Promise<void> {
+    await this.run(['stage', 'move', from, to]);
   }
 
   /** Push local commits to the remote. Returns the pushed revisions + byte/fragment summary. */
@@ -270,16 +315,40 @@ export class LoreClient {
     await this.run(['lock', 'release', ...paths]);
   }
 
-  // --- Lore-native: links (sub-repo mounts) & layers (overlays), read-only for now ---
+  // --- Lore-native: links (sub-repo mounts) & layers (overlays) ---
 
   /** List links (sub-repo mounts). Empty when none. */
-  async links(): Promise<string[]> {
-    return parseSimpleList((await this.run(['link', 'list'], { skip: true })).stdout);
+  async links(): Promise<LoreLink[]> {
+    return parseLinkList((await this.run(['link', 'list'], { skip: true })).stdout);
+  }
+
+  /** Mount a sub-repository as a link. `sourcePath` defaults to the repo root. */
+  async linkAdd(linkPath: string, url: string, sourcePath = '/', pin?: string): Promise<void> {
+    const argv = ['link', 'add', linkPath, url, sourcePath];
+    if (pin) argv.push('--pin', pin);
+    await this.run(argv);
+  }
+
+  /** Remove a link at the given mount path. */
+  async linkRemove(linkPath: string): Promise<void> {
+    await this.run(['link', 'remove', linkPath]);
   }
 
   /** List layers (local overlays). Empty when none. */
-  async layers(): Promise<string[]> {
-    return parseSimpleList((await this.run(['layer', 'list'], { skip: true })).stdout);
+  async layers(): Promise<LoreLayer[]> {
+    return parseLayerList((await this.run(['layer', 'list'], { skip: true })).stdout);
+  }
+
+  /** Add a repository as a layer (overlay) at `path`. */
+  async layerAdd(path: string, repository: string, sourcePath = '/'): Promise<void> {
+    await this.run(['layer', 'add', path, repository, sourcePath]);
+  }
+
+  /** Remove a layer at the given path. */
+  async layerRemove(path: string, repository?: string): Promise<void> {
+    const argv = ['layer', 'remove', path];
+    if (repository) argv.push(repository);
+    await this.run(argv);
   }
 
   // --- Lore-native: sparse view filter (.lore/view, gitignore-style exclusion) ---
@@ -403,5 +472,13 @@ export async function loreLogin(
 /** List stored authentication identities (raw text). Empty when none are stored. */
 export async function loreAuthList(bin: string): Promise<string> {
   const { stdout } = await runLore({ bin, cwd: process.cwd(), argv: ['auth', 'list'], throwOnError: false });
+  return stdout;
+}
+
+/** Identity info for the current (or given) user. Raw text; empty when not authenticated. */
+export async function loreAuthInfo(bin: string, repoPath?: string): Promise<string> {
+  const { stdout } = await runLore({
+    bin, cwd: repoPath ?? process.cwd(), argv: ['auth', 'info'], throwOnError: false,
+  });
   return stdout;
 }

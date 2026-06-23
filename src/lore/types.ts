@@ -33,10 +33,15 @@ export interface LoreFileChange {
   conflicted?: boolean;
 }
 
-/** In-progress merge state, parsed from a `Pending merge, incoming revision <hash>` line. */
+/** A pending conflict-capable operation. */
+export type LoreOperation = 'merge' | 'revert' | 'cherry-pick';
+
+/** In-progress merge/revert/cherry-pick state, parsed from a `Pending <op>, …` line. */
 export interface LoreMergeState {
   inProgress: boolean;
-  /** Incoming (source) revision signature being merged in. */
+  /** Which operation is pending — drives which resolve/abort subcommand the UI uses. */
+  operation: LoreOperation;
+  /** Incoming (source) revision signature, when present. */
   incoming?: string;
 }
 
@@ -106,6 +111,34 @@ export interface LoreFileDiff {
   sourceRevision?: number;
   /** Unified-diff body (the `@@ … @@` hunks and context/changed lines). */
   hunks: string;
+  /** True when the CLI reported `Binary files differ` (no textual diff). */
+  binary?: boolean;
+}
+
+/** A revision plus its changed files (from `revision info --delta`). */
+export interface LoreRevisionDetail {
+  revision: LoreRevision;
+  files: LoreFileChange[];
+}
+
+/** A link (sub-repo mount) from `link list`. */
+export interface LoreLink {
+  id: string;
+  /** Mount path in this repo. */
+  linkPath: string;
+  /** Path inside the linked repo. */
+  sourcePath: string;
+  branch?: string;
+  branchId?: string;
+  revision?: string;
+}
+
+/** A layer (overlay) from `layer list`. */
+export interface LoreLayer {
+  repository: string;
+  revision: string;
+  /** Mapping string, e.g. "/ -> overlay". */
+  paths: string;
 }
 
 export interface LoreBranchRef {

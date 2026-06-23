@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LoreClient, resolveLoreBin, LoreStatus, LoreBranches, LoreLock } from '../lore';
+import { LoreClient, resolveLoreBin, LoreStatus, LoreBranches, LoreLock, LoreRevision, LoreLink, LoreLayer } from '../lore';
 import { RunningCommand } from '../components/types';
 
 interface UseLoreOptions {
@@ -10,11 +10,11 @@ interface UseLoreOptions {
 interface UseLoreResult {
   client: LoreClient | null;
   status: LoreStatus | null;
-  history: Array<{ number: number; message: string }>;
+  history: LoreRevision[];
   branches: LoreBranches | null;
   locks: LoreLock[];
-  links: string[];
-  layers: string[];
+  links: LoreLink[];
+  layers: LoreLayer[];
   /** Active sparse view filter (.lore/view), or null for a full checkout. */
   view: string | null;
   isLoading: boolean;
@@ -31,11 +31,11 @@ interface UseLoreResult {
 export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
   const [client, setClient] = useState<LoreClient | null>(null);
   const [status, setStatus] = useState<LoreStatus | null>(null);
-  const [history, setHistory] = useState<Array<{ number: number; message: string }>>([]);
+  const [history, setHistory] = useState<LoreRevision[]>([]);
   const [branches, setBranches] = useState<LoreBranches | null>(null);
   const [locks, setLocks] = useState<LoreLock[]>([]);
-  const [links, setLinks] = useState<string[]>([]);
-  const [layers, setLayers] = useState<string[]>([]);
+  const [links, setLinks] = useState<LoreLink[]>([]);
+  const [layers, setLayers] = useState<LoreLayer[]>([]);
   const [view, setView] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +75,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
       setError(null);
       const [st, hist, brs, lks, lnk, lyr, vw] = await Promise.all([
         c.status({ scan: true }),
-        c.historyOneline(),
+        c.history(),
         c.branchList(),
         c.locks(),
         c.links(),
