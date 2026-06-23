@@ -48,6 +48,7 @@ function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoD
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [tokenType, setTokenType] = useState<string>('eg1');
   const [token, setToken] = useState<string>('');
+  const [authUrl, setAuthUrl] = useState<string>('');
   const [identity, setIdentity] = useState<string>('');
 
   // Best-effort: show the current auth identity (empty when auth is disabled / not signed in).
@@ -131,7 +132,7 @@ function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoD
     }
   };
 
-  const doLogin = async (opts: { token?: string; tokenType?: string } = {}) => {
+  const doLogin = async (opts: { token?: string; tokenType?: string; authUrl?: string } = {}) => {
     setLoading(true);
     setProgress([]);
     try {
@@ -291,8 +292,14 @@ function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoD
                     onChange={(e) => setToken(e.target.value)}
                   />
                 </div>
+                <input
+                  className="dialog-input"
+                  placeholder="auth URL (e.g. ucs-auth://auth.example.com) — needed for token login outside a repo"
+                  value={authUrl}
+                  onChange={(e) => setAuthUrl(e.target.value)}
+                />
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="dialog-button" disabled={loading || !token.trim()} onClick={() => doLogin({ token: token.trim(), tokenType })}>
+                  <button className="dialog-button" disabled={loading || !token.trim()} onClick={() => doLogin({ token: token.trim(), tokenType, authUrl: authUrl.trim() || undefined })}>
                     Login with token
                   </button>
                   <button className="dialog-button" disabled={loading} onClick={() => doLogin({})} title="Opens a browser to authenticate">
@@ -300,7 +307,9 @@ function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoD
                   </button>
                 </div>
                 <small style={{ color: 'var(--text-secondary)' }}>
-                  Token login is UNTESTED against a secured server (the dev server runs auth-disabled).
+                  Lore auth is JWT/OIDC: a secured server verifies signed tokens against a JWK source.
+                  This flow is wired but UNTESTED — the local dev server runs auth-disabled, so there's
+                  no issuer to verify against here.
                 </small>
               </div>
             )}

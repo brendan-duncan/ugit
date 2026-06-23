@@ -168,6 +168,18 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
 - Validated: 15 new parser assertions + a live run exercising amend/revert/cherry-pick/
   revisionInfo and link/layer add→list→remove. tsc/webpack/build:main clean.
 
+### Binary asset cards + auth finalize — DONE
+- **Binary asset cards**: non-image binaries (detected via `isProbablyBinary` — a NUL byte in
+  the first 8 KB) show a metadata card (name, size, type, hash, revision count + latest
+  message, lock owner) instead of an empty text diff. Verified: text=false, NUL-byte blob=true.
+- **Auth finalize**: the login form now includes the documented `--auth-url` field; the note is
+  accurate (Lore auth is JWT/OIDC — a secured server verifies signed tokens against a JWK
+  source). DECISION: live token-login is **not verified locally** — it needs an OIDC/JWK issuer
+  to mint+verify tokens, which is out of scope for the auth-disabled dev server. The client/UI
+  match the CLI's documented flow (`login [url] --token-type eg1|api-key|lore --token … [--auth-url …]`),
+  but the handshake itself remains untested by design. (Source confirms: `lore-server/src/auth/
+  {jwt,jwk}.rs`.)
+
 ### Lore-centric reframe (phase 2): lazy tree + asset previews — DONE
 - **Lazy tree**: top level loads via `tree(undefined, 1)`; directories fetch their children on
   first expand via `tree(dir, 2)` (merged into the node set). Huge repos no longer materialize

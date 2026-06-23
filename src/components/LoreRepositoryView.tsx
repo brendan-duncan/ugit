@@ -35,6 +35,11 @@ function imageMime(path: string): string | null {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   return IMAGE_MIME[ext] ?? null;
 }
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /**
  * Lore repository panel. Presents Lore's own model (numbered revisions, staged/unstaged split,
@@ -71,6 +76,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [fileInfo, setFileInfo] = useState<LoreFileInfo | null>(null);
   const [fileHist, setFileHist] = useState<LoreFileHistoryEntry[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileBinary, setFileBinary] = useState<boolean>(false);
   const [treeNodes, setTreeNodes] = useState<LoreTreeNode[]>([]);
   const [loadedDirs, setLoadedDirs] = useState<Set<string>>(new Set());
 
@@ -179,12 +185,15 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setFileInfo(null);
     setFileHist([]);
     setPreviewUrl(null);
+    setFileBinary(false);
     setDiffLoading(true);
     try {
       const mime = imageMime(node.path);
       if (mime) {
         const b64 = client!.readWorkingFileBase64(node.path);
         setPreviewUrl(b64 ? `data:${mime};base64,${b64}` : null);
+      } else {
+        setFileBinary(client!.isProbablyBinary(node.path));
       }
       const [info, hist, diff] = await Promise.all([
         client!.fileInfo(node.path),
@@ -647,6 +656,22 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                           </div>
                         ) : imageMime(treeFile.path) ? (
                           <div className="lore-empty">Image too large to preview ({fileInfo ? fileInfo.size : '?'} bytes).</div>
+                        ) : fileBinary ? (
+                          <div style={{ padding: 16 }}>
+                            <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
+                            <div style={{ fontWeight: 600, marginBottom: 8 }}>Binary asset</div>
+                            <div className="lore-file-meta" style={{ padding: 0, lineHeight: 1.8 }}>
+                              <div>name: <code>{treeFile.name}</code></div>
+                              <div>size: <code>{formatBytes(fileInfo?.size ?? treeFile.size)}</code></div>
+                              {fileInfo?.type && <div>type: <code>{fileInfo.type}</code></div>}
+                              {fileInfo?.hash && <div>hash: <code>{fileInfo.hash.slice(0, 16)}</code></div>}
+                              <div>revisions: <code>{fileHist.length}</code>{fileHist[0] && <> · latest: <code>{fileHist[0].message}</code></>}</div>
+                              {lockOwners.has(treeFile.path) && <div>🔒 locked by <code>{lockOwners.get(treeFile.path)}</code></div>}
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 10 }}>
+                              Content-defined chunking — no text diff. Use the history below to see when it changed.
+                            </div>
+                          </div>
                         ) : <LoreDiffView diff={diffText} />}
                     </div>
                     <div className="lore-history-area">

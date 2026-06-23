@@ -333,6 +333,23 @@ export class LoreClient {
     fs.writeFileSync(path.join(this.repoPath, relPath), content, { encoding: 'utf8' });
   }
 
+  /** Heuristic: does the file look binary? (a NUL byte in the first 8 KB). */
+  isProbablyBinary(relPath: string): boolean {
+    try {
+      const fd = fs.openSync(path.join(this.repoPath, relPath), 'r');
+      try {
+        const buf = Buffer.alloc(8192);
+        const n = fs.readSync(fd, buf, 0, buf.length, 0);
+        for (let i = 0; i < n; i++) if (buf[i] === 0) return true;
+        return false;
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch {
+      return false;
+    }
+  }
+
   /** Read a working-tree file as base64 (for asset/image previews). Null if missing/too big. */
   readWorkingFileBase64(relPath: string, maxBytes = 8 * 1024 * 1024): string | null {
     try {
