@@ -231,6 +231,101 @@ Already on branch main latest revision 2 -> 5cfaa95d…2586dc
 ```
 TODO: also capture sync when behind (actually pulls a new revision). Currently surfaced raw.
 
+## branch create
+
+```
+Created branch feature at revision 7fe9e9d8…dda545
+```
+Parse: `Created branch <name> at revision <hash>`.
+
+## branch switch
+
+No file changes (same revision):
+```
+Switching branch to feature, using current local latest revision 7fe9e9d8…
+Switched to branch feature revision 7fe9e9d8…
+```
+With file changes (deltas applied):
+```
+Switching branch to main, using current remote latest revision 7fe9e9d8…
+Calculating deltas 2 -> 1
+Verifying 1 changes with local file system
+Switched to branch main revision 7fe9e9d8…
+```
+Parse the final `Switched to branch <name> revision <hash>` line for the result.
+
+## status — extra sync-line variants
+
+- `Remote branch does not exist` → branch not yet pushed. New sync state: `no-remote`.
+- `Local branch is behind remote` → `behind` (seen on a stale clone before sync).
+
+## push (branch + summary lines)
+
+```
+Creating branch feature at 7fe9e9d8…           (only when the remote branch is new)
+Pushing 1 fragment(s)
+Pushed 1 fragment(s), 227.00 bytes
+Pushing 5b2ba28a… to branch feature
+Pushed revision 2 -> 5b2ba28a… to branch feature
+```
+Parse: one or more `Pushed revision <N> -> <hash> to branch <branch>` lines (the structured
+result), plus the `Pushed <n> fragment(s), <bytes>` summary. `Creating branch …` appears only
+for a brand-new remote branch.
+
+## sync (pull-forward, when behind)
+
+```
+Sync from remote lore://127.0.0.1:41337
+On branch main revision 1 -> 7fe9e9d8…
+Synchronizing to revision 2 -> 96000046…
+Calculating deltas 1 -> 2
+Verifying 1 changes with local file system
+```
+vs. already up to date: `Already on branch <b> latest revision <N> -> <hash>`.
+Parse: `Synchronizing to revision <N> -> <hash>` (pulled) OR the `Already on branch …` line
+(no-op). `Sync from remote <url>` gives the remote URL.
+
+## auth list
+
+Empty output (exit 0) when no identities are stored — the dev server has auth disabled, so no
+login is needed. (Auth-required error shape against a secured server: still TODO.)
+
+## file locks (Perforce-style)
+
+`lore lock acquire <paths>`:
+```
+Lock acquired on files:
+f.txt
+```
+`lore lock status <paths>`:
+```
+Files locked for edit:
+f.txt by <unknown> on Tue, 23 Jun 2026 17:12:34 +0000
+```
+`lore lock query [--branch <b>] [--owner <id>] [--path <p>]`:
+```
+Locks found:
+f.txt by <unknown> on branch e726318bbc3fd75ac8733a7e030cc35b
+```
+(empty list → just `Locks found:` with no rows). `lore lock release <paths>`:
+```
+Lock released on files:
+f.txt
+```
+Parse notes: lock rows are `<path> by <owner> on branch <hash>` (query) or
+`<path> by <owner> on <date>` (status). Owner is `<unknown>` here because the dev server has
+auth disabled (no identity). `query` is the list source for the panel; `acquire`/`release`
+return a `… on files:` block listing affected paths.
+
+## links / layers (empty in dev)
+
+```
+$ lore link list   -> No links found in this repository
+$ lore layer list  -> No layers
+```
+Populated formats are still TODO (need a second repo to link/layer). Parser treats the
+"No links…/No layers" lines as empty lists.
+
 ## OPEN / to investigate
 - Capture `D` (delete), move, and copy rows in status, and the corresponding diff output.
 - Capture `sync` when the local branch is BEHIND (a real pull), and `push` to a protected

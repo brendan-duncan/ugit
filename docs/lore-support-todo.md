@@ -98,11 +98,53 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
 - `parseBranchList` + `LoreClient.branchList()` added (live-verified: `{local:[main*],
   remote:[main]}`). `push`/`sync` live-verified against the dev server.
 
-Next UI steps: parse push/sync into structured summaries (fixtures captured); show branches in
-the panel; wire commit/refresh into the app toolbar/menu; Lore-native surfaces (sparse
-`.lore/view`, links/layers, locks); a Lore-aware open/create flow (server-addressed `lore://`
-URLs, not just folder-pick); capture the still-missing fixtures (delete/move rows, sync-when-
-behind, merge/conflict, binary diff).
+### In-app create/clone flow — DONE
+- `cloneLoreRepository()` added + `createLoreRepository()` now mkdirs its target.
+- `src/components/LoreRepoDialog.tsx` — server-addressed dialog (NOT the git folder-pick):
+  Create-new or Clone-existing modes, `lore://host:port/` URL + parent folder + name, and
+  Lore-native clone options (sparse `--view` filter, `--bare`). On success it opens the new
+  repo as a tab (detection renders the Lore panel).
+- `src/main.ts` — File menu gains **New/Clone Lore Repository...** → sends `show-lore-repo-dialog`.
+- `src/App.tsx` — listens for `show-lore-repo-dialog`, renders `LoreRepoDialog`, wires
+  onCreated → `openRepository(path)`.
+- Verified: tsc/webpack/build:main clean; live create→commit→push→clone→verify loop passes
+  (clone lands files, status `in-sync`).
+- Known limits: clone awaits with no streaming progress (fine for dev-sized repos; large
+  clones should move to a background+progress flow like git's CloneProgressView). No auth UI
+  (dev server has auth disabled).
+
+### Structured push/sync + branch switching + clone progress + auth — DONE
+- Parsers added & validated (18 assertions): `parsePushResult`, `parseSyncResult`,
+  `parseBranchCreate`, `parseBranchSwitch`, plus status `no-remote` ("Remote branch does not
+  exist") and `behind`. Fixtures in [lore-cli-output-samples.md](lore-cli-output-samples.md).
+- `LoreClient`: `push()`/`sync()` now return structured results; added `createBranch`,
+  `switchBranch`, `branchList` (loaded by `useLore`). Live-verified end-to-end.
+- `LoreRepositoryView`: header branch **picker** (switch) + **+ Branch** (create), and
+  **Push**/**Sync** now show concise summaries instead of raw text.
+- Clone progress: `runLoreStreaming` (spawn, line-by-line) + `cloneLoreRepositoryStreaming`;
+  `LoreRepoDialog` shows live progress (verified: emits "Cloned N/N files …", "Clone
+  complete"). NOTE: progress streams IN the dialog (modal), not a background tab like git's
+  CloneProgressView — backgrounding is still a future step.
+- Auth: `loreLogin` / `loreAuthList` helpers + `isLoreAuthError` heuristic; dialog has a
+  **Login** button and shows an auth hint on auth-classified errors. UNTESTED against a
+  secured server (dev server runs auth-disabled); `authList` returns empty as expected.
+
+### Lore-native surfaces: file locks (+ links/layers read-only) — DONE
+- Parsers (validated, 12 assertions): `parseLocks` (query + status row shapes),
+  `parseLockAffectedPaths`, `parseSimpleList` (link/layer lists). Fixtures in
+  [lore-cli-output-samples.md](lore-cli-output-samples.md).
+- `LoreClient`: `locks(branch?)`, `lockAcquire`, `lockRelease`, `links()`, `layers()`.
+  `useLore` loads all three.
+- `LoreRepositoryView`: per-file **Lock/Unlock** buttons + 🔒 indicator on locked rows, a
+  **Locks** section listing locked files (owner + Release), and Links/Layers counts when present.
+- Live-verified: acquire → query shows the lock (owner `<unknown>`, auth disabled) → release
+  clears it. Tab color-coding for lore tabs also landed (violet accent).
+
+Next UI steps: tab-color persistence for restored tabs is handled (App decorates tabs);
+remaining — links/layers ADD/remove + populated-list parsing (need a 2nd repo to link/layer),
+a richer sparse `.lore/view` editor, background-tab clone (reuse CloneProgressView), wire
+commit/refresh into the app toolbar/menu, auth against a secured server + token-login dialog,
+and the still-missing fixtures (delete/move rows, merge/conflict, binary diff).
 
 ## Concrete steps
 
