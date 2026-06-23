@@ -123,6 +123,11 @@ export class LoreStashStore {
     fs.writeFileSync(file, JSON.stringify(manifest, null, 2));
   }
 
+  /** Read a stashed file's captured bytes (for viewing stash contents). Null if missing. */
+  readBlobBytes(id: string, blob: string): Buffer | null {
+    try { return fs.readFileSync(path.join(this.stashDir(id), 'blobs', blob)); } catch { return null; }
+  }
+
   /** Delete a stash. */
   remove(id: string): void {
     fs.rmSync(this.stashDir(id), { recursive: true, force: true });

@@ -10,9 +10,10 @@ import LoreChangeTree from './LoreChangeTree';
 import LoreMediaView from './LoreMediaView';
 import LoreContextMenu, { LoreMenuItem } from './LoreContextMenu';
 import LoreStashDialog from './LoreStashDialog';
+import LoreApplyStashDialog from './LoreApplyStashDialog';
 import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
 import { clipboard } from 'electron';
-import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, StashInput } from '../lore';
+import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, LoreStashFile, StashInput } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
 
@@ -91,6 +92,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const anchorRef = useRef<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; items: LoreMenuItem[] } | null>(null);
   const [stashDialog, setStashDialog] = useState<{ files: StashInput[]; selectedOnly: boolean } | null>(null);
+  const [applyStashTarget, setApplyStashTarget] = useState<LoreStash | null>(null);
+  const [selectedStash, setSelectedStash] = useState<LoreStash | null>(null);
+  const [stashFile, setStashFile] = useState<{ file: LoreStashFile; kind: 'image' | 'audio' | 'text' | 'binary'; content?: string; url?: string } | null>(null);
   // Default to the Lore-centric repository tree; Changes (commit flow) and Graph are toggles.
   const [viewMode, setViewMode] = useState<'changes' | 'files' | 'graph'>('files');
   const [treeFile, setTreeFile] = useState<LoreTreeNode | null>(null);
@@ -170,6 +174,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
 
   const onSelectFilePath = useCallback(async (filePath: string) => {
     setRevDetail(null);
+    setSelectedStash(null);
     setSelectedPath(filePath);
     setHistoryDiff(false);
     setDiffText('');
@@ -340,21 +345,46 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     }
   };
   const applyStash = (id: string, pop: boolean) => runAction(async () => { await stashStore!.apply(id, pop); });
-  const deleteStash = (id: string) => runAction(async () => { stashStore!.remove(id); });
+  const openApplyStash = (s: LoreStash) => setApplyStashTarget(s);
+  const deleteStash = (s: LoreStash) => {
+    showConfirm(`Delete stash "${s.message}"? This cannot be undone.`, 'Delete stash').then(ok => {
+      if (!ok) return;
+      runAction(async () => {
+        stashStore!.remove(s.id);
+        if (selectedStash?.id === s.id) { setSelectedStash(null); setStashFile(null); }
+      });
+    });
+  };
   const renameStash = (s: LoreStash) => {
     const m = window.prompt('Stash description:', s.message);
     if (m === null) return;
     const d = window.prompt('Details (optional):', s.description) ?? s.description;
     runAction(async () => { stashStore!.rename(s.id, m.trim() || s.message, d); });
   };
+  // Single click shows the stash's contents (does not apply it).
+  const onSelectStash = (s: LoreStash) => {
+    setSelectedStash(s);
+    setStashFile(null);
+    setSelectedPath(null);
+    setRevDetail(null);
+    setTreeFile(null);
+  };
+  const onSelectStashFile = (s: LoreStash, file: LoreStashFile) => {
+    const media = mediaMime(file.path);
+    const bytes = file.blob ? stashStore!.readBlobBytes(s.id, file.blob) : null;
+    if (!bytes) { setStashFile({ file, kind: 'binary' }); return; }
+    if (media) { setStashFile({ file, kind: media.kind, url: `data:${media.mime};base64,${bytes.toString('base64')}` }); return; }
+    if (bytes.includes(0)) { setStashFile({ file, kind: 'binary' }); return; }
+    setStashFile({ file, kind: 'text', content: bytes.toString('utf8') });
+  };
   const onStashMenu = (e: React.MouseEvent, s: LoreStash) => {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, items: [
-      { label: 'Apply (keep stash)', onClick: () => applyStash(s.id, false) },
-      { label: 'Pop (apply & delete)', onClick: () => applyStash(s.id, true) },
+      { label: 'Show Contents', onClick: () => onSelectStash(s) },
+      { label: 'Apply…', onClick: () => openApplyStash(s) },
       { label: 'Rename…', onClick: () => renameStash(s) },
       { separator: true },
-      { label: 'Delete', danger: true, onClick: () => deleteStash(s.id) },
+      { label: 'Delete…', danger: true, onClick: () => deleteStash(s) },
     ] });
   };
 
@@ -397,6 +427,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
 
   const onSelectRevision = useCallback(async (rev: { signature: string }) => {
     setSelectedPath(null);
+    setSelectedStash(null);
     setRevDetail(null);
     try {
       setRevDetail(await client!.revisionInfo(rev.signature));
@@ -427,6 +458,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setTreeFile(node);
     setSelectedPath(node.path);
     setRevDetail(null);
+    setSelectedStash(null);
     setDiffText('');
     setFileInfo(null);
     setFileHist([]);
@@ -738,8 +770,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   <button className="lore-mini-btn" disabled={busy} onClick={doStashAll}>Stash all</button>
                 </div>
                 {stashes.length ? stashes.map(s => (
-                  <div key={s.id} className="lore-row" onClick={() => applyStash(s.id, false)}
-                    onContextMenu={(e) => onStashMenu(e, s)} title={`${s.message}${s.description ? '\n\n' + s.description : ''}\n\n${s.files.length} file(s) on ${s.branch} · ${new Date(s.date).toLocaleString()}`}>
+                  <div key={s.id} className={`lore-row ${selectedStash?.id === s.id ? 'selected' : ''}`}
+                    onClick={() => onSelectStash(s)} onDoubleClick={() => openApplyStash(s)}
+                    onContextMenu={(e) => onStashMenu(e, s)} title={`${s.message}${s.description ? '\n\n' + s.description : ''}\n\n${s.files.length} file(s) on ${s.branch} · ${new Date(s.date).toLocaleString()}\n\nClick to view · double-click to apply`}>
                     <span>📦</span>
                     <span className="lore-row-name">{s.message}</span>
                     <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{s.files.length}</span>
@@ -1011,7 +1044,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
 
                 <div className="lore-detail-col">
                   <div className="lore-detail-header">
-                    {selectedPath ? `Diff: ${selectedPath}`
+                    {selectedStash ? `Stash: ${selectedStash.message}`
+                      : selectedPath ? `Diff: ${selectedPath}`
                       : revDetail ? `Revision ${revDetail.revision.number}`
                       : 'Diff'}
                     {selectedPath && revDetail && (
@@ -1019,7 +1053,39 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     )}
                   </div>
                   <div className="lore-diff-area">
-                    {selectedPath && mediaKind ? (
+                    {selectedStash ? (
+                      stashFile ? (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 4 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{stashFile.file.path}</span>
+                            <button className="lore-mini-btn" onClick={() => setStashFile(null)}>← files</button>
+                          </div>
+                          {stashFile.kind === 'image' || stashFile.kind === 'audio'
+                            ? <LoreMediaView kind={stashFile.kind} name={stashFile.file.path} newUrl={stashFile.url ?? null} />
+                            : stashFile.kind === 'binary'
+                              ? <div className="lore-empty">Binary file — no preview.</div>
+                              : <pre className="lore-file-content">{stashFile.content ?? ''}</pre>}
+                        </>
+                      ) : (
+                        <div style={{ padding: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{selectedStash.message}</div>
+                          {selectedStash.description && <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', margin: '4px 0' }}>{selectedStash.description}</div>}
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>on {selectedStash.branch} · {new Date(selectedStash.date).toLocaleString()}</div>
+                          <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
+                            <button className="lore-mini-btn" disabled={busy} onClick={() => openApplyStash(selectedStash)}>Apply…</button>
+                            <button className="lore-mini-btn" disabled={busy} onClick={() => deleteStash(selectedStash)}>Delete…</button>
+                          </div>
+                          <div className="lore-changes-group-header"><span>Files ({selectedStash.files.length})</span></div>
+                          {selectedStash.files.map(f => (
+                            <div key={f.path} className={`lore-row ${stashFile?.file.path === f.path ? 'selected' : ''}`} onClick={() => onSelectStashFile(selectedStash, f)} title={f.path}>
+                              <span className="lore-code" style={{ color: changeColor(f.change) }}>{f.change}</span>
+                              <span className="lore-row-name">{f.path}</span>
+                              {f.staged && <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>staged</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    ) : selectedPath && mediaKind ? (
                       <LoreMediaView kind={mediaKind} name={selectedPath.split('/').pop() || selectedPath} newUrl={mediaNewUrl} oldUrl={mediaOldUrl} loadingOld={mediaLoadingOld} />
                     ) : selectedPath ? (
                       diffLoading ? <div className="lore-empty">Loading diff…</div> : <LoreDiffView diff={diffText} />
@@ -1076,6 +1142,14 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           selectedOnly={stashDialog.selectedOnly}
           onClose={() => setStashDialog(null)}
           onCreate={createStash}
+        />
+      )}
+
+      {applyStashTarget && (
+        <LoreApplyStashDialog
+          stash={applyStashTarget}
+          onClose={() => setApplyStashTarget(null)}
+          onApply={async (pop) => { await applyStash(applyStashTarget.id, pop); if (pop) { setSelectedStash(null); setStashFile(null); } }}
         />
       )}
 
