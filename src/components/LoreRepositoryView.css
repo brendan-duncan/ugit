@@ -198,3 +198,44 @@
 }
 .lore-merge-banner code { color: var(--text-primary); }
 .lore-changes-group-header.conflict { color: var(--danger-color); }
+
+/* Interactive merge resolver overlay */
+.lore-resolver-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+}
+.lore-resolver {
+  width: 80%; max-width: 1000px; height: 82%;
+  background: var(--bg-primary); color: var(--text-primary);
+  border: 1px solid var(--border-color); border-radius: 6px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.lore-resolver-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-bottom: 1px solid var(--border-color);
+}
+.lore-resolver-body { flex: 1; overflow: auto; padding: 8px 12px; }
+.lore-resolver-footer {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-top: 1px solid var(--border-color);
+}
+.lore-conflict-block { border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 12px; }
+.lore-conflict-side { border-bottom: 1px solid var(--border-color); }
+.lore-conflict-side:last-child { border-bottom: none; }
+.lore-conflict-side-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.lore-conflict-side.ours .lore-conflict-side-head { background: color-mix(in srgb, var(--success-color) 22%, var(--bg-secondary)); }
+.lore-conflict-side.base .lore-conflict-side-head { background: var(--bg-tertiary); color: var(--text-secondary); }
+.lore-conflict-side.theirs .lore-conflict-side-head { background: color-mix(in srgb, var(--accent-color) 22%, var(--bg-secondary)); }
+.lore-conflict-code { margin: 0; padding: 4px 8px; font-size: 12px; white-space: pre-wrap; font-family: monospace; background: var(--bg-secondary); }
+.lore-conflict-block.resolved { opacity: 0.85; border-color: var(--success-color); }
+.lore-resolver-result { font-family: monospace; font-size: 12px; white-space: pre-wrap; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; max-height: 220px; overflow: auto; }
+.lore-resolver-edit { width: 100%; min-height: 320px; box-sizing: border-box; font-family: monospace; font-size: 12px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; resize: vertical; }
+.lore-chip {
+  font-size: 11px; padding: 1px 8px; border-radius: 9px;
+  background: var(--bg-tertiary); color: var(--text-secondary);
+}
+.lore-chip.active { background: var(--accent-color); color: var(--text-highlight); }

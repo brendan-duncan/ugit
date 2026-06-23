@@ -168,6 +168,22 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
 - Validated: 15 new parser assertions + a live run exercising amend/revert/cherry-pick/
   revisionInfo and link/layer add→list→remove. tsc/webpack/build:main clean.
 
+### Interactive merge resolver + revision graph — DONE
+- **Interactive 3-way resolver** (`LoreMergeResolver`): parses Lore's diff3 markers
+  (`conflictParser`: ours/base/theirs), per-conflict choice (ours/theirs/both/base) + manual
+  text edit, live result preview; writes the composed file and marks it resolved via
+  `<op> resolve <path>` (no side). Opened from a conflict row's "Resolve…" button. Validated:
+  14 conflict-parser assertions; manual-resolve CLI flow proven.
+- **Revision graph** (`LoreRevisionGraph` + pure `computeGraphLayout`): lane-based DAG across
+  all local branches (`graphRevisions` unions per-branch history), handles 2-parent merges,
+  SVG nodes/edges with revision numbers, and a Lore-centric **local-HEAD / remote-HEAD sync
+  boundary**. Toolbar **Graph** toggle. Validated: 9 layout assertions + live cross-branch
+  merge (4 edges, 2 lanes). `parseHistory` reconstructs first-parent chain from sequence +
+  the `Merge :` line.
+- Design note: started the **Lore-centric reframe** — next is foregrounding the revision/sync
+  gauge, a sparse repository tree with inline lock owners, and per-file (asset) history, while
+  keeping the git-panel chrome/polish.
+
 ### Merge & conflict resolution — DONE
 - Parsers (validated, 14 assertions): `parseMergeResult` + status `Pending merge`/`Changes in
   conflict:` handling (strips the `(M)!` annotation, routes to `status.conflicted`, sets

@@ -3,6 +3,8 @@ import { useLore } from '../hooks/useLore';
 import { useAlert } from '../contexts/AlertContext';
 import { LoreFileChange } from '../lore';
 import LoreDiffView from './LoreDiffView';
+import LoreMergeResolver from './LoreMergeResolver';
+import LoreRevisionGraph from './LoreRevisionGraph';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
 
@@ -30,7 +32,7 @@ function changeColor(code: string): string {
  */
 function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: LoreRepositoryViewProps) {
   const { showAlert } = useAlert();
-  const { client, status, history, branches, locks, links, layers, view, isLoading, error, commandState, refresh } = useLore({
+  const { client, status, history, branches, locks, links, layers, graph, view, isLoading, error, commandState, refresh } = useLore({
     repoPath,
     onError: (err) => showAlert(err.message, 'Lore error'),
   });
@@ -51,6 +53,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [linkForm, setLinkForm] = useState({ path: '', url: '', src: '/' });
   const [showAddLayer, setShowAddLayer] = useState(false);
   const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/' });
+  const [resolvingPath, setResolvingPath] = useState<string | null>(null);
+  const [showGraph, setShowGraph] = useState(false);
   const [leftWidth, setLeftWidth] = useState<number>(28);
   const draggingSplitter = useRef(false);
 
@@ -297,6 +301,10 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           <span className="toolbar-button-icon">🌿</span>
           <span className="toolbar-button-label">Branch</span>
         </button>
+        <button className={`toolbar-button ${showGraph ? 'active' : ''}`} onClick={() => setShowGraph(g => !g)}>
+          <span className="toolbar-button-icon">🕸</span>
+          <span className="toolbar-button-label">Graph</span>
+        </button>
         <div className="toolbar-separator" />
         {commandState.length > 0 &&
           <div className="toolbar-status"><span className="toolbar-busy-spinner" title={lastCommand}>↻</span></div>}
@@ -488,6 +496,24 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   <button className="lore-mini-btn" disabled={busy} onClick={doMergeAbort}>Abort {status.merge.operation}</button>
                 </div>
               )}
+              {showGraph ? (
+                <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                  <div className="lore-detail-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>Revision graph ({graph.length})</span>
+                    <span style={{ flex: 1 }} />
+                    <button className="lore-mini-btn" onClick={() => setShowGraph(false)}>Close</button>
+                  </div>
+                  <div style={{ height: 'calc(100% - 30px)' }}>
+                    <LoreRevisionGraph
+                      revisions={graph}
+                      localHead={status.local.signature}
+                      remoteHead={status.remote.signature}
+                      selectedSignature={revDetail?.revision.signature}
+                      onSelect={(rev) => { onSelectRevision(rev); }}
+                    />
+                  </div>
+                </div>
+              ) : (
               <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
                 <div className="lore-changes-col">
                   <div className="lore-changes-scroll">
@@ -503,8 +529,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                             <span className="lore-code" style={{ color: 'var(--danger-color)' }}>!</span>
                             <span className="lore-row-name" title={f.path}>{f.path}</span>
                             <span className="lore-row-actions">
-                              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doResolve(f.path, 'mine'); }} title="Resolve using my changes">Use mine</button>
-                              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doResolve(f.path, 'theirs'); }} title="Resolve using their changes">Use theirs</button>
+                              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); setResolvingPath(f.path); }} title="Open the 3-way resolver">Resolve…</button>
+                              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doResolve(f.path, 'mine'); }} title="Resolve using my changes">Mine</button>
+                              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doResolve(f.path, 'theirs'); }} title="Resolve using their changes">Theirs</button>
                             </span>
                           </div>
                         ))}
@@ -593,10 +620,21 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </>
         )}
       </div>
+
+      {resolvingPath && client && (
+        <LoreMergeResolver
+          client={client}
+          path={resolvingPath}
+          operation={status?.merge?.operation ?? 'merge'}
+          onClose={() => setResolvingPath(null)}
+          onResolved={() => { setResolvingPath(null); refresh(); }}
+        />
+      )}
     </div>
   );
 }

@@ -87,8 +87,10 @@ export interface LoreMergeResult {
 export interface LoreRevision {
   number: number;
   signature: string;
-  /** Parent signature, when present (absent on the first revision). */
+  /** Parent signature, when present (absent on the first revision). First of `parents`. */
   parent?: string;
+  /** All parent signatures. A merge revision has two (from the `Merge :` line). */
+  parents: string[];
   branch: string;
   /** Raw date string (RFC-2822 form the CLI prints). */
   date: string;
@@ -195,6 +197,14 @@ export interface LoreLock {
   /** Acquisition date string (from `lock status`). */
   date?: string;
 }
+
+/** Per-conflict resolution choice in the interactive resolver. */
+export type ConflictChoice = 'ours' | 'theirs' | 'both-ot' | 'both-to' | 'base';
+
+/** A segment of a conflicted file: either unchanged text or a 3-way conflict block. */
+export type ConflictSegment =
+  | { type: 'stable'; lines: string[] }
+  | { type: 'conflict'; ours: string[]; base: string[]; theirs: string[] };
 
 /** Options shared by most Lore CLI invocations. */
 export interface LoreRunOptions {

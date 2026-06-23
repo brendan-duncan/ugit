@@ -171,6 +171,7 @@ const KV_RE = /^([A-Za-z]+)\s*:\s*(.*)$/;
  */
 export function parseRevisionBlock(lines: string[]): LoreRevision | null {
   const rev: Partial<LoreRevision> = {};
+  let parents: string[] = [];
   const messageLines: string[] = [];
   let sawNumber = false;
 
@@ -187,7 +188,9 @@ export function parseRevisionBlock(lines: string[]): LoreRevision | null {
     switch (key) {
       case 'revision': rev.number = parseInt(value, 10); sawNumber = true; break;
       case 'signature': rev.signature = value; break;
-      case 'parent': rev.parent = value; break;
+      case 'parent': parents = [value]; break;
+      // A merge revision lists multiple parents: "Merge : <p1> <p2>".
+      case 'merge': parents = value.split(/\s+/).filter(Boolean); break;
       case 'branch': rev.branch = value; break;
       case 'date': rev.date = value; break;
       // 'repository' line (in commit output) intentionally ignored here.
@@ -198,7 +201,8 @@ export function parseRevisionBlock(lines: string[]): LoreRevision | null {
   return {
     number: rev.number,
     signature: rev.signature,
-    parent: rev.parent,
+    parent: parents[0],
+    parents,
     branch: rev.branch ?? '',
     date: rev.date ?? '',
     message: messageLines.join('\n').trim(),
@@ -300,7 +304,15 @@ export function parseLayerList(text: string): LoreLayer[] {
   return layers;
 }
 
-/** Parse full `lore history` (default) → list of revision blocks (newest first). */
+/**
+ * Parse full `lore history` (default) → list of revision blocks (newest first).
+ *
+ * `history` prints the first-parent chain implicitly via ORDER (each entry's primary parent is
+ * the next, older entry) and annotates only the *additional* parent of a merge via a single
+ * `Merge : <hash>` line — unlike `revision info`, which lists both parents. So we reconstruct
+ * each revision's parents = [sequential-next (primary), …merge parents]. This keeps the graph
+ * edges correct.
+ */
 export function parseHistory(text: string): LoreRevision[] {
   const blocks: string[][] = [];
   let current: string[] = [];
@@ -313,7 +325,16 @@ export function parseHistory(text: string): LoreRevision[] {
     }
   }
   if (current.length) blocks.push(current);
-  return blocks.map(parseRevisionBlock).filter((r): r is LoreRevision => r != null);
+
+  const revs = blocks.map(parseRevisionBlock).filter((r): r is LoreRevision => r != null);
+  return revs.map((rev, i) => {
+    const seqParent = revs[i + 1]?.signature; // older neighbor = primary parent
+    const annotated = rev.parents; // from Parent:/Merge: lines in this block
+    const parents: string[] = [];
+    if (seqParent) parents.push(seqParent);
+    for (const p of annotated) if (p !== seqParent && !parents.includes(p)) parents.push(p);
+    return { ...rev, parents, parent: parents[0] };
+  });
 }
 
 /**

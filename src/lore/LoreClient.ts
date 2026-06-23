@@ -167,12 +167,27 @@ export class LoreClient {
     return parseCommitResult(stdout);
   }
 
-  /** Revision history, newest first. `length` caps the number returned. */
-  async history(length?: number): Promise<LoreRevision[]> {
+  /** Revision history, newest first. `length` caps the number returned; `branch` scopes it. */
+  async history(length?: number, branch?: string): Promise<LoreRevision[]> {
     const argv = ['history'];
+    if (branch) argv.push('--branch', branch);
     if (length != null) argv.push(String(length));
-    const { stdout } = await this.run(argv);
+    const { stdout } = await this.run(argv, { skip: !!branch });
     return parseHistory(stdout);
+  }
+
+  /**
+   * Union of revisions across all local branches (deduped by signature) — the data a revision
+   * graph needs. Bounded by `perBranch` revisions per branch.
+   */
+  async graphRevisions(perBranch = 200): Promise<LoreRevision[]> {
+    const branches = await this.branchList();
+    const seen = new Map<string, LoreRevision>();
+    for (const b of branches.local) {
+      const revs = await this.history(perBranch, b.name);
+      for (const r of revs) if (!seen.has(r.signature)) seen.set(r.signature, r);
+    }
+    return [...seen.values()];
   }
 
   /** Compact history list ({number, message}) for the log view. */
@@ -280,6 +295,16 @@ export class LoreClient {
   /** Move/rename a file (record after the file has been moved on disk). */
   async stageMove(from: string, to: string): Promise<void> {
     await this.run(['stage', 'move', from, to]);
+  }
+
+  /** Read a working-tree file's text content (relative path). */
+  readWorkingFile(relPath: string): string {
+    return fs.readFileSync(path.join(this.repoPath, relPath), 'utf8');
+  }
+
+  /** Write a working-tree file's text content (relative path), BOM-free. */
+  writeWorkingFile(relPath: string, content: string): void {
+    fs.writeFileSync(path.join(this.repoPath, relPath), content, { encoding: 'utf8' });
   }
 
   /** Push local commits to the remote. Returns the pushed revisions + byte/fragment summary. */

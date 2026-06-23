@@ -4,6 +4,8 @@
 export * from './types';
 export * from './loreProcess';
 export * from './loreParsers';
+export * from './conflictParser';
+export * from './graphLayout';
 export {
   LoreClient,
   createLoreRepository,

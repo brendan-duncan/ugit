@@ -15,6 +15,8 @@ interface UseLoreResult {
   locks: LoreLock[];
   links: LoreLink[];
   layers: LoreLayer[];
+  /** Revisions unioned across all local branches, for the revision graph. */
+  graph: LoreRevision[];
   /** Active sparse view filter (.lore/view), or null for a full checkout. */
   view: string | null;
   isLoading: boolean;
@@ -36,6 +38,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
   const [locks, setLocks] = useState<LoreLock[]>([]);
   const [links, setLinks] = useState<LoreLink[]>([]);
   const [layers, setLayers] = useState<LoreLayer[]>([]);
+  const [graph, setGraph] = useState<LoreRevision[]>([]);
   const [view, setView] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,13 +76,14 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     try {
       setIsLoading(true);
       setError(null);
-      const [st, hist, brs, lks, lnk, lyr, vw] = await Promise.all([
+      const [st, hist, brs, lks, lnk, lyr, gr, vw] = await Promise.all([
         c.status({ scan: true }),
         c.history(),
         c.branchList(),
         c.locks(),
         c.links(),
         c.layers(),
+        c.graphRevisions(),
         c.readView(),
       ]);
       setStatus(st);
@@ -88,6 +92,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
       setLocks(lks);
       setLinks(lnk);
       setLayers(lyr);
+      setGraph(gr);
       setView(vw);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load Lore repository';
@@ -103,5 +108,5 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     if (client) load();
   }, [client, load]);
 
-  return { client, status, history, branches, locks, links, layers, view, isLoading, error, commandState, refresh: load };
+  return { client, status, history, branches, locks, links, layers, graph, view, isLoading, error, commandState, refresh: load };
 }

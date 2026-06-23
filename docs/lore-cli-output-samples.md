@@ -443,6 +443,31 @@ Repository                Revision                Paths
 stored identities (empty). `login [url] --token-type <eg1|api-key|lore> --token <t>` for
 non-interactive login (UNTESTED against a secured server).
 
+## conflict markers + manual resolve
+
+Conflicted files use diff3 markers:
+```
+line1
+<<<<<<< ours
+MAIN
+||||||| original
+line2
+=======
+FEATURE
+>>>>>>> theirs
+line3
+```
+To resolve manually: write a marker-free file, then `branch merge resolve <path>` (no
+mine/theirs) → `Resolved conflicts:` and the file is staged. The interactive resolver uses
+exactly this (compose file → `<op> resolve <path>`).
+
+## merge revision parents — `history` vs `revision info`
+
+- `revision info` lists BOTH parents on one line: `Merge : <p1> <p2>`.
+- `history` lists only the *additional* (incoming) parent: `Merge : <hash>`, and the primary
+  parent is the NEXT (older) entry in sequence (no `Parent :` lines). `parseHistory` therefore
+  reconstructs `parents = [sequential-next, …merge]`. (This is what the revision graph needs.)
+
 ## OPEN / to investigate
 - Capture `D` (delete), move, and copy rows in status, and the corresponding diff output.
 - Capture `sync` when the local branch is BEHIND (a real pull), and `push` to a protected
