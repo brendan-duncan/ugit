@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
+import LoreRepositoryView from './components/LoreRepositoryView';
+import { detectRepositoryType, RepoType } from './utils/repoType';
 import CloneDialog from './components/CloneDialog';
 import CloneProgressView from './components/CloneProgressView';
 import InitRepositoryDialog from './components/InitRepositoryDialog';
@@ -19,6 +21,10 @@ interface Tab {
   id: string;
   path: string;
   name: string;
+  // Which VCS backs this repo. Detected on open; drives which repository view renders
+  // (git → RepositoryView, lore → LoreRepositoryView). May be undefined for tabs created
+  // before detection (e.g. a clone in flight); the render falls back to live detection.
+  type?: RepoType;
   // Set while a background clone is populating this tab. When cloning, `path` holds
   // the intended target path (which may not exist on disk yet) and the tab renders
   // a progress view instead of a RepositoryView.
@@ -329,7 +335,8 @@ function App(): React.ReactElement {
     const newTab: Tab = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       path: repoPath,
-      name: repoPath.split(/[\\/]/).pop() || repoPath
+      name: repoPath.split(/[\\/]/).pop() || repoPath,
+      type: detectRepositoryType(repoPath)
     };
 
     setTabs([...currentTabs, newTab]);
@@ -573,6 +580,13 @@ function App(): React.ReactElement {
                       }
                     }}
                     onClose={() => closeTab(tab.id)}
+                  />
+                ) : (tab.type ?? detectRepositoryType(tab.path)) === 'lore' ? (
+                  <LoreRepositoryView
+                    repoPath={tab.path}
+                    isActiveTab={tab.id === activeTabId}
+                    onTabStatusChange={tabStatusHandlers[tab.id]}
+                    refreshSignal={refreshSignal[tab.path] || 0}
                   />
                 ) : (
                   <RepositoryView
