@@ -1,0 +1,187 @@
+/* Lore panel styling. Reuses the git RepositoryView chrome classes (.repository-view,
+   .toolbar, .repo-content-horizontal, .repo-sidebar, .horizontal-splitter-handle,
+   .repo-content-viewer) from RepositoryView.css / Toolbar.css, and adds Lore-specific
+   section styles below, all keyed off the shared theme variables so it matches git tabs. */
+
+.lore-sidebar-section {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.lore-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Repo info card (top of sidebar) */
+.lore-info-card {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-bottom: 1px solid var(--border-color);
+}
+.lore-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.lore-info-label { color: var(--text-secondary); }
+.lore-info-value { color: var(--repo-info-local-color); font-family: monospace; }
+
+.lore-badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.lore-badge.in-sync { color: var(--success-color); }
+.lore-badge.ahead,
+.lore-badge.behind,
+.lore-badge.diverged { color: var(--warning-color); }
+.lore-badge.no-remote { color: var(--text-secondary); }
+
+/* Generic list rows (branches, locks, files) */
+.lore-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lore-row:hover { background: var(--bg-tertiary); }
+.lore-row.selected { background: var(--accent-color); color: var(--text-selected); }
+.lore-row.current { background: var(--current-branch-bg); color: var(--current-branch-color); }
+.lore-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lore-code {
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+  font-family: monospace;
+}
+.lore-row-actions { display: flex; gap: 4px; opacity: 0; }
+.lore-row:hover .lore-row-actions,
+.lore-row.always-actions .lore-row-actions { opacity: 1; }
+.lore-lock-owner { color: var(--text-secondary); font-size: 11px; }
+
+.lore-empty {
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 3px 10px 8px;
+  font-style: italic;
+}
+
+.lore-mini-btn {
+  font-size: 11px;
+  padding: 1px 7px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.lore-mini-btn:hover:not(:disabled) { background: var(--border-color); }
+.lore-mini-btn:disabled { opacity: 0.5; cursor: default; }
+
+.lore-new-branch-input {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+/* Content viewer: changes column + detail column */
+.lore-content-cols { display: flex; height: 100%; }
+.lore-changes-col {
+  width: 42%;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-color);
+}
+.lore-changes-scroll { flex: 1; overflow: auto; }
+.lore-changes-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 600;
+  background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+}
+
+.lore-commit-box {
+  border-top: 1px solid var(--border-color);
+  padding: 8px;
+}
+.lore-commit-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 56px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.lore-primary-btn {
+  margin-top: 6px;
+  background: var(--accent-color);
+  color: var(--text-highlight);
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.lore-primary-btn:disabled { opacity: 0.5; cursor: default; }
+
+.lore-detail-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.lore-detail-header {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+.lore-diff-area { flex: 1; overflow: auto; }
+.lore-history-area {
+  border-top: 1px solid var(--border-color);
+  max-height: 40%;
+  overflow: auto;
+}
+.lore-history-row {
+  font-family: monospace;
+  font-size: 12px;
+  padding: 2px 10px;
+}
+.lore-history-num { color: var(--text-secondary); margin-right: 8px; }

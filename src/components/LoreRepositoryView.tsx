@@ -3,6 +3,8 @@ import { useLore } from '../hooks/useLore';
 import { useAlert } from '../contexts/AlertContext';
 import { LoreFileChange } from '../lore';
 import LoreDiffView from './LoreDiffView';
+import './LoreRepositoryView.css';
+import './Toolbar.css';
 
 interface LoreRepositoryViewProps {
   repoPath: string;
@@ -12,19 +14,19 @@ interface LoreRepositoryViewProps {
 }
 
 const CODE_COLORS: Record<string, string> = {
-  A: '#4caf50', // added
-  M: '#2196f3', // modified
-  D: '#f44336', // deleted
+  A: 'var(--success-color)',
+  M: 'var(--accent-color)',
+  D: 'var(--danger-color)',
 };
 
 function changeColor(code: string): string {
-  return CODE_COLORS[code[0]?.toUpperCase()] || '#aaa';
+  return CODE_COLORS[code[0]?.toUpperCase()] || 'var(--text-secondary)';
 }
 
 /**
- * Minimal Lore repository panel. Deliberately NOT a clone of RepositoryView — it presents
- * Lore's own model (numbered revisions, staged/unstaged split, sync-to-remote state). This is
- * the scaffold that the dedicated Lore UI grows from. See docs/lore-support-todo.md.
+ * Lore repository panel. Presents Lore's own model (numbered revisions, staged/unstaged split,
+ * sync-to-remote state, branches, file locks) but reuses the git RepositoryView chrome
+ * (toolbar, resizable sidebar, content viewer) so Lore tabs feel consistent with git tabs.
  */
 function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: LoreRepositoryViewProps) {
   const { showAlert } = useAlert();
@@ -42,20 +44,24 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [working, setWorking] = useState(false);
   const [showNewBranch, setShowNewBranch] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
+  const [leftWidth, setLeftWidth] = useState<number>(28);
+  const draggingSplitter = useRef(false);
+
+  const busy = isLoading || working;
+  const ahead = status ? Math.max(0, status.local.number - status.remote.number) : 0;
+  const behind = status ? Math.max(0, status.remote.number - status.local.number) : 0;
 
   // Report ahead/behind to the tab indicator from the parsed sync state.
   const prevTabStatus = useRef<string>('');
   useEffect(() => {
     if (!onTabStatusChange) return;
     if (!status) { onTabStatusChange(null); return; }
-    const ahead = Math.max(0, status.local.number - status.remote.number);
-    const behind = Math.max(0, status.remote.number - status.local.number);
     const key = `${ahead}/${behind}`;
     if (key !== prevTabStatus.current) {
       prevTabStatus.current = key;
       onTabStatusChange(ahead || behind ? { ahead, behind } : null);
     }
-  }, [status, onTabStatusChange]);
+  }, [status, ahead, behind, onTabStatusChange]);
 
   // Reload when the parent bumps the refresh signal.
   const prevRefresh = useRef(refreshSignal);
@@ -65,6 +71,16 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       refresh();
     }
   }, [refreshSignal, refresh]);
+
+  // Sidebar splitter drag.
+  const onSplitterDown = () => { draggingSplitter.current = true; };
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!draggingSplitter.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    setLeftWidth(Math.min(60, Math.max(15, pct)));
+  };
+  const onMouseUp = () => { draggingSplitter.current = false; };
 
   const runAction = useCallback(async (fn: () => Promise<void>) => {
     setWorking(true);
@@ -83,7 +99,6 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setDiffText('');
     setDiffLoading(true);
     try {
-      // Renderer-ready unified diff (headers normalized to a/ b/ for diff2html).
       setDiffText(await client!.diffText([file.path]));
     } catch (err) {
       showAlert(err instanceof Error ? err.message : String(err), 'Lore diff error');
@@ -118,7 +133,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const doLock = (path: string) => runAction(async () => { await client!.lockAcquire([path]); });
   const doUnlock = (path: string) => runAction(async () => { await client!.lockRelease([path]); });
 
-  const doSwitchBranch = (name: string) => runAction(async () => { await client!.switchBranch(name); });
+  const doSwitchBranch = (name: string) => { if (name !== status?.branch) runAction(async () => { await client!.switchBranch(name); }); };
   const doCreateBranch = () => runAction(async () => {
     const name = newBranchName.trim();
     if (!name) throw new Error('Branch name is required');
@@ -128,9 +143,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setShowNewBranch(false);
   });
 
-  const stageAll = () => runAction(async () => {
-    await client!.stage((status?.unstaged ?? []).map(f => f.path));
-  });
+  const stageAll = () => runAction(async () => { await client!.stage((status?.unstaged ?? []).map(f => f.path)); });
   const stageOne = (file: LoreFileChange) => runAction(async () => { await client!.stage([file.path]); });
   const unstageOne = (file: LoreFileChange) => runAction(async () => { await client!.unstage([file.path]); });
   const doCommit = () => runAction(async () => {
@@ -142,156 +155,207 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const renderFileRow = (file: LoreFileChange, staged: boolean) => (
     <div
       key={`${file.section}:${file.path}`}
+      className={`lore-row ${selectedPath === file.path ? 'selected' : ''}`}
       onClick={() => onSelectFile(file)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '2px 6px', cursor: 'pointer',
-        background: selectedPath === file.path ? 'rgba(33,150,243,0.15)' : 'transparent',
-        fontFamily: 'monospace', fontSize: 12,
-      }}
     >
-      <span style={{ color: changeColor(file.code), fontWeight: 'bold', width: 16 }}>{file.code}</span>
-      {lockedPaths.has(file.path) && <span title="Locked" style={{ color: '#e0a030' }}>🔒</span>}
-      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.path}</span>
-      <button
-        disabled={working}
-        onClick={(e) => { e.stopPropagation(); lockedPaths.has(file.path) ? doUnlock(file.path) : doLock(file.path); }}
-        style={{ fontSize: 11 }}
-        title={lockedPaths.has(file.path) ? 'Release lock' : 'Lock for edit'}
-      >
-        {lockedPaths.has(file.path) ? 'Unlock' : 'Lock'}
-      </button>
-      <button
-        disabled={working}
-        onClick={(e) => { e.stopPropagation(); staged ? unstageOne(file) : stageOne(file); }}
-        style={{ fontSize: 11 }}
-      >
-        {staged ? 'Unstage' : 'Stage'}
-      </button>
+      <span className="lore-code" style={{ color: changeColor(file.code) }}>{file.code}</span>
+      {lockedPaths.has(file.path) && <span title="Locked" style={{ color: 'var(--warning-color)' }}>🔒</span>}
+      <span className="lore-row-name" title={file.path}>{file.path}</span>
+      <span className="lore-row-actions">
+        <button
+          className="lore-mini-btn"
+          disabled={working}
+          onClick={(e) => { e.stopPropagation(); lockedPaths.has(file.path) ? doUnlock(file.path) : doLock(file.path); }}
+          title={lockedPaths.has(file.path) ? 'Release lock' : 'Lock for edit'}
+        >
+          {lockedPaths.has(file.path) ? 'Unlock' : 'Lock'}
+        </button>
+        <button
+          className="lore-mini-btn"
+          disabled={working}
+          onClick={(e) => { e.stopPropagation(); staged ? unstageOne(file) : stageOne(file); }}
+        >
+          {staged ? 'Unstage' : 'Stage'}
+        </button>
+      </span>
     </div>
   );
 
-  if (error) {
+  if (error && !status) {
     return (
-      <div style={{ padding: 16, color: '#f44336' }}>
-        <h3>Lore error</h3>
-        <pre style={{ whiteSpace: 'pre-wrap' }}>{error}</pre>
-        <button onClick={refresh}>Retry</button>
+      <div className="repository-view">
+        <div className="loading" style={{ color: 'var(--danger-color)' }}>
+          <h3>Lore error</h3>
+          <pre style={{ whiteSpace: 'pre-wrap' }}>{error}</pre>
+          <button className="lore-mini-btn" onClick={refresh}>Retry</button>
+        </div>
       </div>
     );
   }
 
+  const lastCommand = commandState.length > 0 ? commandState[commandState.length - 1].command : '';
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ padding: '6px 10px', borderBottom: '1px solid #333', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-        <strong>Lore</strong>
-        <label>
-          branch{' '}
-          <select
-            value={status?.branch || ''}
-            disabled={working || isLoading}
-            onChange={(e) => { if (e.target.value && e.target.value !== status?.branch) doSwitchBranch(e.target.value); }}
-          >
-            {/* current branch may not be in the list yet on first paint */}
-            {status?.branch && !branches?.local.some(b => b.name === status.branch) && (
-              <option value={status.branch}>{status.branch}</option>
-            )}
-            {branches?.local.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
-          </select>
-        </label>
-        {showNewBranch ? (
-          <span style={{ display: 'inline-flex', gap: 4 }}>
-            <input
-              autoFocus
-              value={newBranchName}
-              onChange={(e) => setNewBranchName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') doCreateBranch(); if (e.key === 'Escape') setShowNewBranch(false); }}
-              placeholder="new branch name"
-              style={{ fontSize: 12 }}
-            />
-            <button onClick={doCreateBranch} disabled={working || !newBranchName.trim()}>Create</button>
-            <button onClick={() => setShowNewBranch(false)}>Cancel</button>
-          </span>
-        ) : (
-          <button onClick={() => setShowNewBranch(true)} disabled={working || isLoading} title="New branch">+ Branch</button>
-        )}
-        <span>revision <code>{status ? status.local.number : '…'}</code></span>
-        <span style={{ color: '#888' }}>{status?.syncState ?? ''}</span>
-        <span style={{ flex: 1 }} />
-        {commandState.length > 0 && <span style={{ color: '#888', fontSize: 12 }}>running: {commandState[commandState.length - 1].command}</span>}
-        <button onClick={doSync} disabled={isLoading || working}>Sync</button>
-        <button onClick={doPush} disabled={isLoading || working}>Push</button>
-        <button onClick={refresh} disabled={isLoading || working}>Refresh</button>
+    <div className="repository-view">
+      {/* Toolbar (reuses git toolbar styling) */}
+      <div className="toolbar">
+        <button className="toolbar-button" onClick={refresh} disabled={busy}>
+          <span className={`toolbar-button-icon ${busy ? 'spinning' : ''}`}>↻</span>
+          <span className="toolbar-button-label">Refresh</span>
+        </button>
+        <div className="toolbar-separator" />
+        <button className="toolbar-button" onClick={doSync} disabled={busy}>
+          <span className="toolbar-button-icon">⤓</span>
+          <span className="toolbar-button-label">{behind > 0 ? `Sync (${behind})` : 'Sync'}</span>
+        </button>
+        <button className="toolbar-button" onClick={doPush} disabled={busy}>
+          <span className="toolbar-button-icon">⬆</span>
+          <span className="toolbar-button-label">{ahead > 0 ? `Push (${ahead})` : 'Push'}</span>
+        </button>
+        <div className="toolbar-separator" />
+        <button className="toolbar-button" onClick={() => setShowNewBranch(true)} disabled={busy}>
+          <span className="toolbar-button-icon">🌿</span>
+          <span className="toolbar-button-label">Branch</span>
+        </button>
+        <div className="toolbar-separator" />
+        {commandState.length > 0 &&
+          <div className="toolbar-status"><span className="toolbar-busy-spinner" title={lastCommand}>↻</span></div>}
       </div>
 
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {/* Left: changes + commit */}
-        <div style={{ width: '40%', minWidth: 260, borderRight: '1px solid #333', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ flex: 1, overflow: 'auto', padding: 6 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ margin: '6px 0' }}>Changes not staged</h4>
-              <button onClick={stageAll} disabled={working || !(status?.unstaged.length)}>Stage all</button>
+      <div className="repo-content-horizontal" onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+        {isLoading && !status && <div className="loading">Loading Lore repository...</div>}
+
+        {status && (
+          <>
+            {/* Sidebar: repo info + branches + locks */}
+            <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
+              <div className="lore-info-card">
+                <div className="lore-info-row">
+                  <span className="lore-info-label">Lore branch</span>
+                  <span className="lore-info-value">{status.branch}</span>
+                </div>
+                <div className="lore-info-row">
+                  <span className="lore-info-label">revision</span>
+                  <span className="lore-info-value">{status.local.number}</span>
+                </div>
+                <div className="lore-info-row">
+                  <span className="lore-info-label">remote</span>
+                  <span className={`lore-badge ${status.syncState}`}>{status.syncState}</span>
+                </div>
+              </div>
+
+              <div className="lore-sidebar-section">
+                <div className="lore-section-header">
+                  <span>Branches</span>
+                  <button className="lore-mini-btn" disabled={busy} onClick={() => setShowNewBranch(true)}>+ New</button>
+                </div>
+                {showNewBranch && (
+                  <div className="lore-row always-actions">
+                    <input
+                      autoFocus
+                      className="lore-new-branch-input lore-row-name"
+                      value={newBranchName}
+                      onChange={(e) => setNewBranchName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') doCreateBranch(); if (e.key === 'Escape') setShowNewBranch(false); }}
+                      placeholder="new branch name"
+                    />
+                    <span className="lore-row-actions">
+                      <button className="lore-mini-btn" disabled={busy || !newBranchName.trim()} onClick={doCreateBranch}>Create</button>
+                      <button className="lore-mini-btn" onClick={() => setShowNewBranch(false)}>Cancel</button>
+                    </span>
+                  </div>
+                )}
+                {(branches?.local ?? []).map(b => (
+                  <div
+                    key={b.name}
+                    className={`lore-row ${b.name === status.branch ? 'current' : ''}`}
+                    onClick={() => doSwitchBranch(b.name)}
+                    title={b.name === status.branch ? 'Current branch' : 'Switch to this branch'}
+                  >
+                    <span className="lore-row-name">{b.name}</span>
+                  </div>
+                ))}
+                {!branches?.local.length && <div className="lore-empty">no branches</div>}
+              </div>
+
+              <div className="lore-sidebar-section">
+                <div className="lore-section-header"><span>Locks {locks.length ? `(${locks.length})` : ''}</span></div>
+                {locks.length ? locks.map(l => (
+                  <div key={l.path} className="lore-row always-actions">
+                    <span title="Locked" style={{ color: 'var(--warning-color)' }}>🔒</span>
+                    <span className="lore-row-name" title={`by ${l.owner}`}>{l.path}</span>
+                    <span className="lore-lock-owner">{l.owner}</span>
+                    <span className="lore-row-actions">
+                      <button className="lore-mini-btn" disabled={busy} onClick={() => doUnlock(l.path)}>Release</button>
+                    </span>
+                  </div>
+                )) : <div className="lore-empty">no locked files</div>}
+              </div>
+
+              {(links.length > 0 || layers.length > 0) && (
+                <div className="lore-sidebar-section">
+                  <div className="lore-section-header"><span>Composition</span></div>
+                  {links.length > 0 && <div className="lore-empty">Links: {links.length}</div>}
+                  {layers.length > 0 && <div className="lore-empty">Layers: {layers.length}</div>}
+                </div>
+              )}
             </div>
-            {status?.unstaged.length ? status.unstaged.map(f => renderFileRow(f, false))
-              : <div style={{ color: '#777', fontSize: 12, padding: 6 }}>none</div>}
 
-            <h4 style={{ margin: '12px 0 6px' }}>Staged for commit</h4>
-            {status?.staged.length ? status.staged.map(f => renderFileRow(f, true))
-              : <div style={{ color: '#777', fontSize: 12, padding: 6 }}>none</div>}
+            <div className="horizontal-splitter-handle" onMouseDown={onSplitterDown}>
+              <div className="horizontal-splitter-line" />
+            </div>
 
-            <h4 style={{ margin: '12px 0 6px' }}>Locks {locks.length ? `(${locks.length})` : ''}</h4>
-            {locks.length ? locks.map(l => (
-              <div key={l.path} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 6px', fontFamily: 'monospace', fontSize: 12 }}>
-                <span title="Locked" style={{ color: '#e0a030' }}>🔒</span>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`by ${l.owner}`}>{l.path}</span>
-                <span style={{ color: '#888', fontSize: 11 }}>{l.owner}</span>
-                <button disabled={working} onClick={() => doUnlock(l.path)} style={{ fontSize: 11 }}>Release</button>
+            {/* Content: changes + commit | diff + history */}
+            <div className="repo-content-viewer" style={{ width: `${100 - leftWidth}%` }}>
+              <div className="lore-content-cols">
+                <div className="lore-changes-col">
+                  <div className="lore-changes-scroll">
+                    <div className="lore-changes-group-header">
+                      <span>Changes not staged</span>
+                      <button className="lore-mini-btn" onClick={stageAll} disabled={busy || !status.unstaged.length}>Stage all</button>
+                    </div>
+                    {status.unstaged.length ? status.unstaged.map(f => renderFileRow(f, false)) : <div className="lore-empty">none</div>}
+
+                    <div className="lore-changes-group-header"><span>Staged for commit</span></div>
+                    {status.staged.length ? status.staged.map(f => renderFileRow(f, true)) : <div className="lore-empty">none</div>}
+                  </div>
+                  <div className="lore-commit-box">
+                    <textarea
+                      className="lore-commit-input"
+                      value={commitMessage}
+                      onChange={(e) => setCommitMessage(e.target.value)}
+                      placeholder="Commit message"
+                    />
+                    <button className="lore-primary-btn" onClick={doCommit} disabled={busy || !status.staged.length || !commitMessage.trim()}>
+                      Commit {status.staged.length ? `(${status.staged.length})` : ''}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="lore-detail-col">
+                  <div className="lore-detail-header">{selectedPath ? `Diff: ${selectedPath}` : 'Diff'}</div>
+                  <div className="lore-diff-area">
+                    {!selectedPath ? (
+                      <div className="lore-empty">Select a file to view its diff.</div>
+                    ) : diffLoading ? (
+                      <div className="lore-empty">Loading diff…</div>
+                    ) : (
+                      <LoreDiffView diff={diffText} />
+                    )}
+                  </div>
+                  <div className="lore-history-area">
+                    <div className="lore-detail-header">History</div>
+                    {history.length ? history.map(h => (
+                      <div key={h.number} className="lore-history-row">
+                        <span className="lore-history-num">{h.number}</span>{h.message}
+                      </div>
+                    )) : <div className="lore-empty">no revisions</div>}
+                  </div>
+                </div>
               </div>
-            )) : <div style={{ color: '#777', fontSize: 12, padding: 6 }}>no locked files</div>}
-
-            {(links.length > 0 || layers.length > 0) && (
-              <div style={{ marginTop: 12, color: '#888', fontSize: 12 }}>
-                {links.length > 0 && <div>Links: {links.length}</div>}
-                {layers.length > 0 && <div>Layers: {layers.length}</div>}
-              </div>
-            )}
-          </div>
-
-          <div style={{ borderTop: '1px solid #333', padding: 6 }}>
-            <textarea
-              value={commitMessage}
-              onChange={(e) => setCommitMessage(e.target.value)}
-              placeholder="Commit message"
-              rows={3}
-              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
-            />
-            <button onClick={doCommit} disabled={working || !status?.staged.length || !commitMessage.trim()} style={{ marginTop: 4 }}>
-              Commit {status?.staged.length ? `(${status.staged.length})` : ''}
-            </button>
-          </div>
-        </div>
-
-        {/* Right: diff + history */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
-            <h4 style={{ margin: '4px 0' }}>{selectedPath ? `Diff: ${selectedPath}` : 'Diff'}</h4>
-            {!selectedPath ? (
-              <div style={{ color: '#777', fontSize: 12, padding: 8 }}>Select a file to view its diff.</div>
-            ) : diffLoading ? (
-              <div style={{ color: '#777', fontSize: 12, padding: 8 }}>Loading diff…</div>
-            ) : (
-              <LoreDiffView diff={diffText} />
-            )}
-          </div>
-          <div style={{ borderTop: '1px solid #333', maxHeight: '40%', overflow: 'auto', padding: 8 }}>
-            <h4 style={{ margin: '4px 0' }}>History</h4>
-            {history.length ? history.map(h => (
-              <div key={h.number} style={{ fontFamily: 'monospace', fontSize: 12, padding: '1px 0' }}>
-                <span style={{ color: '#888', marginRight: 8 }}>{h.number}</span>{h.message}
-              </div>
-            )) : <div style={{ color: '#777', fontSize: 12 }}>no revisions</div>}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
