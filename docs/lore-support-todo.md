@@ -262,14 +262,21 @@ Ported the applicable git-panel actions to the Lore panel (context menus + repo 
   "…"/right-click context menu for a clean, item-only tree.
 - Not ported (N/A to Lore): Git LFS, rebase, multiple remotes, tags, PR/hosting links, stash.
 
-## Backlog / ideas
+### Stash (client-side emulation) — DONE
+Lore has NO native stash (verified, 0.8.3), so ugit emulates it. Stashes live in
+`.lore/stashes/<id>/` (manifest.json + blobs/) — local-only (never pushed) and invisible to
+Lore's VCS operations. `LoreStashStore` (src/lore/loreStash.ts):
+- **create**: capture selected/all changed files' bytes + change code (A/M/D) + staged flag;
+  when not "keep", removes them from the working tree (revert modified/deleted via `reset`,
+  delete added).
+- **apply / pop**: restore bytes to the working tree (re-delete for D), re-stage staged files;
+  pop deletes the stash after.
+- **rename** (short + long description), **remove**, **list** (newest first).
+- UI: a Stashes sidebar section + a Stash dialog (short/long description, keep checkbox), a
+  toolbar **Stash** button, a file-context **Stash** action, and per-stash "…"/right-click
+  (Apply / Pop / Rename / Delete). Live-verified create→revert→apply→pop.
 
-- **Stash / shelf (ugit-level).** Lore has NO native stash/shelve (verified, 0.8.3). Note:
-  uncommitted changes carry across `branch switch`, so you don't stash to switch branches. To
-  truly set changes aside with a clean tree, the Lore-native way is a cheap WIP branch (commit
-  there, switch back). A nicer UX would be a **client-side shelf** in the panel: capture the
-  changed files (bytes + add/delete record) to a local scratch area, reset the working tree,
-  and restore on demand. Bounded work; needs care for binaries and added/deleted files.
+## Backlog / ideas
 
 ## Concrete steps
 

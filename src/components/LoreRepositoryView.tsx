@@ -9,9 +9,10 @@ import LoreRepositoryTree from './LoreRepositoryTree';
 import LoreChangeTree from './LoreChangeTree';
 import LoreMediaView from './LoreMediaView';
 import LoreContextMenu, { LoreMenuItem } from './LoreContextMenu';
+import LoreStashDialog from './LoreStashDialog';
 import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
 import { clipboard } from 'electron';
-import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry } from '../lore';
+import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, StashInput } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
 
@@ -64,7 +65,7 @@ function formatBytes(n: number): string {
  */
 function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: LoreRepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
-  const { client, status, history, branches, locks, links, layers, graph, tree, view, isLoading, error, commandState, refresh } = useLore({
+  const { client, status, history, branches, locks, links, layers, graph, tree, stashStore, stashes, view, isLoading, error, commandState, refresh } = useLore({
     repoPath,
     onError: (err) => showAlert(err.message, 'Lore error'),
   });
@@ -89,6 +90,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const anchorRef = useRef<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; items: LoreMenuItem[] } | null>(null);
+  const [stashDialog, setStashDialog] = useState<{ files: StashInput[]; selectedOnly: boolean } | null>(null);
   // Default to the Lore-centric repository tree; Changes (commit flow) and Graph are toggles.
   const [viewMode, setViewMode] = useState<'changes' | 'files' | 'graph'>('files');
   const [treeFile, setTreeFile] = useState<LoreTreeNode | null>(null);
@@ -243,6 +245,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire(targets); }) });
       items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease(targets); }) });
       if (!staged) items.push({ label: `Discard${n}`, onClick: () => runAction(async () => { await client!.discard(targets); }) });
+      items.push({ label: `Stash${n}`, onClick: () => doStashSelected(targets) });
       items.push({ separator: true });
       items.push({ label: `Ignore file${n}`, onClick: () => runAction(async () => { targets.forEach(p => client!.addToIgnore(p)); }) });
       if (ext) items.push({ label: `Ignore *.${ext}`, onClick: () => runAction(async () => { client!.addToIgnore(`*.${ext}`); }) });
@@ -306,6 +309,52 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       { label: 'Clean Working Directory…', onClick: doClean },
       { separator: true },
       { label: 'Reset to Server…', danger: true, onClick: doResetToServer },
+    ] });
+  };
+
+  // --- stashes (client-side emulation) ---
+  const changesToStash = (filter?: Set<string>): StashInput[] => {
+    if (!status) return [];
+    const pick = (list: typeof status.unstaged, staged: boolean) => list
+      .filter(f => !f.path.endsWith('/') && (!filter || filter.has(f.path)))
+      .map(f => ({ path: f.path, change: f.code, staged }));
+    return [...pick(status.unstaged, false), ...pick(status.staged, true)];
+  };
+  const doStashAll = () => {
+    const files = changesToStash();
+    if (!files.length) { showAlert('No changes to stash.', 'Stash'); return; }
+    setStashDialog({ files, selectedOnly: false });
+  };
+  const doStashSelected = (targets: string[]) => {
+    const files = changesToStash(new Set(targets));
+    if (!files.length) { showAlert('No stashable changes in the selection.', 'Stash'); return; }
+    setStashDialog({ files, selectedOnly: true });
+  };
+  const createStash = async (message: string, description: string, keep: boolean) => {
+    if (!stashStore || !stashDialog) return;
+    try {
+      await stashStore.create({ message, description, branch: status?.branch ?? '', files: stashDialog.files, keep });
+      await refresh();
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Stash error');
+    }
+  };
+  const applyStash = (id: string, pop: boolean) => runAction(async () => { await stashStore!.apply(id, pop); });
+  const deleteStash = (id: string) => runAction(async () => { stashStore!.remove(id); });
+  const renameStash = (s: LoreStash) => {
+    const m = window.prompt('Stash description:', s.message);
+    if (m === null) return;
+    const d = window.prompt('Details (optional):', s.description) ?? s.description;
+    runAction(async () => { stashStore!.rename(s.id, m.trim() || s.message, d); });
+  };
+  const onStashMenu = (e: React.MouseEvent, s: LoreStash) => {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, items: [
+      { label: 'Apply (keep stash)', onClick: () => applyStash(s.id, false) },
+      { label: 'Pop (apply & delete)', onClick: () => applyStash(s.id, true) },
+      { label: 'Rename…', onClick: () => renameStash(s) },
+      { separator: true },
+      { label: 'Delete', danger: true, onClick: () => deleteStash(s.id) },
     ] });
   };
 
@@ -578,6 +627,10 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           <span className="toolbar-button-icon">🌿</span>
           <span className="toolbar-button-label">Branch</span>
         </button>
+        <button className="toolbar-button" onClick={doStashAll} disabled={busy} title="Stash all changes">
+          <span className="toolbar-button-icon">📦</span>
+          <span className="toolbar-button-label">Stash</span>
+        </button>
         <button className={`toolbar-button ${viewMode === 'changes' ? 'active' : ''}`} onClick={() => setViewMode('changes')}>
           <span className="toolbar-button-icon">✎</span>
           <span className="toolbar-button-label">Changes</span>
@@ -677,6 +730,23 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     </span>
                   </div>
                 )) : <div className="lore-empty">no locked files</div>}
+              </div>
+
+              <div className="lore-sidebar-section">
+                <div className="lore-section-header">
+                  <span>Stashes {stashes.length ? `(${stashes.length})` : ''}</span>
+                  <button className="lore-mini-btn" disabled={busy} onClick={doStashAll}>Stash all</button>
+                </div>
+                {stashes.length ? stashes.map(s => (
+                  <div key={s.id} className="lore-row" onClick={() => applyStash(s.id, false)}
+                    onContextMenu={(e) => onStashMenu(e, s)} title={`${s.message}${s.description ? '\n\n' + s.description : ''}\n\n${s.files.length} file(s) on ${s.branch} · ${new Date(s.date).toLocaleString()}`}>
+                    <span>📦</span>
+                    <span className="lore-row-name">{s.message}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{s.files.length}</span>
+                    <button className="lore-row-menu" disabled={busy} title="Stash actions"
+                      onClick={(e) => { e.stopPropagation(); onStashMenu(e, s); }}>⋯</button>
+                  </div>
+                )) : <div className="lore-empty">no stashes</div>}
               </div>
 
               <div className="lore-sidebar-section">
@@ -999,6 +1069,15 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       </div>
 
       {menu && <LoreContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+
+      {stashDialog && (
+        <LoreStashDialog
+          fileCount={stashDialog.files.length}
+          selectedOnly={stashDialog.selectedOnly}
+          onClose={() => setStashDialog(null)}
+          onCreate={createStash}
+        />
+      )}
 
       {resolvingPath && client && (
         <LoreMergeResolver

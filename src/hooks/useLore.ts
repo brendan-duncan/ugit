@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { LoreClient, resolveLoreBin, LoreStatus, LoreBranches, LoreLock, LoreRevision, LoreLink, LoreLayer, LoreTreeNode } from '../lore';
+import { LoreClient, resolveLoreBin, LoreStatus, LoreBranches, LoreLock, LoreRevision, LoreLink, LoreLayer, LoreTreeNode, LoreStashStore, LoreStash } from '../lore';
 import { RunningCommand } from '../components/types';
 
 interface UseLoreOptions {
@@ -19,6 +19,9 @@ interface UseLoreResult {
   graph: LoreRevision[];
   /** The repository tree (sparse view), for the file browser. */
   tree: LoreTreeNode[];
+  /** Client-side stash store (emulated; null until the client is ready). */
+  stashStore: LoreStashStore | null;
+  stashes: LoreStash[];
   /** Active sparse view filter (.lore/view), or null for a full checkout. */
   view: string | null;
   isLoading: boolean;
@@ -42,11 +45,14 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
   const [layers, setLayers] = useState<LoreLayer[]>([]);
   const [graph, setGraph] = useState<LoreRevision[]>([]);
   const [tree, setTree] = useState<LoreTreeNode[]>([]);
+  const [stashStore, setStashStore] = useState<LoreStashStore | null>(null);
+  const [stashes, setStashes] = useState<LoreStash[]>([]);
   const [view, setView] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
   const clientRef = useRef<LoreClient | null>(null);
+  const stashStoreRef = useRef<LoreStashStore | null>(null);
 
   // Keep the latest onError in a ref so `load`/`refresh` can stay stable identities. Passing
   // an inline `onError` (new function each render) must NOT churn the load callback, or the
@@ -65,6 +71,9 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
       },
     });
     clientRef.current = c;
+    const store = new LoreStashStore(c);
+    stashStoreRef.current = store;
+    setStashStore(store);
     setClient(c);
     return () => {
       c.commandStateCallback = null;
@@ -99,6 +108,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
       setGraph(gr);
       setTree(tr);
       setView(vw);
+      if (stashStoreRef.current) setStashes(stashStoreRef.current.list());
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load Lore repository';
       setError(message);
@@ -113,5 +123,5 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     if (client) load();
   }, [client, load]);
 
-  return { client, status, history, branches, locks, links, layers, graph, tree, view, isLoading, error, commandState, refresh: load };
+  return { client, status, history, branches, locks, links, layers, graph, tree, stashStore, stashes, view, isLoading, error, commandState, refresh: load };
 }
