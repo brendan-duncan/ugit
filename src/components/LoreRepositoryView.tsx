@@ -27,6 +27,15 @@ function changeColor(code: string): string {
   return CODE_COLORS[code[0]?.toUpperCase()] || 'var(--text-secondary)';
 }
 
+const IMAGE_MIME: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml', ico: 'image/x-icon', avif: 'image/avif',
+};
+function imageMime(path: string): string | null {
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  return IMAGE_MIME[ext] ?? null;
+}
+
 /**
  * Lore repository panel. Presents Lore's own model (numbered revisions, staged/unstaged split,
  * sync-to-remote state, branches, file locks) but reuses the git RepositoryView chrome
@@ -61,6 +70,12 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [treeFile, setTreeFile] = useState<LoreTreeNode | null>(null);
   const [fileInfo, setFileInfo] = useState<LoreFileInfo | null>(null);
   const [fileHist, setFileHist] = useState<LoreFileHistoryEntry[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [treeNodes, setTreeNodes] = useState<LoreTreeNode[]>([]);
+  const [loadedDirs, setLoadedDirs] = useState<Set<string>>(new Set());
+
+  // Seed the lazy tree from the top-level load; reset expansion state on each refresh.
+  useEffect(() => { setTreeNodes(tree); setLoadedDirs(new Set()); }, [tree]);
 
   const lockOwners = new Map(locks.map(l => [l.path, l.owner]));
   const statusByPath = new Map<string, string>();
@@ -141,6 +156,21 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     }
   }, [client, showAlert]);
 
+  // Lazily fetch a directory's children and merge them into the tree.
+  const loadDir = useCallback(async (dirPath: string) => {
+    if (!client || loadedDirs.has(dirPath)) return;
+    try {
+      const children = await client.tree(dirPath, 2);
+      setTreeNodes(prev => {
+        const seen = new Set(prev.map(n => n.path));
+        return [...prev, ...children.filter(n => !seen.has(n.path))];
+      });
+      setLoadedDirs(prev => new Set(prev).add(dirPath));
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Lore tree error');
+    }
+  }, [client, loadedDirs, showAlert]);
+
   const onSelectTreeFile = useCallback(async (node: LoreTreeNode) => {
     setTreeFile(node);
     setSelectedPath(node.path);
@@ -148,12 +178,18 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setDiffText('');
     setFileInfo(null);
     setFileHist([]);
+    setPreviewUrl(null);
     setDiffLoading(true);
     try {
+      const mime = imageMime(node.path);
+      if (mime) {
+        const b64 = client!.readWorkingFileBase64(node.path);
+        setPreviewUrl(b64 ? `data:${mime};base64,${b64}` : null);
+      }
       const [info, hist, diff] = await Promise.all([
         client!.fileInfo(node.path),
         client!.fileHistory(node.path),
-        client!.diffText([node.path]),
+        mime ? Promise.resolve('') : client!.diffText([node.path]),
       ]);
       setFileInfo(info);
       setFileHist(hist);
@@ -580,14 +616,16 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
               ) : showTree ? (
                 <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
                   <div className="lore-changes-col" style={{ width: '50%' }}>
-                    <div className="lore-changes-group-header"><span>Repository tree ({tree.length})</span></div>
+                    <div className="lore-changes-group-header"><span>Repository tree</span></div>
                     <div className="lore-changes-scroll">
                       <LoreRepositoryTree
-                        nodes={tree}
+                        nodes={treeNodes}
                         lockOwners={lockOwners}
                         statusByPath={statusByPath}
                         selectedPath={treeFile?.path ?? null}
                         onSelect={onSelectTreeFile}
+                        loadedDirs={loadedDirs}
+                        onExpand={loadDir}
                       />
                     </div>
                   </div>
@@ -603,7 +641,13 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     <div className="lore-diff-area">
                       {!treeFile ? <div className="lore-empty">Select a file to see its info, history, and diff.</div>
                         : diffLoading ? <div className="lore-empty">Loading…</div>
-                        : <LoreDiffView diff={diffText} />}
+                        : previewUrl ? (
+                          <div style={{ padding: 10, textAlign: 'center' }}>
+                            <img src={previewUrl} alt={treeFile.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }} />
+                          </div>
+                        ) : imageMime(treeFile.path) ? (
+                          <div className="lore-empty">Image too large to preview ({fileInfo ? fileInfo.size : '?'} bytes).</div>
+                        ) : <LoreDiffView diff={diffText} />}
                     </div>
                     <div className="lore-history-area">
                       <div className="lore-detail-header">File history{treeFile ? `: ${treeFile.name}` : ''}</div>

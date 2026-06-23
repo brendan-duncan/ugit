@@ -333,6 +333,18 @@ export class LoreClient {
     fs.writeFileSync(path.join(this.repoPath, relPath), content, { encoding: 'utf8' });
   }
 
+  /** Read a working-tree file as base64 (for asset/image previews). Null if missing/too big. */
+  readWorkingFileBase64(relPath: string, maxBytes = 8 * 1024 * 1024): string | null {
+    try {
+      const full = path.join(this.repoPath, relPath);
+      const stat = fs.statSync(full);
+      if (stat.size > maxBytes) return null;
+      return fs.readFileSync(full).toString('base64');
+    } catch {
+      return null;
+    }
+  }
+
   /** Push local commits to the remote. Returns the pushed revisions + byte/fragment summary. */
   async push(branch?: string): Promise<LorePushResult> {
     const argv = ['push'];

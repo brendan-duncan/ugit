@@ -87,7 +87,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
         c.links(),
         c.layers(),
         c.graphRevisions(),
-        c.tree(),
+        c.tree(undefined, 1), // top level only; the tree view lazily loads deeper levels
         c.readView(),
       ]);
       setStatus(st);

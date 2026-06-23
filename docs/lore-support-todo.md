@@ -168,6 +168,15 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
 - Validated: 15 new parser assertions + a live run exercising amend/revert/cherry-pick/
   revisionInfo and link/layer add→list→remove. tsc/webpack/build:main clean.
 
+### Lore-centric reframe (phase 2): lazy tree + asset previews — DONE
+- **Lazy tree**: top level loads via `tree(undefined, 1)`; directories fetch their children on
+  first expand via `tree(dir, 2)` (merged into the node set). Huge repos no longer materialize
+  the whole tree. (`--max-depth` counts from root; `--path <dir> --max-depth 2` = dir + its
+  immediate children — verified.)
+- **Asset previews**: selecting an image file (png/jpg/gif/webp/svg/…) renders an inline
+  preview (read via `readWorkingFileBase64` → data URL, capped at 8 MB) instead of a text diff.
+- Live-verified: top-level vs lazy expand return the right scopes; PNG reads to valid base64.
+
 ### Lore-centric reframe (phase 1) — DONE
 Shed git metaphors while keeping the chrome/polish:
 - **Sync gauge** in the toolbar: `local rev ⇄ remote rev` colored by sync state — foregrounds
