@@ -3,20 +3,14 @@ import { LoreFileChange } from '../lore';
 
 interface LoreChangeTreeProps {
   changes: LoreFileChange[];
-  /** True for the staged list (button reads "Unstage" instead of "Stage"). */
-  staged: boolean;
-  selectedPath: string | null;
-  onSelect: (path: string) => void;
-  lockedPaths: Set<string>;
   busy: boolean;
-  onLock: (path: string) => void;
-  onUnlock: (path: string) => void;
-  /** Stage (or unstage, for the staged list) a single file. */
-  onStageToggle: (path: string) => void;
-  /** Ignore a file (path) or folder (path + '/') — appends to .loreignore. */
-  onIgnore: (path: string, isDir: boolean) => void;
-  /** Optional: delete a file from the working tree (shown only when provided). */
-  onDelete?: (path: string) => void;
+  /** Multi-selection of file paths (shared across both change lists). */
+  selection: Set<string>;
+  /** Row click — parent applies modifier-key logic (ctrl toggle / shift range) using `ordered`. */
+  onRowClick: (e: React.MouseEvent, path: string, ordered: string[]) => void;
+  /** Right-click or the "…" button — parent shows a context menu (no inline action buttons). */
+  onRowContextMenu: (e: React.MouseEvent, path: string, isDir: boolean, ordered: string[]) => void;
+  lockedPaths: Set<string>;
 }
 
 interface Item { path: string; name: string; isDir: boolean; change?: LoreFileChange; children: Item[]; }
@@ -26,7 +20,6 @@ const CODE_COLORS: Record<string, string> = {
 };
 function changeColor(code: string): string { return CODE_COLORS[code[0]?.toUpperCase()] || 'var(--text-secondary)'; }
 
-/** Build a nested tree from a flat list of changed file paths, synthesizing folder nodes. */
 function buildChangeTree(changes: LoreFileChange[]): Item[] {
   const map = new Map<string, Item>();
   const roots: Item[] = [];
@@ -40,6 +33,9 @@ function buildChangeTree(changes: LoreFileChange[]): Item[] {
     return item;
   };
   for (const ch of changes) {
+    // Lore status lists directory entries too (trailing slash, e.g. "A Content/"); they're
+    // redundant with the synthesized folders, so skip them as leaves.
+    if (ch.path.endsWith('/')) { getDir(ch.path.slice(0, -1)); continue; }
     const slash = ch.path.lastIndexOf('/');
     const leaf: Item = { path: ch.path, name: ch.path.split('/').pop() || ch.path, isDir: false, change: ch, children: [] };
     map.set(ch.path, leaf);
@@ -53,24 +49,40 @@ function buildChangeTree(changes: LoreFileChange[]): Item[] {
   return roots;
 }
 
-/** Hierarchical changed-files list (folders collapsible) with per-row stage/lock/ignore actions. */
-function LoreChangeTree({ changes, staged, selectedPath, onSelect, lockedPaths, busy, onLock, onUnlock, onStageToggle, onIgnore, onDelete }: LoreChangeTreeProps) {
+/** Depth-first list of file paths in render order, for shift-range selection. */
+function flatFiles(items: Item[]): string[] {
+  const out: string[] = [];
+  const walk = (list: Item[]) => list.forEach(i => { if (i.isDir) walk(i.children); else out.push(i.path); });
+  walk(items);
+  return out;
+}
+
+/**
+ * Hierarchical changed-files list with multi-select. Actions live in the right-click context
+ * menu (and a hover "…" button) rather than inline buttons, so rows stay all about the items.
+ */
+function LoreChangeTree({ changes, busy, selection, onRowClick, onRowContextMenu, lockedPaths }: LoreChangeTreeProps) {
   const tree = useMemo(() => buildChangeTree(changes), [changes]);
+  const ordered = useMemo(() => flatFiles(tree), [tree]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (p: string) => setCollapsed(prev => { const n = new Set(prev); n.has(p) ? n.delete(p) : n.add(p); return n; });
+
+  const menuButton = (path: string, isDir: boolean) => (
+    <button className="lore-row-menu" disabled={busy} title="More actions"
+      onClick={(e) => { e.stopPropagation(); onRowContextMenu(e, path, isDir, ordered); }}>⋯</button>
+  );
 
   const render = (items: Item[], depth: number): React.ReactNode => items.map(item => {
     if (item.isDir) {
       const open = !collapsed.has(item.path);
       return (
         <React.Fragment key={item.path}>
-          <div className="lore-row" style={{ paddingLeft: 6 + depth * 14 }} onClick={() => toggle(item.path)} title={item.path}>
+          <div className="lore-row" style={{ paddingLeft: 6 + depth * 14 }} onClick={() => toggle(item.path)}
+            onContextMenu={(e) => onRowContextMenu(e, item.path, true, ordered)} title={item.path}>
             <span style={{ width: 12, color: 'var(--text-secondary)' }}>{open ? '▾' : '▸'}</span>
             <span>📁</span>
             <span className="lore-row-name">{item.name}</span>
-            <span className="lore-row-actions">
-              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); onIgnore(item.path, true); }} title="Add this folder to .loreignore">Ignore</button>
-            </span>
+            {menuButton(item.path, true)}
           </div>
           {open && render(item.children, depth + 1)}
         </React.Fragment>
@@ -80,26 +92,16 @@ function LoreChangeTree({ changes, staged, selectedPath, onSelect, lockedPaths, 
     return (
       <div
         key={item.path}
-        className={`lore-row ${selectedPath === item.path ? 'selected' : ''}`}
+        className={`lore-row ${selection.has(item.path) ? 'selected' : ''}`}
         style={{ paddingLeft: 6 + depth * 14 }}
-        onClick={() => onSelect(item.path)}
+        onClick={(e) => onRowClick(e, item.path, ordered)}
+        onContextMenu={(e) => onRowContextMenu(e, item.path, false, ordered)}
         title={item.path}
       >
         <span className="lore-code" style={{ color: changeColor(ch.code) }}>{ch.code}</span>
         {lockedPaths.has(item.path) && <span title="Locked" style={{ color: 'var(--warning-color)' }}>🔒</span>}
         <span className="lore-row-name">{item.name}</span>
-        <span className="lore-row-actions">
-          <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); onIgnore(item.path, false); }} title="Add this file to .loreignore">Ignore</button>
-          <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); lockedPaths.has(item.path) ? onUnlock(item.path) : onLock(item.path); }}>
-            {lockedPaths.has(item.path) ? 'Unlock' : 'Lock'}
-          </button>
-          <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); onStageToggle(item.path); }}>
-            {staged ? 'Unstage' : 'Stage'}
-          </button>
-          {onDelete && (
-            <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); onDelete(item.path); }} title="Delete this file from disk">Delete</button>
-          )}
-        </span>
+        {menuButton(item.path, false)}
       </div>
     );
   });

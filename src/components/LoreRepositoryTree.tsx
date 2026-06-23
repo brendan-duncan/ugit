@@ -13,8 +13,7 @@ interface LoreRepositoryTreeProps {
   loadedDirs: Set<string>;
   /** Request a directory's children (lazy load). */
   onExpand: (dirPath: string) => void;
-  /** Ignore a file (path) or folder (path + '/') — appends to .loreignore. */
-  onIgnore: (path: string, isDir: boolean) => void;
+  onContextMenu?: (e: React.MouseEvent, path: string, isDir: boolean) => void;
   busy?: boolean;
 }
 
@@ -52,7 +51,7 @@ function buildTree(nodes: LoreTreeNode[]): TreeItem[] {
  * inline lock owners, and change markers. Directories load their children lazily on first
  * expand (via `repository dump --path <dir>`), so huge repos don't materialize the whole tree.
  */
-function LoreRepositoryTree({ nodes, lockOwners, statusByPath, selectedPath, onSelect, loadedDirs, onExpand, onIgnore, busy }: LoreRepositoryTreeProps) {
+function LoreRepositoryTree({ nodes, lockOwners, statusByPath, selectedPath, onSelect, loadedDirs, onExpand, onContextMenu, busy }: LoreRepositoryTreeProps) {
   const tree = useMemo(() => buildTree(nodes), [nodes]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -77,6 +76,7 @@ function LoreRepositoryTree({ nodes, lockOwners, statusByPath, selectedPath, onS
           className={`lore-row ${selectedPath === item.path ? 'selected' : ''}`}
           style={{ paddingLeft: 6 + depth * 14 }}
           onClick={() => (item.isDir ? toggle(item) : onSelect(item))}
+          onContextMenu={(e) => onContextMenu?.(e, item.path, item.isDir)}
           title={item.path}
         >
           <span style={{ width: 12, color: 'var(--text-secondary)' }}>{item.isDir ? (isOpen ? '▾' : '▸') : ''}</span>
@@ -85,9 +85,10 @@ function LoreRepositoryTree({ nodes, lockOwners, statusByPath, selectedPath, onS
           <span className="lore-row-name">{item.name}</span>
           {owner && <span title={`Locked by ${owner}`} style={{ color: 'var(--warning-color)', fontSize: 11 }}>🔒{owner === '<unknown>' ? '' : ` ${owner}`}</span>}
           <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{formatBytes(item.size)}</span>
-          <span className="lore-row-actions">
-            <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); onIgnore(item.path, item.isDir); }} title={`Add this ${item.isDir ? 'folder' : 'file'} to .loreignore`}>Ignore</button>
-          </span>
+          {onContextMenu && (
+            <button className="lore-row-menu" disabled={busy} title="More actions"
+              onClick={(e) => { e.stopPropagation(); onContextMenu(e, item.path, item.isDir); }}>⋯</button>
+          )}
         </div>
         {loading && <div className="lore-empty" style={{ paddingLeft: 6 + (depth + 1) * 14 }}>loading…</div>}
         {item.isDir && isOpen && renderItems(item.children, depth + 1)}

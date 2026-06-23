@@ -58,6 +58,7 @@
   padding: 3px 10px;
   font-size: 13px;
   cursor: pointer;
+  user-select: none;
 }
 .lore-row:hover { background: var(--bg-tertiary); }
 .lore-row.selected { background: var(--accent-color); color: var(--text-selected); }
@@ -77,6 +78,14 @@
 .lore-row-actions { display: flex; gap: 4px; opacity: 0; }
 .lore-row:hover .lore-row-actions,
 .lore-row.always-actions .lore-row-actions { opacity: 1; }
+
+/* Single hover "…" actions button — keeps rows clean; opens the context menu. */
+.lore-row-menu {
+  opacity: 0; background: none; border: none; color: var(--text-secondary);
+  cursor: pointer; font-size: 17px; line-height: 1; padding: 0 4px; flex-shrink: 0;
+}
+.lore-row:hover .lore-row-menu, .lore-row.selected .lore-row-menu { opacity: 1; }
+.lore-row-menu:hover { color: var(--text-highlight); }
 .lore-lock-owner { color: var(--text-secondary); font-size: 11px; }
 
 .lore-empty {
@@ -256,6 +265,21 @@
 .lore-sync-gauge.diverged .lore-sync-arrow, .lore-sync-gauge.diverged .lore-sync-state { color: var(--warning-color); }
 .lore-file-meta { font-size: 12px; color: var(--text-secondary); padding: 6px 10px; }
 .lore-file-meta code { color: var(--text-primary); }
+/* Context / dropdown menu */
+.lore-context-menu {
+  position: fixed; z-index: 300; min-width: 200px;
+  background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); padding: 4px 0;
+  user-select: none;
+}
+.lore-context-item { padding: 5px 14px; font-size: 13px; cursor: pointer; color: var(--text-primary); white-space: nowrap; }
+.lore-context-item:hover { background: var(--accent-color); color: var(--text-highlight); }
+.lore-context-item.danger { color: var(--danger-color); }
+.lore-context-item.danger:hover { background: var(--danger-color); color: #fff; }
+.lore-context-item.disabled { color: var(--text-secondary); cursor: default; }
+.lore-context-item.disabled:hover { background: transparent; color: var(--text-secondary); }
+.lore-context-sep { height: 1px; background: var(--border-color); margin: 4px 0; }
+
 .lore-file-content {
   margin: 0; padding: 8px 10px; font-family: monospace; font-size: 12px;
   white-space: pre; overflow: auto; color: var(--text-primary); tab-size: 4;

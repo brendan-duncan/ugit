@@ -8,6 +8,8 @@ import LoreRevisionGraph from './LoreRevisionGraph';
 import LoreRepositoryTree from './LoreRepositoryTree';
 import LoreChangeTree from './LoreChangeTree';
 import LoreMediaView from './LoreMediaView';
+import LoreContextMenu, { LoreMenuItem } from './LoreContextMenu';
+import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
 import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
@@ -83,6 +85,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [showAddLayer, setShowAddLayer] = useState(false);
   const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/' });
   const [resolvingPath, setResolvingPath] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Set<string>>(new Set());
+  const anchorRef = useRef<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: LoreMenuItem[] } | null>(null);
   // Default to the Lore-centric repository tree; Changes (commit flow) and Graph are toggles.
   const [viewMode, setViewMode] = useState<'changes' | 'files' | 'graph'>('files');
   const [treeFile, setTreeFile] = useState<LoreTreeNode | null>(null);
@@ -193,13 +198,78 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const onSelectFile = useCallback((file: LoreFileChange) => onSelectFilePath(file.path), [onSelectFilePath]);
 
   const doIgnore = (p: string, isDir: boolean) => runAction(async () => { client!.addToIgnore(isDir ? `${p}/` : p); });
-  const stagePath = (p: string) => runAction(async () => { await client!.stage([p]); });
-  const unstagePath = (p: string) => runAction(async () => { await client!.unstage([p]); });
-  const doDelete = (p: string) => runAction(async () => {
-    const ok = await showConfirm(`Delete "${p}" from the working tree? This removes the file from disk.`, 'Delete file');
+  const absPath = (rel: string) => `${repoPath.replace(/[\\/]+$/, '')}/${rel}`;
+
+  // --- multi-selection (Ctrl/Cmd toggle, Shift range) over the changed-files lists ---
+  const onRowClick = useCallback((e: React.MouseEvent, path: string, ordered: string[]) => {
+    if (e.ctrlKey || e.metaKey) {
+      setSelection(prev => { const n = new Set(prev); n.has(path) ? n.delete(path) : n.add(path); return n; });
+      anchorRef.current = path;
+    } else if (e.shiftKey && anchorRef.current) {
+      const a = ordered.indexOf(anchorRef.current), b = ordered.indexOf(path);
+      if (a >= 0 && b >= 0) { const lo = Math.min(a, b), hi = Math.max(a, b); setSelection(new Set(ordered.slice(lo, hi + 1))); }
+    } else {
+      setSelection(new Set([path]));
+      anchorRef.current = path;
+      onSelectFilePath(path);
+    }
+  }, [selection, onSelectFilePath]);
+
+  const doDeleteMany = (paths: string[]) => runAction(async () => {
+    const ok = await showConfirm(`Delete ${paths.length} file(s) from the working tree? This removes ${paths.length === 1 ? 'it' : 'them'} from disk.`, 'Delete file');
     if (!ok) return;
-    client!.deleteWorkingFile(p);
+    paths.forEach(p => client!.deleteWorkingFile(p));
   });
+
+  // Context menu for a changed-file (or its folder) row.
+  const onChangeContextMenu = useCallback((e: React.MouseEvent, path: string, isDir: boolean, staged: boolean) => {
+    e.preventDefault();
+    if (!isDir && !selection.has(path)) { setSelection(new Set([path])); anchorRef.current = path; onSelectFilePath(path); }
+    const targets = isDir ? [path] : ((selection.has(path) && selection.size > 1) ? Array.from(selection) : [path]);
+    const items: LoreMenuItem[] = [
+      { label: 'Show in File Explorer', onClick: () => showInExplorer(absPath(path)) },
+      { label: 'Open in Editor', onClick: () => openInEditor(absPath(path)) },
+      { separator: true },
+    ];
+    if (isDir) {
+      items.push({ label: 'Ignore folder', onClick: () => doIgnore(path, true) });
+    } else {
+      items.push({ label: `${staged ? 'Unstage' : 'Stage'}${targets.length > 1 ? ` (${targets.length})` : ''}`, onClick: () => runAction(async () => { staged ? await client!.unstage(targets) : await client!.stage(targets); }) });
+      items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire(targets); }) });
+      items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease(targets); }) });
+      items.push({ label: `Ignore${targets.length > 1 ? ` (${targets.length})` : ''}`, onClick: () => runAction(async () => { targets.forEach(p => client!.addToIgnore(p)); }) });
+      if (!staged) items.push({ separator: true }, { label: `Delete${targets.length > 1 ? ` (${targets.length})` : ''}`, danger: true, onClick: () => doDeleteMany(targets) });
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items });
+  }, [selection, onSelectFilePath, client]);
+
+  // Context menu for a Files-tree row.
+  const onFileTreeContextMenu = useCallback((e: React.MouseEvent, path: string, isDir: boolean) => {
+    e.preventDefault();
+    const items: LoreMenuItem[] = [
+      { label: 'Show in File Explorer', onClick: () => showInExplorer(absPath(path)) },
+      { label: 'Open in Editor', onClick: () => openInEditor(absPath(path)) },
+      { separator: true },
+    ];
+    if (isDir) {
+      items.push({ label: 'Ignore folder', onClick: () => doIgnore(path, true) });
+    } else {
+      items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire([path]); }) });
+      items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease([path]); }) });
+      items.push({ label: 'Ignore', onClick: () => doIgnore(path, false) });
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items });
+  }, [client]);
+
+  // Repository "…" menu.
+  const onRepoMenu = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenu({ x: r.left, y: r.bottom + 2, items: [
+      { label: 'Open in File Explorer', onClick: () => showInExplorer(repoPath) },
+      { label: 'Open in Editor', onClick: () => openInEditor(repoPath) },
+      { label: 'Open in Console', onClick: () => openInConsole(repoPath) },
+    ] });
+  };
 
   const onSelectRevision = useCallback(async (rev: { signature: string }) => {
     setSelectedPath(null);
@@ -462,6 +532,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
         )}
         {commandState.length > 0 &&
           <div className="toolbar-status"><span className="toolbar-busy-spinner" title={lastCommand}>↻</span></div>}
+        <button className="toolbar-button" onClick={onRepoMenu} title="Repository actions">
+          <span className="toolbar-button-label">⋯</span>
+        </button>
       </div>
 
       <div className="repo-content-horizontal" onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
@@ -680,7 +753,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                         onSelect={onSelectTreeFile}
                         loadedDirs={loadedDirs}
                         onExpand={loadDir}
-                        onIgnore={doIgnore}
+                        onContextMenu={onFileTreeContextMenu}
                         busy={busy}
                       />
                     </div>
@@ -774,18 +847,18 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       <button className="lore-mini-btn" onClick={stageAll} disabled={busy || !status.unstaged.length}>Stage all</button>
                     </div>
                     <LoreChangeTree
-                      changes={status.unstaged} staged={false} busy={busy}
-                      selectedPath={selectedPath} onSelect={onSelectFilePath}
-                      lockedPaths={lockedPaths} onLock={doLock} onUnlock={doUnlock}
-                      onStageToggle={stagePath} onIgnore={doIgnore} onDelete={doDelete}
+                      changes={status.unstaged} busy={busy}
+                      selection={selection} onRowClick={onRowClick}
+                      onRowContextMenu={(e, path, isDir) => onChangeContextMenu(e, path, isDir, false)}
+                      lockedPaths={lockedPaths}
                     />
 
                     <div className="lore-changes-group-header"><span>Staged for commit</span></div>
                     <LoreChangeTree
-                      changes={status.staged} staged={true} busy={busy}
-                      selectedPath={selectedPath} onSelect={onSelectFilePath}
-                      lockedPaths={lockedPaths} onLock={doLock} onUnlock={doUnlock}
-                      onStageToggle={unstagePath} onIgnore={doIgnore}
+                      changes={status.staged} busy={busy}
+                      selection={selection} onRowClick={onRowClick}
+                      onRowContextMenu={(e, path, isDir) => onChangeContextMenu(e, path, isDir, true)}
+                      lockedPaths={lockedPaths}
                     />
                   </div>
                   <div className="lore-commit-box">
@@ -869,6 +942,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           </>
         )}
       </div>
+
+      {menu && <LoreContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
 
       {resolvingPath && client && (
         <LoreMergeResolver

@@ -610,6 +610,24 @@ ipcMain.handle('open-in-editor', async (event: any, itemPath: string, editor: st
   }
 });
 
+// Open a terminal/console at the given directory (or a file's parent directory).
+ipcMain.handle('open-in-console', async (event: any, itemPath: string) => {
+  try {
+    let dir = itemPath;
+    if (fs.existsSync(itemPath) && !fs.statSync(itemPath).isDirectory()) dir = path.dirname(itemPath);
+    if (!fs.existsSync(dir)) dir = path.dirname(itemPath);
+    if (process.platform === 'win32') {
+      exec(`start "" cmd /K cd /d "${dir}"`, { cwd: dir });
+    } else if (process.platform === 'darwin') {
+      exec(`open -a Terminal "${dir}"`);
+    } else {
+      exec(`x-terminal-emulator || gnome-terminal || xterm`, { cwd: dir });
+    }
+  } catch (error) {
+    console.error('Error opening console:', error);
+  }
+});
+
 // Show save dialog
 ipcMain.handle('show-save-dialog', async (event: any, options: any) => {
   if (!mainWindow) {

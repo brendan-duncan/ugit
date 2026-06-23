@@ -243,6 +243,15 @@ a richer sparse `.lore/view` editor, background-tab clone (reuse CloneProgressVi
 commit/refresh into the app toolbar/menu, auth against a secured server + token-login dialog,
 and the still-missing fixtures (delete/move rows, merge/conflict, binary diff).
 
+## Backlog / ideas
+
+- **Stash / shelf (ugit-level).** Lore has NO native stash/shelve (verified, 0.8.3). Note:
+  uncommitted changes carry across `branch switch`, so you don't stash to switch branches. To
+  truly set changes aside with a clean tree, the Lore-native way is a cheap WIP branch (commit
+  there, switch back). A nicer UX would be a **client-side shelf** in the panel: capture the
+  changed files (bytes + add/delete record) to a local scratch area, reset the working tree,
+  and restore on demand. Bounded work; needs care for binaries and added/deleted files.
+
 ## Concrete steps
 
 1. **Repo type detection.** Add `detectRepositoryType(path): 'git' | 'lore'` (check for
