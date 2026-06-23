@@ -16,7 +16,7 @@ export const ZERO_SIGNATURE = '0'.repeat(64);
 export type LoreChangeType = 'added' | 'modified' | 'deleted' | 'moved' | 'copied' | 'unknown';
 
 /** Which `status` section a change appeared under. */
-export type LoreChangeSection = 'untracked' | 'unstaged' | 'staged';
+export type LoreChangeSection = 'untracked' | 'unstaged' | 'staged' | 'conflict';
 
 export interface LoreFileChange {
   /** Path relative to the repository root. */
@@ -29,6 +29,15 @@ export interface LoreFileChange {
   code: string;
   /** Section the row came from; `staged` rows are staged, the rest are not. */
   section: LoreChangeSection;
+  /** True for an unresolved merge conflict (a `!`-marked row in `Changes in conflict:`). */
+  conflicted?: boolean;
+}
+
+/** In-progress merge state, parsed from a `Pending merge, incoming revision <hash>` line. */
+export interface LoreMergeState {
+  inProgress: boolean;
+  /** Incoming (source) revision signature being merged in. */
+  incoming?: string;
 }
 
 /** Local-vs-remote sync relationship, parsed from the status sync line. */
@@ -49,9 +58,24 @@ export interface LoreStatus {
   staged: LoreFileChange[];
   /** Files changed but not staged — untracked (new) + modified-not-staged. */
   unstaged: LoreFileChange[];
+  /** Files in an unresolved merge conflict (`Changes in conflict:` section). */
+  conflicted: LoreFileChange[];
+  /** Set when a merge is in progress (`Pending merge, …`). */
+  merge?: LoreMergeState;
   /** True when the CLI reported `No tracked changes`. */
   clean: boolean;
   /** Raw CLI text, for debugging / unparsed fields. */
+  raw: string;
+}
+
+/** Result of `branch merge start`: either auto-committed (clean) or stopped on conflicts. */
+export interface LoreMergeResult {
+  /** Paths reported under `Files in conflict:`. */
+  conflicted: string[];
+  /** True when the merge auto-committed (no conflicts). */
+  committed: boolean;
+  /** Counts from the `Merged files, N updated, N deleted, N merged, N conflicted` line. */
+  counts?: { updated: number; deleted: number; merged: number; conflicted: number };
   raw: string;
 }
 

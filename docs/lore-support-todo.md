@@ -151,6 +151,17 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
   (textarea → BOM-free temp file → `--view`). Live-verified: sparse clone materializes only
   the included paths; read/write round-trips BOM-free.
 
+### Merge & conflict resolution — DONE
+- Parsers (validated, 14 assertions): `parseMergeResult` + status `Pending merge`/`Changes in
+  conflict:` handling (strips the `(M)!` annotation, routes to `status.conflicted`, sets
+  `status.merge`). Fixtures in [lore-cli-output-samples.md](lore-cli-output-samples.md).
+- `LoreClient`: `mergeStart` / `mergeResolve(paths, 'mine'|'theirs')` / `mergeAbort`.
+- `LoreRepositoryView`: per-branch **Merge** button; a **merge banner** (incoming revision +
+  conflict count + Abort); a **Conflicts** section (Use mine / Use theirs per file); diff shows
+  the diff3 conflict markers; the commit button becomes **Complete merge** during a merge.
+- Live-verified: clean merge auto-commits; conflict merge → resolve theirs → commit completes
+  (took theirs), and the merge state clears.
+
 ### Background-tab clone — DONE
 - Lore CLONE now runs in the background like git's: the dialog closes immediately, App opens a
   `type:'lore'` tab with `cloning:true`, streams progress into the shared `CloneProgressView`

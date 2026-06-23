@@ -28,6 +28,7 @@ import {
   parseBranchSwitch,
   parseLocks,
   parseSimpleList,
+  parseMergeResult,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -39,6 +40,7 @@ import {
   LoreSyncResult,
   LoreBranchOpResult,
   LoreLock,
+  LoreMergeResult,
 } from './types';
 
 /** Notified when a lore command starts/ends, for the busy/timing UI (mirrors GitAdapter). */
@@ -209,6 +211,30 @@ export class LoreClient {
     if (revision) argv.push(revision);
     const { stdout } = await this.run(argv);
     return parseBranchSwitch(stdout);
+  }
+
+  /**
+   * Merge `branch` INTO the current branch. Auto-commits when there are no conflicts; otherwise
+   * stops with a pending merge (resolve conflicts, then commit). `message` sets the merge
+   * commit message used on a clean merge.
+   */
+  async mergeStart(branch: string, message?: string): Promise<LoreMergeResult> {
+    const argv = ['branch', 'merge', 'start', branch];
+    if (message) argv.push('--message', message);
+    return parseMergeResult((await this.run(argv)).stdout);
+  }
+
+  /** Resolve conflicted paths during a merge, optionally taking 'mine' or 'theirs' wholesale. */
+  async mergeResolve(paths: string[], side?: 'mine' | 'theirs'): Promise<void> {
+    const argv = ['branch', 'merge', 'resolve'];
+    if (side) argv.push(side);
+    argv.push(...paths);
+    await this.run(argv);
+  }
+
+  /** Abort an in-progress merge, restoring the pre-merge state. */
+  async mergeAbort(): Promise<void> {
+    await this.run(['branch', 'merge', 'abort']);
   }
 
   /** Push local commits to the remote. Returns the pushed revisions + byte/fragment summary. */

@@ -17,6 +17,7 @@ import {
   LoreSyncResult,
   LoreBranchOpResult,
   LoreLock,
+  LoreMergeResult,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -47,6 +48,7 @@ function sectionFromHeader(line: string): LoreChangeSection | null {
   if (l.startsWith('untracked files')) return 'untracked';
   if (l.startsWith('changes not staged')) return 'unstaged';
   if (l.startsWith('changes staged')) return 'staged';
+  if (l.startsWith('changes in conflict')) return 'conflict';
   return null;
 }
 
@@ -74,6 +76,7 @@ export function parseStatus(text: string): LoreStatus {
     syncState: 'unknown',
     staged: [],
     unstaged: [],
+    conflicted: [],
     clean: false,
     raw: text,
   };
@@ -107,6 +110,11 @@ export function parseStatus(text: string): LoreStatus {
       status.syncState = syncStateFromLine(line);
       continue;
     }
+    if (line.startsWith('Pending merge')) {
+      const inc = line.match(/incoming revision\s+([0-9a-fA-F]{64})/);
+      status.merge = { inProgress: true, incoming: inc ? inc[1] : undefined };
+      continue;
+    }
     if (line.startsWith('No tracked changes')) {
       status.clean = true;
       continue;
@@ -121,19 +129,27 @@ export function parseStatus(text: string): LoreStatus {
       const row = line.match(FILE_ROW_RE);
       if (row) {
         const code = row[1];
+        let path = row[2];
+        // Strip a trailing merge annotation like " (M)" or " (M)!" ('!' = unresolved).
+        let conflicted = false;
+        const annot = path.match(/^(.*?)\s+\(([A-Z?]+)\)(!?)\s*$/);
+        if (annot) { path = annot[1]; conflicted = annot[3] === '!'; }
         const change: LoreFileChange = {
-          path: row[2],
+          path,
           change: changeTypeFromCode(code),
           code,
           section,
+          conflicted: conflicted || section === 'conflict' || undefined,
         };
-        if (section === 'staged') status.staged.push(change);
+        if (section === 'conflict') status.conflicted.push(change);
+        else if (section === 'staged') status.staged.push(change);
         else status.unstaged.push(change);
       }
     }
   }
 
-  status.clean = status.clean || (status.staged.length === 0 && status.unstaged.length === 0);
+  status.clean = status.clean ||
+    (status.staged.length === 0 && status.unstaged.length === 0 && status.conflicted.length === 0);
   return status;
 }
 
@@ -323,6 +339,36 @@ export function parseSyncResult(text: string): LoreSyncResult {
     if (onBranch && !branch) branch = onBranch[1];
   }
   return { upToDate, branch, toRevision, raw: text };
+}
+
+/**
+ * Parse `lore branch merge start` output. Either auto-commits (clean) or lists conflicts:
+ *   Merged files, 1 updated, 0 deleted, 0 merged, 0 conflicted
+ *   Committed merged repository state 3 -> <hash>          (clean → committed)
+ * vs.
+ *   Merged files, 0 updated, 0 deleted, 0 merged, 1 conflicted
+ *   Files in conflict:
+ *   f.txt
+ */
+export function parseMergeResult(text: string): LoreMergeResult {
+  const lines = text.split(/\r?\n/);
+  let counts: LoreMergeResult['counts'];
+  const conflicted: string[] = [];
+  let committed = false;
+  let inConflictList = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const m = line.match(/^Merged files,\s+(\d+) updated,\s+(\d+) deleted,\s+(\d+) merged,\s+(\d+) conflicted/);
+    if (m) {
+      counts = { updated: +m[1], deleted: +m[2], merged: +m[3], conflicted: +m[4] };
+      continue;
+    }
+    if (/^Committed merged repository state/.test(line)) { committed = true; continue; }
+    if (/^Files in conflict:/i.test(line)) { inConflictList = true; continue; }
+    if (inConflictList && line) conflicted.push(line);
+  }
+  return { conflicted, committed, counts, raw: text };
 }
 
 /** Parse `lore branch create <name>` → "Created branch <name> at revision <hash>". */

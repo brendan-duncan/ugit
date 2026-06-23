@@ -136,6 +136,17 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const doUnlock = (path: string) => runAction(async () => { await client!.lockRelease([path]); });
 
   const doSwitchBranch = (name: string) => { if (name !== status?.branch) runAction(async () => { await client!.switchBranch(name); }); };
+  const doMerge = (branch: string) => runAction(async () => {
+    const r = await client!.mergeStart(branch);
+    showAlert(
+      r.committed
+        ? `Merged ${branch} (clean, auto-committed).`
+        : `Merge of ${branch} stopped with ${r.conflicted.length} conflict(s): ${r.conflicted.join(', ')}.\nResolve them, then Commit to finish.`,
+      'Lore merge',
+    );
+  });
+  const doResolve = (path: string, side: 'mine' | 'theirs') => runAction(async () => { await client!.mergeResolve([path], side); });
+  const doMergeAbort = () => runAction(async () => { await client!.mergeAbort(); });
   const doCreateBranch = () => runAction(async () => {
     const name = newBranchName.trim();
     if (!name) throw new Error('Branch name is required');
@@ -155,8 +166,10 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const stageOne = (file: LoreFileChange) => runAction(async () => { await client!.stage([file.path]); });
   const unstageOne = (file: LoreFileChange) => runAction(async () => { await client!.unstage([file.path]); });
   const doCommit = () => runAction(async () => {
-    if (!commitMessage.trim()) throw new Error('Commit message is required');
-    await client!.commit(commitMessage.trim());
+    const msg = commitMessage.trim()
+      || (status?.merge?.inProgress ? `Merge ${status.merge.incoming?.slice(0, 8) ?? ''}`.trim() : '');
+    if (!msg) throw new Error('Commit message is required');
+    await client!.commit(msg);
     setCommitMessage('');
   });
 
@@ -281,6 +294,18 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     title={b.name === status.branch ? 'Current branch' : 'Switch to this branch'}
                   >
                     <span className="lore-row-name">{b.name}</span>
+                    {b.name !== status.branch && !status.merge?.inProgress && (
+                      <span className="lore-row-actions">
+                        <button
+                          className="lore-mini-btn"
+                          disabled={busy}
+                          onClick={(e) => { e.stopPropagation(); doMerge(b.name); }}
+                          title={`Merge ${b.name} into ${status.branch}`}
+                        >
+                          Merge
+                        </button>
+                      </span>
+                    )}
                   </div>
                 ))}
                 {!branches?.local.length && <div className="lore-empty">no branches</div>}
@@ -344,10 +369,39 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
             </div>
 
             {/* Content: changes + commit | diff + history */}
-            <div className="repo-content-viewer" style={{ width: `${100 - leftWidth}%` }}>
-              <div className="lore-content-cols">
+            <div className="repo-content-viewer" style={{ width: `${100 - leftWidth}%`, display: 'flex', flexDirection: 'column' }}>
+              {status.merge?.inProgress && (
+                <div className="lore-merge-banner">
+                  <span>Merging — incoming <code>{status.merge.incoming?.slice(0, 8)}</code></span>
+                  <span>{status.conflicted.length > 0
+                    ? `${status.conflicted.length} conflict(s) to resolve`
+                    : 'conflicts resolved — Commit to finish'}</span>
+                  <span style={{ flex: 1 }} />
+                  <button className="lore-mini-btn" disabled={busy} onClick={doMergeAbort}>Abort merge</button>
+                </div>
+              )}
+              <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
                 <div className="lore-changes-col">
                   <div className="lore-changes-scroll">
+                    {status.conflicted.length > 0 && (
+                      <>
+                        <div className="lore-changes-group-header conflict"><span>Conflicts ({status.conflicted.length})</span></div>
+                        {status.conflicted.map(f => (
+                          <div
+                            key={`conflict:${f.path}`}
+                            className={`lore-row ${selectedPath === f.path ? 'selected' : ''}`}
+                            onClick={() => onSelectFile(f)}
+                          >
+                            <span className="lore-code" style={{ color: 'var(--danger-color)' }}>!</span>
+                            <span className="lore-row-name" title={f.path}>{f.path}</span>
+                            <span className="lore-row-actions">
+                              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doResolve(f.path, 'mine'); }} title="Resolve using my changes">Use mine</button>
+                              <button className="lore-mini-btn" disabled={busy} onClick={(e) => { e.stopPropagation(); doResolve(f.path, 'theirs'); }} title="Resolve using their changes">Use theirs</button>
+                            </span>
+                          </div>
+                        ))}
+                      </>
+                    )}
                     <div className="lore-changes-group-header">
                       <span>Changes not staged</span>
                       <button className="lore-mini-btn" onClick={stageAll} disabled={busy || !status.unstaged.length}>Stage all</button>
@@ -364,8 +418,12 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       onChange={(e) => setCommitMessage(e.target.value)}
                       placeholder="Commit message"
                     />
-                    <button className="lore-primary-btn" onClick={doCommit} disabled={busy || !status.staged.length || !commitMessage.trim()}>
-                      Commit {status.staged.length ? `(${status.staged.length})` : ''}
+                    <button
+                      className="lore-primary-btn"
+                      onClick={doCommit}
+                      disabled={busy || !status.staged.length || (!commitMessage.trim() && !status.merge?.inProgress)}
+                    >
+                      {status.merge?.inProgress ? 'Complete merge' : 'Commit'} {status.staged.length ? `(${status.staged.length})` : ''}
                     </button>
                   </div>
                 </div>

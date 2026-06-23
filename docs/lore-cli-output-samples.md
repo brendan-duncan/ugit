@@ -346,6 +346,42 @@ Behavior (verified):
   line and the filter silently does nothing (everything materializes). Node `fs.writeFileSync(…,
   'utf8')` is BOM-free; PowerShell `Set-Content -Encoding utf8` (5.1) is NOT.
 
+## merge (`branch merge start <branch>` — merges <branch> INTO current)
+
+Clean merge (auto-commits):
+```
+... (3-way diff streaming) ...
+Merged files, 1 updated, 0 deleted, 0 merged, 0 conflicted
+Staged merged repository state <hash>
+Committed merged repository state 3 -> <hash>
+```
+Conflict merge (stops, exit still 0):
+```
+Merged files, 0 updated, 0 deleted, 0 merged, 1 conflicted
+Staged merged repository state <hash>
+Files in conflict:
+f.txt
+```
+Parse (`parseMergeResult`): `Merged files, N updated, N deleted, N merged, N conflicted`
+counts; `Committed merged repository state` → auto-committed; `Files in conflict:` list.
+
+**status during a merge:**
+```
+On branch main revision 2 -> <hash>
+...
+Pending merge, incoming revision <hash>
+Changes in conflict:
+M  f.txt (M)!
+```
+- `Pending merge, incoming revision <hash>` → `status.merge = { inProgress, incoming }`.
+- `Changes in conflict:` rows look like `M  f.txt (M)!` — the trailing `(M)` annotation and
+  `!` (unresolved) are stripped; the file goes to `status.conflicted`.
+- After `branch merge resolve theirs f.txt`, the row moves to `Changes staged for commit:` as
+  `M f.txt (M)` (no `!`); `commit` then completes the merge.
+
+**Conflict markers** written to the file (diff3 style): `<<<<<<< ours` / `||||||| original`
+/ `=======` / `>>>>>>> theirs`. `lore diff` shows them as added lines.
+
 ## OPEN / to investigate
 - Capture `D` (delete), move, and copy rows in status, and the corresponding diff output.
 - Capture `sync` when the local branch is BEHIND (a real pull), and `push` to a protected
