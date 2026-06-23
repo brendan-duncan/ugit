@@ -7,6 +7,7 @@ import LoreMergeResolver from './LoreMergeResolver';
 import LoreRevisionGraph from './LoreRevisionGraph';
 import LoreRepositoryTree from './LoreRepositoryTree';
 import LoreChangeTree from './LoreChangeTree';
+import LoreMediaView from './LoreMediaView';
 import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
@@ -35,6 +36,17 @@ const IMAGE_MIME: Record<string, string> = {
 function imageMime(path: string): string | null {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   return IMAGE_MIME[ext] ?? null;
+}
+const AUDIO_MIME: Record<string, string> = {
+  mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', oga: 'audio/ogg', m4a: 'audio/mp4',
+  aac: 'audio/aac', flac: 'audio/flac', opus: 'audio/ogg', weba: 'audio/webm',
+};
+function mediaMime(path: string): { kind: 'image' | 'audio'; mime: string } | null {
+  const img = imageMime(path);
+  if (img) return { kind: 'image', mime: img };
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  if (AUDIO_MIME[ext]) return { kind: 'audio', mime: AUDIO_MIME[ext] };
+  return null;
 }
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -76,9 +88,13 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [treeFile, setTreeFile] = useState<LoreTreeNode | null>(null);
   const [fileInfo, setFileInfo] = useState<LoreFileInfo | null>(null);
   const [fileHist, setFileHist] = useState<LoreFileHistoryEntry[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [fileBinary, setFileBinary] = useState<boolean>(false);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  // Media (image/audio) preview & diff for the selected file (used in both Files and Changes views).
+  const [mediaKind, setMediaKind] = useState<'image' | 'audio' | null>(null);
+  const [mediaNewUrl, setMediaNewUrl] = useState<string | null>(null);
+  const [mediaOldUrl, setMediaOldUrl] = useState<string | null>(null);
+  const [mediaLoadingOld, setMediaLoadingOld] = useState<boolean>(false);
   // Files view shows the file content by default; clicking a history revision shows its diff.
   const [historyDiff, setHistoryDiff] = useState<boolean>(false);
   const [treeNodes, setTreeNodes] = useState<LoreTreeNode[]>([]);
@@ -142,10 +158,29 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     }
   }, [refresh, showAlert]);
 
+  const clearMedia = () => { setMediaKind(null); setMediaNewUrl(null); setMediaOldUrl(null); };
+
   const onSelectFilePath = useCallback(async (filePath: string) => {
     setRevDetail(null);
     setSelectedPath(filePath);
+    setHistoryDiff(false);
     setDiffText('');
+    clearMedia();
+    const media = mediaMime(filePath);
+    if (media) {
+      // Working tree (new) vs the current committed revision (old) — an image/audio diff.
+      setMediaKind(media.kind);
+      const b64 = client!.readWorkingFileBase64(filePath);
+      setMediaNewUrl(b64 ? `data:${media.mime};base64,${b64}` : null);
+      if (status?.local.number) {
+        setMediaLoadingOld(true);
+        try {
+          const oldB64 = await client!.readFileAtRevisionBase64(filePath, status.local.signature);
+          setMediaOldUrl(oldB64 ? `data:${media.mime};base64,${oldB64}` : null);
+        } finally { setMediaLoadingOld(false); }
+      }
+      return;
+    }
     setDiffLoading(true);
     try {
       setDiffText(await client!.diffText([filePath]));
@@ -154,7 +189,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     } finally {
       setDiffLoading(false);
     }
-  }, [client, showAlert]);
+  }, [client, showAlert, status]);
   const onSelectFile = useCallback((file: LoreFileChange) => onSelectFilePath(file.path), [onSelectFilePath]);
 
   const doIgnore = (p: string, isDir: boolean) => runAction(async () => { client!.addToIgnore(isDir ? `${p}/` : p); });
@@ -201,16 +236,17 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setDiffText('');
     setFileInfo(null);
     setFileHist([]);
-    setPreviewUrl(null);
     setFileBinary(false);
     setFileContent(null);
     setHistoryDiff(false);
+    clearMedia();
     setDiffLoading(true);
     try {
-      const mime = imageMime(node.path);
-      if (mime) {
+      const media = mediaMime(node.path);
+      if (media) {
+        setMediaKind(media.kind);
         const b64 = client!.readWorkingFileBase64(node.path);
-        setPreviewUrl(b64 ? `data:${mime};base64,${b64}` : null);
+        setMediaNewUrl(b64 ? `data:${media.mime};base64,${b64}` : null);
       } else if (client!.isProbablyBinary(node.path)) {
         setFileBinary(true);
       } else {
@@ -235,6 +271,23 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     const prev = fileHist[idx + 1];
     setSelectedPath(treeFile.path);
     setHistoryDiff(true);
+    const media = mediaMime(treeFile.path);
+    if (media) {
+      // old (previous revision) vs new (this revision) — image/audio diff.
+      setMediaKind(media.kind);
+      setMediaNewUrl(null);
+      setMediaOldUrl(null);
+      setMediaLoadingOld(true);
+      try {
+        const [newB64, oldB64] = await Promise.all([
+          client!.readFileAtRevisionBase64(treeFile.path, cur.signature),
+          prev ? client!.readFileAtRevisionBase64(treeFile.path, prev.signature) : Promise.resolve(null),
+        ]);
+        setMediaNewUrl(newB64 ? `data:${media.mime};base64,${newB64}` : null);
+        setMediaOldUrl(oldB64 ? `data:${media.mime};base64,${oldB64}` : null);
+      } finally { setMediaLoadingOld(false); }
+      return;
+    }
     setDiffLoading(true);
     try {
       setDiffText(await client!.diffText([treeFile.path], prev?.signature, cur.signature));
@@ -644,19 +697,22 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     <div className="lore-diff-area">
                       {!treeFile ? <div className="lore-empty">Select a file to see its content and history.</div>
                         : diffLoading ? <div className="lore-empty">Loading…</div>
-                        : historyDiff ? (
+                        : historyDiff && mediaKind ? (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 4 }}>
+                              <button className="lore-mini-btn" onClick={() => setHistoryDiff(false)}>← file</button>
+                            </div>
+                            <LoreMediaView kind={mediaKind} name={treeFile.name} newUrl={mediaNewUrl} oldUrl={mediaOldUrl} loadingOld={mediaLoadingOld} />
+                          </>
+                        ) : historyDiff ? (
                           <>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 4 }}>
                               <button className="lore-mini-btn" onClick={() => setHistoryDiff(false)}>← file</button>
                             </div>
                             <LoreDiffView diff={diffText} />
                           </>
-                        ) : previewUrl ? (
-                          <div style={{ padding: 10, textAlign: 'center' }}>
-                            <img src={previewUrl} alt={treeFile.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }} />
-                          </div>
-                        ) : imageMime(treeFile.path) ? (
-                          <div className="lore-empty">Image too large to preview ({fileInfo ? fileInfo.size : '?'} bytes).</div>
+                        ) : mediaKind ? (
+                          <LoreMediaView kind={mediaKind} name={treeFile.name} newUrl={mediaNewUrl} />
                         ) : fileBinary ? (
                           <div style={{ padding: 16 }}>
                             <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
@@ -759,7 +815,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     )}
                   </div>
                   <div className="lore-diff-area">
-                    {selectedPath ? (
+                    {selectedPath && mediaKind ? (
+                      <LoreMediaView kind={mediaKind} name={selectedPath.split('/').pop() || selectedPath} newUrl={mediaNewUrl} oldUrl={mediaOldUrl} loadingOld={mediaLoadingOld} />
+                    ) : selectedPath ? (
                       diffLoading ? <div className="lore-empty">Loading diff…</div> : <LoreDiffView diff={diffText} />
                     ) : revDetail ? (
                       <div style={{ padding: 8 }}>

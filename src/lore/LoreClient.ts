@@ -370,6 +370,25 @@ export class LoreClient {
     fs.rmSync(path.join(this.repoPath, relPath), { force: true });
   }
 
+  /**
+   * Read a file's bytes at a specific revision as base64 (for old-vs-new media diffs). Exports
+   * via `file write … --output <temp>`, reads it, and cleans up. Null on failure/too big.
+   */
+  async readFileAtRevisionBase64(relPath: string, revision: string, maxBytes = 16 * 1024 * 1024): Promise<string | null> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lore-rev-'));
+    const out = path.join(dir, 'blob');
+    try {
+      await this.run(['file', 'write', '--path', relPath, '--revision', revision, '--output', out], { skip: true, throwOnError: true });
+      const stat = fs.statSync(out);
+      if (stat.size > maxBytes) return null;
+      return fs.readFileSync(out).toString('base64');
+    } catch {
+      return null;
+    } finally {
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+    }
+  }
+
   /** Read a working-tree file as base64 (for asset/image previews). Null if missing/too big. */
   readWorkingFileBase64(relPath: string, maxBytes = 8 * 1024 * 1024): string | null {
     try {
