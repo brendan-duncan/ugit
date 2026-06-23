@@ -1,6 +1,19 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { runLore, runLoreStreaming, LoreProcessResult } from './loreProcess';
+
+/**
+ * Write `content` to a temp file (BOM-free) suitable for `clone --view`, and return its path.
+ * A UTF-8 BOM silently breaks the view filter, so this always writes plain UTF-8.
+ */
+export function writeTempViewFile(content: string): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lore-view-'));
+  const file = path.join(dir, 'view');
+  const trimmed = content.replace(/\s+$/, '');
+  fs.writeFileSync(file, trimmed ? trimmed + '\n' : '', { encoding: 'utf8' });
+  return file;
+}
 import {
   parseStatus,
   parseHistory,
@@ -241,6 +254,36 @@ export class LoreClient {
   /** List layers (local overlays). Empty when none. */
   async layers(): Promise<string[]> {
     return parseSimpleList((await this.run(['layer', 'list'], { skip: true })).stdout);
+  }
+
+  // --- Lore-native: sparse view filter (.lore/view, gitignore-style exclusion) ---
+
+  /** Absolute path to this repo's view filter file. */
+  viewFilePath(): string {
+    return path.join(this.repoPath, '.lore', 'view');
+  }
+
+  /**
+   * Read the active sparse view filter (`.lore/view`), or null when the repo has no view
+   * (full checkout). The file is gitignore-style: `**` excludes all, `!pattern` re-includes.
+   */
+  async readView(): Promise<string | null> {
+    try {
+      return fs.readFileSync(this.viewFilePath(), 'utf8');
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write the sparse view filter (`.lore/view`), BOM-free (a UTF-8 BOM silently breaks the
+   * filter). NOTE: this governs future syncs / re-clones; it does NOT retroactively
+   * re-materialize the current checkout.
+   */
+  async writeView(content: string): Promise<void> {
+    const trimmed = content.replace(/\s+$/, '');
+    const normalized = trimmed ? trimmed + '\n' : '';
+    fs.writeFileSync(this.viewFilePath(), normalized, { encoding: 'utf8' });
   }
 }
 

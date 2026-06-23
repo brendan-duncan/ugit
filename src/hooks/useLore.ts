@@ -15,6 +15,8 @@ interface UseLoreResult {
   locks: LoreLock[];
   links: string[];
   layers: string[];
+  /** Active sparse view filter (.lore/view), or null for a full checkout. */
+  view: string | null;
   isLoading: boolean;
   error: string | null;
   commandState: RunningCommand[];
@@ -34,6 +36,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
   const [locks, setLocks] = useState<LoreLock[]>([]);
   const [links, setLinks] = useState<string[]>([]);
   const [layers, setLayers] = useState<string[]>([]);
+  const [view, setView] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [commandState, setCommandState] = useState<RunningCommand[]>([]);
@@ -70,13 +73,14 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     try {
       setIsLoading(true);
       setError(null);
-      const [st, hist, brs, lks, lnk, lyr] = await Promise.all([
+      const [st, hist, brs, lks, lnk, lyr, vw] = await Promise.all([
         c.status({ scan: true }),
         c.historyOneline(),
         c.branchList(),
         c.locks(),
         c.links(),
         c.layers(),
+        c.readView(),
       ]);
       setStatus(st);
       setHistory(hist);
@@ -84,6 +88,7 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
       setLocks(lks);
       setLinks(lnk);
       setLayers(lyr);
+      setView(vw);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load Lore repository';
       setError(message);
@@ -98,5 +103,5 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
     if (client) load();
   }, [client, load]);
 
-  return { client, status, history, branches, locks, links, layers, isLoading, error, commandState, refresh: load };
+  return { client, status, history, branches, locks, links, layers, view, isLoading, error, commandState, refresh: load };
 }

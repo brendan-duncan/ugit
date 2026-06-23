@@ -11,6 +11,7 @@ export {
   cloneLoreRepositoryStreaming,
   loreLogin,
   loreAuthList,
+  writeTempViewFile,
 } from './LoreClient';
 export type { LoreClientOptions, LoreCommandStateCallback } from './LoreClient';
 export { resolveLoreBin } from './resolveLoreBin';

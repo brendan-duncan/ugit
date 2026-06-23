@@ -30,7 +30,7 @@ function changeColor(code: string): string {
  */
 function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: LoreRepositoryViewProps) {
   const { showAlert } = useAlert();
-  const { client, status, history, branches, locks, links, layers, isLoading, error, commandState, refresh } = useLore({
+  const { client, status, history, branches, locks, links, layers, view, isLoading, error, commandState, refresh } = useLore({
     repoPath,
     onError: (err) => showAlert(err.message, 'Lore error'),
   });
@@ -44,6 +44,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [working, setWorking] = useState(false);
   const [showNewBranch, setShowNewBranch] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
+  const [editingView, setEditingView] = useState(false);
+  const [viewDraft, setViewDraft] = useState('');
   const [leftWidth, setLeftWidth] = useState<number>(28);
   const draggingSplitter = useRef(false);
 
@@ -141,6 +143,12 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     await client!.switchBranch(name);
     setNewBranchName('');
     setShowNewBranch(false);
+  });
+
+  const startEditView = () => { setViewDraft(view ?? '**\n!path/**\n'); setEditingView(true); };
+  const doSaveView = () => runAction(async () => {
+    await client!.writeView(viewDraft);
+    setEditingView(false);
   });
 
   const stageAll = () => runAction(async () => { await client!.stage((status?.unstaged ?? []).map(f => f.path)); });
@@ -290,6 +298,36 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     </span>
                   </div>
                 )) : <div className="lore-empty">no locked files</div>}
+              </div>
+
+              <div className="lore-sidebar-section">
+                <div className="lore-section-header">
+                  <span>Sparse view</span>
+                  {!editingView && <button className="lore-mini-btn" disabled={busy} onClick={startEditView}>Edit</button>}
+                </div>
+                {editingView ? (
+                  <div style={{ padding: '4px 10px 8px' }}>
+                    <textarea
+                      className="lore-commit-input"
+                      style={{ minHeight: 72, fontFamily: 'monospace' }}
+                      value={viewDraft}
+                      onChange={(e) => setViewDraft(e.target.value)}
+                      placeholder={'**\n!src/**'}
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', margin: '4px 0' }}>
+                      gitignore-style: <code>**</code> excludes all, <code>!path/**</code> re-includes.
+                      Applies to clone &amp; future syncs (not a live re-checkout).
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="lore-mini-btn" disabled={busy} onClick={doSaveView}>Save</button>
+                      <button className="lore-mini-btn" onClick={() => setEditingView(false)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : view ? (
+                  <pre style={{ margin: 0, padding: '4px 10px 8px', fontSize: 12, whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{view.trim()}</pre>
+                ) : (
+                  <div className="lore-empty">Full checkout (no view filter)</div>
+                )}
               </div>
 
               {(links.length > 0 || layers.length > 0) && (

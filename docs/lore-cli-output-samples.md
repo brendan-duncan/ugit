@@ -326,6 +326,26 @@ $ lore layer list  -> No layers
 Populated formats are still TODO (need a second repo to link/layer). Parser treats the
 "No links…/No layers" lines as empty lists.
 
+## sparse view filter (`clone --view <file>`)
+
+The view file is **gitignore-style exclusion syntax** (confirmed from `scripts/test/test_view.py`
+in the lore repo + live tests). `**` excludes everything; `!pattern` re-includes. Example that
+checks out ONLY `src/`:
+```
+**
+!src/**
+```
+Behavior (verified):
+- Applied at **clone time** via `--view`. Materializes only the non-excluded paths.
+- The view is **persisted** in the clone at `.lore/view` (so an open repo's active view is
+  readable/editable).
+- Editing `.lore/view` + `sync` does **NOT** retroactively re-materialize the current
+  checkout (sync is a no-op when the revision is unchanged). The view governs what *future*
+  syncs fetch and what a *clone* materializes — not a live re-apply of the current revision.
+- GOTCHA: the view file must be written **without a UTF-8 BOM**. A BOM corrupts the first
+  line and the filter silently does nothing (everything materializes). Node `fs.writeFileSync(…,
+  'utf8')` is BOM-free; PowerShell `Set-Content -Encoding utf8` (5.1) is NOT.
+
 ## OPEN / to investigate
 - Capture `D` (delete), move, and copy rows in status, and the corresponding diff output.
 - Capture `sync` when the local branch is BEHIND (a real pull), and `push` to a protected

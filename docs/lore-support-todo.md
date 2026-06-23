@@ -140,6 +140,17 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
 - Live-verified: acquire → query shows the lock (owner `<unknown>`, auth disabled) → release
   clears it. Tab color-coding for lore tabs also landed (violet accent).
 
+### Sparse view editor + panel restyle — DONE
+- Panel restyled onto the shared git chrome (.repository-view/.toolbar/.repo-sidebar/
+  .repo-content-viewer + LoreRepositoryView.css) so lore tabs match git tabs.
+- Sparse view: format reverse-engineered (gitignore-style; `**` excludes, `!path/**`
+  re-includes; persisted at `.lore/view`; applies at clone & future syncs, NOT a live
+  re-checkout; must be BOM-free). Client: `readView`/`writeView`/`viewFilePath` +
+  `writeTempViewFile`. Panel: a **Sparse view** sidebar section (shows the active view, or
+  "Full checkout"; Edit/Save). Clone dialog: inline gitignore-style **view authoring**
+  (textarea → BOM-free temp file → `--view`). Live-verified: sparse clone materializes only
+  the included paths; read/write round-trips BOM-free.
+
 Next UI steps: tab-color persistence for restored tabs is handled (App decorates tabs);
 remaining — links/layers ADD/remove + populated-list parsing (need a 2nd repo to link/layer),
 a richer sparse `.lore/view` editor, background-tab clone (reuse CloneProgressView), wire

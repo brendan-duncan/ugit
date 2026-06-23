@@ -6,6 +6,7 @@ import {
   loreLogin,
   resolveLoreBin,
   isLoreAuthError,
+  writeTempViewFile,
 } from '../lore';
 import './Dialog.css';
 
@@ -38,7 +39,7 @@ function LoreRepoDialog({ onClose, onCreated, onError }: LoreRepoDialogProps) {
   const [serverUrl, setServerUrl] = useState<string>('lore://127.0.0.1:41337/');
   const [parentFolder, setParentFolder] = useState<string>('');
   const [name, setName] = useState<string>('');
-  const [viewFile, setViewFile] = useState<string>('');
+  const [viewContent, setViewContent] = useState<string>('');
   const [bare, setBare] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<string[]>([]);
@@ -77,17 +78,6 @@ function LoreRepoDialog({ onClose, onCreated, onError }: LoreRepoDialogProps) {
     }
   };
 
-  const browseViewFile = async () => {
-    try {
-      const result = await ipcRenderer.invoke('show-open-dialog', {
-        properties: ['openFile'],
-        title: 'Select view filter file',
-      });
-      if (!result.canceled && result.filePaths.length > 0) setViewFile(result.filePaths[0]);
-    } catch (error) {
-      console.error('Error browsing file:', error);
-    }
-  };
 
   const isValid = serverUrl.trim() && parentFolder.trim() && name.trim();
 
@@ -118,7 +108,7 @@ function LoreRepoDialog({ onClose, onCreated, onError }: LoreRepoDialogProps) {
       } else {
         const result = await cloneLoreRepositoryStreaming(
           bin, folder, fullUrl, repoName,
-          { view: viewFile.trim() || undefined, bare },
+          { view: viewContent.trim() ? writeTempViewFile(viewContent) : undefined, bare },
           (line) => setProgress(prev => [...prev.slice(-200), line]),
         );
         repoPath = result.path;
@@ -220,22 +210,18 @@ function LoreRepoDialog({ onClose, onCreated, onError }: LoreRepoDialogProps) {
           {mode === 'clone' && (
             <>
               <div className="dialog-field">
-                <label htmlFor="lore-view">View filter (sparse, optional):</label>
-                <div className="dialog-field-horizontal">
-                  <input
-                    id="lore-view"
-                    type="text"
-                    className="dialog-input"
-                    placeholder="Path to a .lore/view filter file"
-                    value={viewFile}
-                    onChange={(e) => setViewFile(e.target.value)}
-                  />
-                  <button type="button" className="dialog-button dialog-button-browse" onClick={browseViewFile}>
-                    Browse...
-                  </button>
-                </div>
+                <label htmlFor="lore-view">Sparse view filter (optional):</label>
+                <textarea
+                  id="lore-view"
+                  className="dialog-input"
+                  style={{ minHeight: 64, resize: 'vertical', fontFamily: 'monospace' }}
+                  placeholder={'**\n!src/**'}
+                  value={viewContent}
+                  onChange={(e) => setViewContent(e.target.value)}
+                />
                 <small style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                  Lore clones are sparse-capable: a view file limits which paths are checked out.
+                  gitignore-style: <code>**</code> excludes all, <code>!path/**</code> re-includes.
+                  Limits which paths are checked out. Leave blank for a full checkout.
                 </small>
               </div>
               <div className="dialog-field" style={{ display: 'block' }}>
