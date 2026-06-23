@@ -151,6 +151,12 @@ dev server, then File → Open Repository → `D:\src\lore-dev\workspaces\clean-
   (textarea → BOM-free temp file → `--view`). Live-verified: sparse clone materializes only
   the included paths; read/write round-trips BOM-free.
 
+### Background-tab clone — DONE
+- Lore CLONE now runs in the background like git's: the dialog closes immediately, App opens a
+  `type:'lore'` tab with `cloning:true`, streams progress into the shared `CloneProgressView`
+  (parsing "Cloned X/Y files" into a %), then swaps to the Lore panel on completion. Retry
+  branches by tab type. CREATE stays inline (it's fast). Tab is violet-coded throughout.
+
 Next UI steps: tab-color persistence for restored tabs is handled (App decorates tabs);
 remaining — links/layers ADD/remove + populated-list parsing (need a 2nd repo to link/layer),
 a richer sparse `.lore/view` editor, background-tab clone (reuse CloneProgressView), wire

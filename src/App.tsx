@@ -12,9 +12,17 @@ import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
 import { useSettings } from './contexts/SettingsContext';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
+import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin } from './lore';
 import { ipcRenderer } from 'electron';
 import fs from 'fs';
 import './App.css';
+
+// Parse a percentage from a Lore clone progress line, e.g. "Cloned 5/5 files (...)".
+function loreClonePct(line: string): number {
+  const m = line.match(/Cloned\s+(\d+)\/(\d+)\s+files/);
+  if (m) { const total = parseInt(m[2], 10); return total ? Math.round((parseInt(m[1], 10) / total) * 100) : 0; }
+  return 0;
+}
 
 const ACTIVE_TAB_KEY = 'ugit-active-tab-path';
 
@@ -34,6 +42,9 @@ interface Tab {
   cloneUrl?: string;
   cloneParentFolder?: string;
   cloneDepth?: number;
+  // Lore-specific clone parameters (for retry of a background Lore clone).
+  cloneViewContent?: string;
+  cloneBare?: boolean;
   // Non-null once a background clone has failed.
   cloneError?: string | null;
 }
@@ -473,6 +484,55 @@ function App(): React.ReactElement {
     startClone(tabId, repoUrl, parentFolder, repoName, depth);
   };
 
+  // Run a Lore clone in the background (renderer), streaming progress into the tab's
+  // CloneProgressView. Mirrors startClone but for the Lore CLI.
+  const startLoreClone = useCallback((tabId: string, url: string, parentFolder: string, repoName: string, viewContent?: string, bare?: boolean) => {
+    setCloneProgress(prev => { const next = { ...prev }; delete next[tabId]; return next; });
+    setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, cloning: true, cloneError: null } : tab));
+
+    const viewPath = viewContent && viewContent.trim() ? writeTempViewFile(viewContent) : undefined;
+    cloneLoreRepositoryStreaming(
+      resolveLoreBin(), parentFolder, url, repoName, { view: viewPath, bare },
+      (line) => setCloneProgress(prev => ({ ...prev, [tabId]: { stage: line, progress: loreClonePct(line) } })),
+    )
+      .then((result) => {
+        setCloneProgress(prev => { const next = { ...prev }; delete next[tabId]; return next; });
+        setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, cloning: false, cloneError: null, path: result.path } : tab));
+        const recent = addRecentRepo(result.path);
+        ipcRenderer.send('update-recent-repos', recent);
+      })
+      .catch((error: unknown) => {
+        setCloneProgress(prev => { const next = { ...prev }; delete next[tabId]; return next; });
+        setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, cloning: false, cloneError: (error as Error).message } : tab));
+      });
+  }, []);
+
+  const handleStartLoreClone = (url: string, parentFolder: string, repoName: string, viewContent: string, bare: boolean): void => {
+    const sep = parentFolder.includes('\\') ? '\\' : '/';
+    const targetPath = `${parentFolder.replace(/[\\/]+$/, '')}${sep}${repoName}`;
+
+    const existingTab = tabsRef.current.find(tab => tab.path === targetPath);
+    if (existingTab) { setActiveTabId(existingTab.id); setShowLoreRepoDialog(false); return; }
+
+    const tabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const newTab: Tab = {
+      id: tabId,
+      path: targetPath,
+      name: repoName,
+      type: 'lore',
+      cloning: true,
+      cloneUrl: url,
+      cloneParentFolder: parentFolder,
+      cloneViewContent: viewContent || undefined,
+      cloneBare: bare,
+      cloneError: null,
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(tabId);
+    setShowLoreRepoDialog(false);
+    startLoreClone(tabId, url, parentFolder, repoName, viewContent, bare);
+  };
+
   // Save open tabs to recent repos when tabs change
   useEffect(() => {
     if (hasLoadedRecent) {
@@ -592,7 +652,11 @@ function App(): React.ReactElement {
                     error={tab.cloneError}
                     onRetry={() => {
                       if (tab.cloneUrl && tab.cloneParentFolder) {
-                        startClone(tab.id, tab.cloneUrl, tab.cloneParentFolder, tab.name, tab.cloneDepth || 0);
+                        if (tab.type === 'lore') {
+                          startLoreClone(tab.id, tab.cloneUrl, tab.cloneParentFolder, tab.name, tab.cloneViewContent, tab.cloneBare);
+                        } else {
+                          startClone(tab.id, tab.cloneUrl, tab.cloneParentFolder, tab.name, tab.cloneDepth || 0);
+                        }
                       }
                     }}
                     onClose={() => closeTab(tab.id)}
@@ -632,6 +696,7 @@ function App(): React.ReactElement {
         <LoreRepoDialog
           onClose={() => setShowLoreRepoDialog(false)}
           onCreated={(repoPath) => openRepository(repoPath)}
+          onStartClone={handleStartLoreClone}
           onError={(message) => showAlert(message, 'Lore error')}
         />
       )}

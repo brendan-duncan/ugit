@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { ipcRenderer } from 'electron';
 import {
   createLoreRepository,
-  cloneLoreRepositoryStreaming,
   loreLogin,
   resolveLoreBin,
   isLoreAuthError,
-  writeTempViewFile,
 } from '../lore';
 import './Dialog.css';
 
@@ -17,8 +15,10 @@ type Mode = 'create' | 'clone';
 
 interface LoreRepoDialogProps {
   onClose: () => void;
-  /** Called with the local repo path once create/clone succeeds, so the parent can open it. */
+  /** Called with the local repo path once create succeeds, so the parent can open it. */
   onCreated: (repoPath: string) => void;
+  /** Start a CLONE in the background (parent owns the tab + progress). */
+  onStartClone: (url: string, parentFolder: string, repoName: string, viewContent: string, bare: boolean) => void;
   onError: (message: string) => void;
 }
 
@@ -34,7 +34,7 @@ function nameFromUrl(url: string): string {
  * is intentionally NOT the git folder-picker / git CloneDialog — it collects a server URL plus
  * a local destination, and exposes Lore-native clone options (sparse --view, --bare).
  */
-function LoreRepoDialog({ onClose, onCreated, onError }: LoreRepoDialogProps) {
+function LoreRepoDialog({ onClose, onCreated, onStartClone, onError }: LoreRepoDialogProps) {
   const [mode, setMode] = useState<Mode>('create');
   const [serverUrl, setServerUrl] = useState<string>('lore://127.0.0.1:41337/');
   const [parentFolder, setParentFolder] = useState<string>('');
@@ -100,21 +100,16 @@ function LoreRepoDialog({ onClose, onCreated, onError }: LoreRepoDialogProps) {
       localStorage.setItem(SERVER_KEY, serverUrl.trim());
       const fullUrl = fullServerUrl();
 
-      let repoPath: string;
       if (mode === 'create') {
         const target = `${folder.replace(/[\\/]+$/, '')}/${repoName}`;
         await createLoreRepository(bin, target, fullUrl);
-        repoPath = target;
+        onCreated(target);
+        onClose();
       } else {
-        const result = await cloneLoreRepositoryStreaming(
-          bin, folder, fullUrl, repoName,
-          { view: viewContent.trim() ? writeTempViewFile(viewContent) : undefined, bare },
-          (line) => setProgress(prev => [...prev.slice(-200), line]),
-        );
-        repoPath = result.path;
+        // Clone runs in the background — the parent owns the tab and its progress view.
+        onStartClone(fullUrl, folder, repoName, viewContent, bare);
+        onClose();
       }
-      onCreated(repoPath);
-      onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (isLoreAuthError(message)) setAuthHint(true);
