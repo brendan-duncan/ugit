@@ -256,3 +256,15 @@
 .lore-sync-gauge.diverged .lore-sync-arrow, .lore-sync-gauge.diverged .lore-sync-state { color: var(--warning-color); }
 .lore-file-meta { font-size: 12px; color: var(--text-secondary); padding: 6px 10px; }
 .lore-file-meta code { color: var(--text-primary); }
+
+/* Active view-mode toolbar button (Changes / Files / Graph). */
+.toolbar-button.active {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--text-highlight);
+}
+.toolbar-button.active:hover:not(:disabled) {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+.toolbar-button.active .toolbar-button-label { font-weight: 700; }
