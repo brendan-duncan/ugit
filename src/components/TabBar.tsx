@@ -7,6 +7,8 @@ interface Tab {
   path: string;
   cloning?: boolean;
   cloneError?: string | null;
+  // Repository kind; used to color-code the tab (lore tabs get a distinct accent).
+  type?: 'git' | 'lore' | 'unknown';
 }
 
 interface TabBarProps {
@@ -75,7 +77,8 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
         return (
           <div
             key={tab.id}
-            className={`tab ${tab.id === activeTabId ? 'active' : ''} ${tab.id === draggedTabId ? 'dragging' : ''} ${tab.id === dragOverTabId ? 'drag-over' : ''}`}
+            className={`tab ${tab.type === 'lore' ? 'lore' : ''} ${tab.id === activeTabId ? 'active' : ''} ${tab.id === draggedTabId ? 'dragging' : ''} ${tab.id === dragOverTabId ? 'drag-over' : ''}`}
+            title={tab.type === 'lore' ? `Lore repository: ${tab.path}` : tab.path}
             onClick={() => onTabSelect(tab.id)}
             draggable={true}
             onDragStart={(e) => handleDragStart(e, tab.id)}

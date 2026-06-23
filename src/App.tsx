@@ -4,6 +4,7 @@ import RepositoryView from './components/RepositoryView';
 import LoreRepositoryView from './components/LoreRepositoryView';
 import { detectRepositoryType, RepoType } from './utils/repoType';
 import CloneDialog from './components/CloneDialog';
+import LoreRepoDialog from './components/LoreRepoDialog';
 import CloneProgressView from './components/CloneProgressView';
 import InitRepositoryDialog from './components/InitRepositoryDialog';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -62,6 +63,7 @@ function App(): React.ReactElement {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
+  const [showLoreRepoDialog, setShowLoreRepoDialog] = useState<boolean>(false);
   const [initRepoPath, setInitRepoPath] = useState<string | null>(null);
   // Bumped per repo path to force the corresponding RepositoryView to reload from git.
   const [refreshSignal, setRefreshSignal] = useState<Record<string, number>>({});
@@ -200,6 +202,10 @@ function App(): React.ReactElement {
       setShowCloneDialog(true);
     };
 
+    const handleShowLoreRepoDialog = () => {
+      setShowLoreRepoDialog(true);
+    };
+
     const handleShowSettingsDialog = () => {
       setShowSettings(true);
     };
@@ -207,6 +213,7 @@ function App(): React.ReactElement {
     ipcRenderer.on('init-repository', handleInitRepo);
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
+    ipcRenderer.on('show-lore-repo-dialog', handleShowLoreRepoDialog);
     ipcRenderer.on('show-settings-dialog', handleShowSettingsDialog);
 
     const handleFetch = () => {
@@ -259,6 +266,7 @@ function App(): React.ReactElement {
       ipcRenderer.removeListener('init-repository', handleInitRepo);
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
       ipcRenderer.removeListener('show-clone-dialog', handleShowCloneDialog);
+      ipcRenderer.removeListener('show-lore-repo-dialog', handleShowLoreRepoDialog);
       ipcRenderer.removeListener('show-settings-dialog', handleShowSettingsDialog);
       ipcRenderer.removeListener('refresh-repository', handleRefresh);
       ipcRenderer.removeListener('fetch-repository', handleFetch);
@@ -545,10 +553,18 @@ function App(): React.ReactElement {
     return () => clearInterval(interval);
   }, [tabs, activeTabId, hasLoadedRecent]);
 
+  // Ensure every tab carries a repo `type` for the tab bar's color-coding, regardless of how
+  // it was created (fresh open sets it; restored/cloned tabs may not). Skip in-flight clones
+  // whose path may not exist on disk yet.
+  const decoratedTabs = useMemo(
+    () => tabs.map(tab => (tab.type || tab.cloning ? tab : { ...tab, type: detectRepositoryType(tab.path) })),
+    [tabs]
+  );
+
   return (
     <div className="app">
       <TabBar
-        tabs={tabs}
+        tabs={decoratedTabs}
         activeTabId={activeTabId || ''}
         onTabSelect={(tabId) => setActiveTabId(tabId)}
         onTabClose={closeTab}
@@ -610,6 +626,13 @@ function App(): React.ReactElement {
         <CloneDialog
           onClose={() => setShowCloneDialog(false)}
           onClone={handleClone}
+        />
+      )}
+      {showLoreRepoDialog && (
+        <LoreRepoDialog
+          onClose={() => setShowLoreRepoDialog(false)}
+          onCreated={(repoPath) => openRepository(repoPath)}
+          onError={(message) => showAlert(message, 'Lore error')}
         />
       )}
       {initRepoPath && (

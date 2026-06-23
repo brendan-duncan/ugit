@@ -28,16 +28,20 @@ function changeColor(code: string): string {
  */
 function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0 }: LoreRepositoryViewProps) {
   const { showAlert } = useAlert();
-  const { client, status, history, isLoading, error, commandState, refresh } = useLore({
+  const { client, status, history, branches, locks, links, layers, isLoading, error, commandState, refresh } = useLore({
     repoPath,
     onError: (err) => showAlert(err.message, 'Lore error'),
   });
+
+  const lockedPaths = new Set(locks.map(l => l.path));
 
   const [commitMessage, setCommitMessage] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [diffText, setDiffText] = useState<string>('');
   const [diffLoading, setDiffLoading] = useState(false);
   const [working, setWorking] = useState(false);
+  const [showNewBranch, setShowNewBranch] = useState(false);
+  const [newBranchName, setNewBranchName] = useState('');
 
   // Report ahead/behind to the tab indicator from the parsed sync state.
   const prevTabStatus = useRef<string>('');
@@ -88,12 +92,41 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     }
   }, [client, showAlert]);
 
-  const showOutput = useCallback((title: string, output: string) => {
-    showAlert(output.trim() || '(no output)', title);
-  }, [showAlert]);
+  const doSync = () => runAction(async () => {
+    const r = await client!.sync();
+    showAlert(
+      r.upToDate
+        ? `Already up to date (revision ${r.toRevision?.number ?? '?'}).`
+        : r.toRevision
+          ? `Synced ${r.branch ?? ''} to revision ${r.toRevision.number}.`.trim()
+          : (r.raw.trim() || 'Sync complete.'),
+      'Lore sync',
+    );
+  });
 
-  const doSync = () => runAction(async () => { showOutput('Lore sync', await client!.sync()); });
-  const doPush = () => runAction(async () => { showOutput('Lore push', await client!.push()); });
+  const doPush = () => runAction(async () => {
+    const r = await client!.push();
+    if (r.pushed.length) {
+      const lines = r.pushed.map(p => `revision ${p.number} -> branch ${p.branch}`).join('\n');
+      const summary = r.bytes ? `Pushed ${r.pushed.length} revision(s) (${r.bytes}):\n${lines}` : `Pushed:\n${lines}`;
+      showAlert(summary, 'Lore push');
+    } else {
+      showAlert(r.raw.trim() || 'Nothing to push.', 'Lore push');
+    }
+  });
+
+  const doLock = (path: string) => runAction(async () => { await client!.lockAcquire([path]); });
+  const doUnlock = (path: string) => runAction(async () => { await client!.lockRelease([path]); });
+
+  const doSwitchBranch = (name: string) => runAction(async () => { await client!.switchBranch(name); });
+  const doCreateBranch = () => runAction(async () => {
+    const name = newBranchName.trim();
+    if (!name) throw new Error('Branch name is required');
+    await client!.createBranch(name);
+    await client!.switchBranch(name);
+    setNewBranchName('');
+    setShowNewBranch(false);
+  });
 
   const stageAll = () => runAction(async () => {
     await client!.stage((status?.unstaged ?? []).map(f => f.path));
@@ -117,7 +150,16 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       }}
     >
       <span style={{ color: changeColor(file.code), fontWeight: 'bold', width: 16 }}>{file.code}</span>
+      {lockedPaths.has(file.path) && <span title="Locked" style={{ color: '#e0a030' }}>🔒</span>}
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.path}</span>
+      <button
+        disabled={working}
+        onClick={(e) => { e.stopPropagation(); lockedPaths.has(file.path) ? doUnlock(file.path) : doLock(file.path); }}
+        style={{ fontSize: 11 }}
+        title={lockedPaths.has(file.path) ? 'Release lock' : 'Lock for edit'}
+      >
+        {lockedPaths.has(file.path) ? 'Unlock' : 'Lock'}
+      </button>
       <button
         disabled={working}
         onClick={(e) => { e.stopPropagation(); staged ? unstageOne(file) : stageOne(file); }}
@@ -143,7 +185,36 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       {/* Header */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #333', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <strong>Lore</strong>
-        <span>branch <code>{status?.branch || '…'}</code></span>
+        <label>
+          branch{' '}
+          <select
+            value={status?.branch || ''}
+            disabled={working || isLoading}
+            onChange={(e) => { if (e.target.value && e.target.value !== status?.branch) doSwitchBranch(e.target.value); }}
+          >
+            {/* current branch may not be in the list yet on first paint */}
+            {status?.branch && !branches?.local.some(b => b.name === status.branch) && (
+              <option value={status.branch}>{status.branch}</option>
+            )}
+            {branches?.local.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+          </select>
+        </label>
+        {showNewBranch ? (
+          <span style={{ display: 'inline-flex', gap: 4 }}>
+            <input
+              autoFocus
+              value={newBranchName}
+              onChange={(e) => setNewBranchName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') doCreateBranch(); if (e.key === 'Escape') setShowNewBranch(false); }}
+              placeholder="new branch name"
+              style={{ fontSize: 12 }}
+            />
+            <button onClick={doCreateBranch} disabled={working || !newBranchName.trim()}>Create</button>
+            <button onClick={() => setShowNewBranch(false)}>Cancel</button>
+          </span>
+        ) : (
+          <button onClick={() => setShowNewBranch(true)} disabled={working || isLoading} title="New branch">+ Branch</button>
+        )}
         <span>revision <code>{status ? status.local.number : '…'}</code></span>
         <span style={{ color: '#888' }}>{status?.syncState ?? ''}</span>
         <span style={{ flex: 1 }} />
@@ -167,6 +238,23 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
             <h4 style={{ margin: '12px 0 6px' }}>Staged for commit</h4>
             {status?.staged.length ? status.staged.map(f => renderFileRow(f, true))
               : <div style={{ color: '#777', fontSize: 12, padding: 6 }}>none</div>}
+
+            <h4 style={{ margin: '12px 0 6px' }}>Locks {locks.length ? `(${locks.length})` : ''}</h4>
+            {locks.length ? locks.map(l => (
+              <div key={l.path} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 6px', fontFamily: 'monospace', fontSize: 12 }}>
+                <span title="Locked" style={{ color: '#e0a030' }}>🔒</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`by ${l.owner}`}>{l.path}</span>
+                <span style={{ color: '#888', fontSize: 11 }}>{l.owner}</span>
+                <button disabled={working} onClick={() => doUnlock(l.path)} style={{ fontSize: 11 }}>Release</button>
+              </div>
+            )) : <div style={{ color: '#777', fontSize: 12, padding: 6 }}>no locked files</div>}
+
+            {(links.length > 0 || layers.length > 0) && (
+              <div style={{ marginTop: 12, color: '#888', fontSize: 12 }}>
+                {links.length > 0 && <div>Links: {links.length}</div>}
+                {layers.length > 0 && <div>Layers: {layers.length}</div>}
+              </div>
+            )}
           </div>
 
           <div style={{ borderTop: '1px solid #333', padding: 6 }}>
