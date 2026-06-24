@@ -912,15 +912,6 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           <span className="toolbar-button-label">{ahead > 0 ? `Push (${ahead})` : 'Push'}</span>
         </button>
         <div className="toolbar-separator" />
-        <button className="toolbar-button" onClick={() => setShowNewBranch(true)} disabled={busy}>
-          <span className="toolbar-button-icon">🌿</span>
-          <span className="toolbar-button-label">Branch</span>
-        </button>
-        <button className="toolbar-button" onClick={doStashAll} disabled={busy} title="Stash all changes">
-          <span className="toolbar-button-icon">📦</span>
-          <span className="toolbar-button-label">Stash</span>
-        </button>
-        <div className="toolbar-separator" />
         <div className="lore-view-toggle" role="tablist" title="Switch view">
           <button className={`toolbar-button ${viewMode === 'changes' ? 'active' : ''}`} onClick={() => setViewMode('changes')}>
             <span className="toolbar-button-icon">✎</span>
