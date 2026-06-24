@@ -663,18 +663,21 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           <span className="toolbar-button-icon">📦</span>
           <span className="toolbar-button-label">Stash</span>
         </button>
-        <button className={`toolbar-button ${viewMode === 'changes' ? 'active' : ''}`} onClick={() => setViewMode('changes')}>
-          <span className="toolbar-button-icon">✎</span>
-          <span className="toolbar-button-label">Changes</span>
-        </button>
-        <button className={`toolbar-button ${viewMode === 'files' ? 'active' : ''}`} onClick={() => setViewMode('files')}>
-          <span className="toolbar-button-icon">🗂</span>
-          <span className="toolbar-button-label">Files</span>
-        </button>
-        <button className={`toolbar-button ${viewMode === 'graph' ? 'active' : ''}`} onClick={() => setViewMode('graph')}>
-          <span className="toolbar-button-icon">🕸</span>
-          <span className="toolbar-button-label">Graph</span>
-        </button>
+        <div className="toolbar-separator" />
+        <div className="lore-view-toggle" role="tablist" title="Switch view">
+          <button className={`toolbar-button ${viewMode === 'changes' ? 'active' : ''}`} onClick={() => setViewMode('changes')}>
+            <span className="toolbar-button-icon">✎</span>
+            <span className="toolbar-button-label">Changes</span>
+          </button>
+          <button className={`toolbar-button ${viewMode === 'files' ? 'active' : ''}`} onClick={() => setViewMode('files')}>
+            <span className="toolbar-button-icon">🗂</span>
+            <span className="toolbar-button-label">Files</span>
+          </button>
+          <button className={`toolbar-button ${viewMode === 'graph' ? 'active' : ''}`} onClick={() => setViewMode('graph')}>
+            <span className="toolbar-button-icon">🕸</span>
+            <span className="toolbar-button-label">Graph</span>
+          </button>
+        </div>
         <div className="toolbar-separator" />
         {status && (
           <div className={`lore-sync-gauge ${status.syncState}`} title={`local revision ${status.local.number}, remote revision ${status.remote.number} (${status.syncState})`}>

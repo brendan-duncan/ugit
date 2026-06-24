@@ -285,14 +285,33 @@
   white-space: pre; overflow: auto; color: var(--text-primary); tab-size: 4;
 }
 
-/* Active view-mode toolbar button (Changes / Files / Graph). */
-.toolbar-button.active {
+/* View-mode switcher rendered as a segmented control, so it reads as a view toggle —
+   distinct from the standalone action buttons (Refresh / Sync / Push / Branch / Stash). */
+.lore-view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+}
+.lore-view-toggle .toolbar-button {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 5px;
+  padding: 4px 12px;
+}
+.lore-view-toggle .toolbar-button:hover:not(:disabled):not(.active) {
+  background-color: var(--bg-tertiary);
+  border-color: transparent;
+}
+.lore-view-toggle .toolbar-button.active {
   background-color: var(--accent-color);
   border-color: var(--accent-color);
   color: var(--text-highlight);
 }
-.toolbar-button.active:hover:not(:disabled) {
+.lore-view-toggle .toolbar-button.active:hover:not(:disabled) {
   background-color: var(--accent-color);
   border-color: var(--accent-color);
 }
-.toolbar-button.active .toolbar-button-label { font-weight: 700; }
+.lore-view-toggle .toolbar-button.active .toolbar-button-label { font-weight: 700; }
