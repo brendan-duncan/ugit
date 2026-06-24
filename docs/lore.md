@@ -99,10 +99,12 @@ Now teammates can clone `lore://<server>/MyGame` and you're all working against 
   branch into the current one. Right-click a branch for more: **Diff against \<current\>** (lists
   what that branch has that the current one doesn't — click a file to diff it), protect/unprotect,
   archive, and **Edit Metadata…** (key/value attributes on the branch).
-- **Metadata** is editable as key/value pairs: per branch (right-click → **Edit Metadata…**) and
-  on the revision you're about to commit (the **Metadata…** button by the commit box). Right-click
-  any past revision → **View Metadata…** to inspect it (committed revisions are read-only — Lore
-  only lets you set metadata on the *staged* revision).
+- **Metadata** is editable as key/value pairs at every level: the **repository** (repo **…** menu →
+  **Repository Metadata…**), a **branch** (right-click → **Edit Metadata…**), the **revision**
+  you're about to commit (the **Metadata…** button by the commit box), and a **file** (Files tree →
+  **File Metadata…**). Right-click any past revision → **View Metadata…** to inspect it. Revisions
+  and files are editable only while *staged* (Lore sets their metadata pre-commit); repository and
+  branch metadata can be edited any time.
 - **Locks** section: every locked file with its owner; release from here.
 - **Sparse view** section: view/edit the `.lore/view` filter (see below).
 - **Links / Layers** sections: compose sub-repositories (Part 10).
@@ -129,9 +131,11 @@ A lane-based **revision graph** across branches, with merges shown, and **HEAD**
 markers so you can see exactly what's local-only (unpushed) versus on the server.
 
 ### Repository menu (the **…** by the repo name)
-Open/copy paths, **Run Garbage Collection**, **List Instances**, **Clean Working Directory**, and
-**Watch Events…** (subscribe to repository events for a bounded window — handy to see pushes/locks
-from others land in real time).
+Open/copy paths, **Repository Metadata…**, **Find Revision…** (by number or metadata `key`/
+`key=value` — jumps to the match), **Repository Info…**, **Verify Repository** (consistency check),
+**Run Garbage Collection**, **List Instances**, **Clean Working Directory**, and **Watch Events…**
+(subscribe to repository events for a bounded window — handy to see pushes/locks from others land in
+real time).
 
 ---
 
@@ -316,8 +320,8 @@ In the **Links** section click **+ Link** and fill in:
 
 ugit runs `lore link add <mount> <url> <source>` (pin defaults to the latest revision on the
 linked repo's main branch). Use a link when you want a **stable, shared dependency** — a common
-asset library, an engine module — that updates only when you deliberately re-pin it (`lore link
-update`).
+asset library, an engine module — that updates only when you deliberately re-pin it: each link row
+has a **Re-pin…** button (prompt for a branch or revision; blank = latest on the current branch).
 
 ### Layers — local overlays
 
@@ -330,9 +334,10 @@ In the **Layers** section click **+ Layer** and fill in:
 - **mount path** — where the overlay applies.
 - **repository** — the layer repo's **id or name** (it's resolved against the server, not a URL).
 - **source path** — subtree to overlay (default `/`).
+- **metadata key** (optional) — match the layer's revision by this metadata key (variant/stream
+  composition).
 
-ugit runs `lore layer add <path> <repository> <source>`. You can also add layers at clone time
-(`clone --layer <repo> --layer-metadata <key>`).
+ugit runs `lore layer add <path> <repository> <source> [--metadata <key>]`.
 
 **Rule of thumb:** reach for a **link** when the dependency should be **pinned and shared with
 everyone** (committed composition); reach for a **layer** when you want a **local overlay**,
@@ -433,12 +438,10 @@ the ignore rules with the team.
 
 - **Auth login round-trip** — wired but unverified; needs a secured server with an OIDC/JWK issuer
   (the dev server runs with auth disabled). Authenticate the CLI with `lore login` and ugit reuses it.
-- **Repository- and file-level metadata** — ugit edits *branch* and *revision* metadata; the
-  `repository metadata` and `file metadata` levels aren't surfaced.
 - **Dependency-based selective clone/sync** — the per-file dependency graph is editable (Part 4),
-  but cloning/syncing *by* it (`--root-file`, `--dependency-tag`) isn't exposed.
-- **Link re-pin / layer metadata matching** — links/layers can be added/removed but not re-pinned
-  (`link update`) or metadata-matched.
-- **Other CLI-only operations** — `repository verify` / `info` / `delete`, `revision find` /
-  `restore`, `branch latest`, `file obliterate` / `hash`, `service` (warm-store process; exits 1 on
-  the dev setup), virtual/prefetch clone modes, and partitions.
+  but cloning/syncing *by* it (`--root-file`, `--dependency-tag`) and other advanced clone modes
+  (`--virtual`, `--prefetch`) aren't exposed.
+- **`service`** — `service start/stop` exit 1 with no output on the dev setup; non-functional here.
+- **Partitions** — no client CLI surface (server-admin scope).
+- **Destructive / niche operations** — `repository delete`, `file obliterate`, `file hash`,
+  `branch latest`, and `revision restore` (which errors on a basic test) are left out.

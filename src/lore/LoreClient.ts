@@ -39,6 +39,7 @@ import {
   parseBranchDiff,
   parseMetadata,
   parseDependencyList,
+  parseRevisionFind,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -324,6 +325,49 @@ export class LoreClient {
   /** Clear all metadata from the STAGED revision (the CLI has no per-key clear for revisions). */
   async revisionMetadataClear(): Promise<void> { await this.run(['revision', 'metadata', 'clear']); }
 
+  /** Read repository-level metadata (includes intrinsic keys like name/creator/created). */
+  async repositoryMetadataGet(): Promise<LoreMetadataEntry[]> {
+    return parseMetadata((await this.run(['repository', 'metadata', 'get'], { skip: true })).stdout);
+  }
+  /** Set key/value pairs on the repository's metadata. */
+  async repositoryMetadataSet(pairs: [string, string][]): Promise<void> {
+    if (!pairs.length) return;
+    const argv = ['repository', 'metadata', 'set'];
+    for (const [k, v] of pairs) argv.push(k, v);
+    await this.run(argv);
+  }
+  /** Clear specific keys from the repository's metadata. */
+  async repositoryMetadataClear(keys: string[]): Promise<void> {
+    if (!keys.length) return;
+    await this.run(['repository', 'metadata', 'clear', ...keys]);
+  }
+
+  /** Read a file's metadata (defaults to the current revision; pass `revision` for an older one). */
+  async fileMetadataGet(filePath: string, revision?: string): Promise<LoreMetadataEntry[]> {
+    const argv = ['file', 'metadata', 'get', filePath];
+    if (revision) argv.push('--revision', revision);
+    return parseMetadata((await this.run(argv, { skip: true })).stdout);
+  }
+  /** Set key/value pairs on a STAGED file's metadata (only staged files are editable). */
+  async fileMetadataSet(filePath: string, pairs: [string, string][]): Promise<void> {
+    if (!pairs.length) return;
+    const argv = ['file', 'metadata', 'set', filePath];
+    for (const [k, v] of pairs) argv.push(k, v);
+    await this.run(argv);
+  }
+  /** Clear all metadata from a STAGED file (no per-key clear for files). */
+  async fileMetadataClear(filePath: string): Promise<void> { await this.run(['file', 'metadata', 'clear', filePath]); }
+
+  /** Find revision signatures by metadata key (optionally a value), or by revision number. */
+  async revisionFindByMetadata(key: string, value?: string): Promise<string[]> {
+    const argv = ['revision', 'find', 'metadata', key];
+    if (value) argv.push(value);
+    return parseRevisionFind((await this.run(argv, { skip: true })).stdout);
+  }
+  async revisionFindByNumber(n: number): Promise<string[]> {
+    return parseRevisionFind((await this.run(['revision', 'find', 'number', String(n)], { skip: true })).stdout);
+  }
+
   // --- File dependencies (per-file dependency graph) ---
 
   /** List a file's dependencies (or, with `reverse`, its dependents). `recursive` follows edges. */
@@ -564,6 +608,14 @@ export class LoreClient {
   /** Run a full garbage-collection pass on the local store. */
   async gc(): Promise<void> { await this.run(['repository', 'gc']); }
 
+  /** Verify local repository state consistency. Returns the raw report. */
+  async verify(): Promise<string> { return (await this.run(['repository', 'verify', 'state'])).stdout; }
+
+  /** Repository info (id, remote URL, default branch, creator/created). Raw text. */
+  async repositoryInfo(): Promise<string> {
+    return (await this.run(['repository', 'info'], { skip: true })).stdout;
+  }
+
   /** List registered instances (working copies) of this repository. Raw text. */
   async instances(): Promise<string> {
     return (await this.run(['repository', 'instance', 'list'], { skip: true })).stdout;
@@ -624,14 +676,23 @@ export class LoreClient {
     await this.run(['link', 'remove', linkPath]);
   }
 
+  /** Re-pin a link to a new branch or revision (defaults to the latest on the current branch). */
+  async linkUpdate(linkPath: string, pin?: string): Promise<void> {
+    const argv = ['link', 'update', linkPath];
+    if (pin) argv.push('--pin', pin);
+    await this.run(argv);
+  }
+
   /** List layers (local overlays). Empty when none. */
   async layers(): Promise<LoreLayer[]> {
     return parseLayerList((await this.run(['layer', 'list'], { skip: true })).stdout);
   }
 
-  /** Add a repository as a layer (overlay) at `path`. */
-  async layerAdd(path: string, repository: string, sourcePath = '/'): Promise<void> {
-    await this.run(['layer', 'add', path, repository, sourcePath]);
+  /** Add a repository as a layer (overlay) at `path`. `metadata` matches revisions by a metadata key. */
+  async layerAdd(path: string, repository: string, sourcePath = '/', metadata?: string): Promise<void> {
+    const argv = ['layer', 'add', path, repository, sourcePath];
+    if (metadata) argv.push('--metadata', metadata);
+    await this.run(argv);
   }
 
   /** Remove a layer at the given path. */

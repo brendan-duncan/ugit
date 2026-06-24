@@ -35,6 +35,7 @@ const CODE_COLORS: Record<string, string> = {
 // Intrinsic keys returned by `metadata get` that aren't user-editable attributes.
 const BRANCH_SYSTEM_KEYS = new Set(['name', 'creator', 'created', 'protect']);
 const REVISION_SYSTEM_KEYS = new Set(['Branch', 'Date', 'Revision', 'Signature', 'Merge', 'Parent', 'Author', 'Message']);
+const REPO_SYSTEM_KEYS = new Set(['name', 'description', 'default-branch', 'default-branch-name', 'creator', 'created']);
 
 function changeColor(code: string): string {
   return CODE_COLORS[code[0]?.toUpperCase()] || 'var(--text-secondary)';
@@ -92,7 +93,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [showAddLink, setShowAddLink] = useState(false);
   const [linkForm, setLinkForm] = useState({ path: '', url: '', src: '/' });
   const [showAddLayer, setShowAddLayer] = useState(false);
-  const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/' });
+  const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/', meta: '' });
   const [bisectStart, setBisectStart] = useState('');
   const [bisectEnd, setBisectEnd] = useState('');
   const [bisect, setBisect] = useState<LoreBisectStep | null>(null);
@@ -310,6 +311,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
         items.push({ separator: true });
       }
       items.push({ label: 'Dependencies…', onClick: () => setDepsPath(path) });
+      items.push({ label: 'File Metadata…', onClick: () => openFileMetadata(path) });
       items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire([path]); }, NO_SCAN) });
       items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease([path]); }, NO_SCAN) });
       items.push({ label: 'Ignore file', onClick: () => doIgnore(path, false) });
@@ -356,6 +358,11 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       { label: 'Open in Console', onClick: () => openInConsole(repoPath) },
       { label: 'Copy Local Path', onClick: () => clipboard.writeText(repoPath) },
       { label: 'Copy Server URL', disabled: !url, onClick: () => url && clipboard.writeText(url) },
+      { separator: true },
+      { label: 'Repository Metadata…', onClick: openRepositoryMetadata },
+      { label: 'Find Revision…', onClick: doFindRevision },
+      { label: 'Repository Info…', onClick: doRepositoryInfo },
+      { label: 'Verify Repository', onClick: doVerify },
       { separator: true },
       { label: 'Run Garbage Collection', onClick: doGc },
       { label: 'List Instances…', onClick: doInstances },
@@ -518,6 +525,80 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
         readOnly: true,
       });
     } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+  };
+
+  // Edit repository-level metadata (intrinsic keys shown read-only).
+  const openRepositoryMetadata = async () => {
+    try {
+      const all = await client!.repositoryMetadataGet();
+      const editable = all.filter(e => !REPO_SYSTEM_KEYS.has(e.key));
+      setMetaEditor({
+        title: 'Repository metadata',
+        subtitle: 'Key/value attributes stored on the repository.',
+        entries: editable,
+        readOnlyEntries: all.filter(e => REPO_SYSTEM_KEYS.has(e.key)),
+        readOnly: false,
+        onSave: async (pairs) => {
+          try {
+            const newKeys = new Set(pairs.map(([k]) => k));
+            const removed = editable.map(e => e.key).filter(k => !newKeys.has(k));
+            await client!.repositoryMetadataSet(pairs);
+            if (removed.length) await client!.repositoryMetadataClear(removed);
+            await refresh(NO_SCAN);
+          } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+        },
+      });
+    } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+  };
+
+  // File metadata: editable only when the file is staged (set/clear act on the staged file);
+  // otherwise show it read-only at the current revision.
+  const openFileMetadata = async (filePath: string) => {
+    try {
+      const staged = !!status?.staged.some(f => f.path === filePath);
+      const all = await client!.fileMetadataGet(filePath);
+      setMetaEditor({
+        title: `File metadata — ${filePath}`,
+        subtitle: staged
+          ? 'Attributes on this staged file.'
+          : 'Read-only — Lore only lets you set file metadata while the file is staged.',
+        entries: all,
+        readOnlyEntries: [],
+        readOnly: !staged,
+        onSave: staged ? async (pairs) => {
+          try {
+            await client!.fileMetadataClear(filePath); // files support only clear-all, so reset then re-set
+            await client!.fileMetadataSet(filePath, pairs);
+            await refresh(NO_SCAN);
+          } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+        } : undefined,
+      });
+    } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+  };
+
+  const doVerify = () => runAction(async () => {
+    const out = await client!.verify();
+    showAlert(out.trim() || 'Repository state verified.', 'Verify repository');
+  }, NO_SCAN);
+  const doRepositoryInfo = async () => {
+    try { showAlert((await client!.repositoryInfo()).trim() || 'No info.', 'Repository info'); }
+    catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore error'); }
+  };
+
+  // Find a revision by number or metadata (key or key=value) and open its detail.
+  const doFindRevision = async () => {
+    const q = window.prompt('Find revision — enter a number, a metadata key, or key=value:');
+    if (q == null || !q.trim()) return;
+    const query = q.trim();
+    try {
+      let sigs: string[];
+      if (/^\d+$/.test(query)) sigs = await client!.revisionFindByNumber(parseInt(query, 10));
+      else { const [k, ...rest] = query.split('='); sigs = await client!.revisionFindByMetadata(k.trim(), rest.join('=').trim() || undefined); }
+      if (!sigs.length) { showAlert(`No revision matched "${query}".`, 'Find revision'); return; }
+      setViewMode('changes');
+      await onSelectRevision({ signature: sigs[0] });
+      if (sigs.length > 1) showAlert(`${sigs.length} revisions matched; showing the first.`, 'Find revision');
+    } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore error'); }
   };
 
   const onBranchMenu = (e: React.MouseEvent, branch: string) => {
@@ -728,10 +809,15 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setLinkForm({ path: '', url: '', src: '/' }); setShowAddLink(false);
   });
   const doLinkRemove = (linkPath: string) => runAction(async () => { await client!.linkRemove(linkPath); });
+  const doLinkUpdate = (linkPath: string) => {
+    const pin = window.prompt(`Re-pin link "${linkPath}" to (branch or revision; blank = latest on current branch):`, '');
+    if (pin == null) return;
+    runAction(async () => { await client!.linkUpdate(linkPath, pin.trim() || undefined); });
+  };
   const doLayerAdd = () => runAction(async () => {
     if (!layerForm.path.trim() || !layerForm.repo.trim()) throw new Error('Layer mount path and repository are required');
-    await client!.layerAdd(layerForm.path.trim(), layerForm.repo.trim(), layerForm.src.trim() || '/');
-    setLayerForm({ path: '', repo: '', src: '/' }); setShowAddLayer(false);
+    await client!.layerAdd(layerForm.path.trim(), layerForm.repo.trim(), layerForm.src.trim() || '/', layerForm.meta.trim() || undefined);
+    setLayerForm({ path: '', repo: '', src: '/', meta: '' }); setShowAddLayer(false);
   });
   const doLayerRemove = (path: string, repo?: string) => runAction(async () => { await client!.layerRemove(path, repo); });
 
@@ -1001,6 +1087,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   <div key={l.id} className="lore-row always-actions" title={`${l.linkPath} ← ${l.sourcePath}${l.revision ? ` @ ${l.revision.slice(0, 8)}` : ''}`}>
                     <span className="lore-row-name">{l.linkPath} ← {l.sourcePath}</span>
                     <span className="lore-row-actions">
+                      <button className="lore-mini-btn" disabled={busy} onClick={() => doLinkUpdate(l.linkPath)}>Re-pin…</button>
                       <button className="lore-mini-btn" disabled={busy} onClick={() => doLinkRemove(l.linkPath)}>Remove</button>
                     </span>
                   </div>
@@ -1018,6 +1105,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                     <input className="lore-new-branch-input" placeholder="mount path (e.g. overlay)" value={layerForm.path} onChange={(e) => setLayerForm({ ...layerForm, path: e.target.value })} />
                     <input className="lore-new-branch-input" placeholder="repository id or name" value={layerForm.repo} onChange={(e) => setLayerForm({ ...layerForm, repo: e.target.value })} />
                     <input className="lore-new-branch-input" placeholder="source path (default /)" value={layerForm.src} onChange={(e) => setLayerForm({ ...layerForm, src: e.target.value })} />
+                    <input className="lore-new-branch-input" placeholder="metadata key for matching (optional)" value={layerForm.meta} onChange={(e) => setLayerForm({ ...layerForm, meta: e.target.value })} />
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button className="lore-mini-btn" disabled={busy} onClick={doLayerAdd}>Add</button>
                       <button className="lore-mini-btn" onClick={() => setShowAddLayer(false)}>Cancel</button>

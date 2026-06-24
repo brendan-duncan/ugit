@@ -389,6 +389,16 @@ export function parseBranchDiff(text: string): { sourceRevision?: string; target
   return { sourceRevision: revs?.[1], targetRevision: revs?.[2], files };
 }
 
+/** Parse `revision find …` output: the matching revision signature(s), one 64-hex line each. */
+export function parseRevisionFind(text: string): string[] {
+  const out: string[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const m = raw.trim().match(/^([0-9a-fA-F]{64})$/);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
 /**
  * Parse `file dependency list <path>` output: a `<path>:` (or `<path> (depended on by):`) header
  * followed by indented entry paths. Returns just the entries (the related file paths).
