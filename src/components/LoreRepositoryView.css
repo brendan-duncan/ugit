@@ -19,23 +19,51 @@
   font-weight: 600;
 }
 
-/* Repo info card (top of sidebar) */
+/* Repo info card (top of sidebar) — mirrors the git RepoInfo: name + "…" menu, then
+   Local / Server / Branch rows with the shared repo-info colors. */
 .lore-info-card {
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   border-bottom: 1px solid var(--border-color);
 }
-.lore-info-row {
+.lore-info-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 13px;
+  margin-bottom: 2px;
 }
-.lore-info-label { color: var(--text-secondary); }
-.lore-info-value { color: var(--repo-info-local-color); font-family: monospace; }
+.lore-repo-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-highlight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lore-info-menu {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.lore-info-menu:hover { color: var(--text-highlight); }
+.lore-info-line {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lore-info-key { color: var(--text-secondary); margin-right: 4px; }
+.lore-info-local { color: var(--repo-info-local-color); }
+.lore-info-origin { color: var(--repo-info-origin-color); }
+.lore-info-branch { color: var(--repo-info-branch-color); font-weight: 600; }
 
 .lore-badge {
   font-size: 11px;

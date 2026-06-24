@@ -636,6 +636,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   }
 
   const lastCommand = commandState.length > 0 ? commandState[commandState.length - 1].command : '';
+  const repoName = repoPath.split(/[\\/]/).filter(Boolean).pop() || repoPath;
+  const serverUrl = client ? client.serverUrl() : null;
 
   return (
     <div className="repository-view">
@@ -689,9 +691,6 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
         )}
         {commandState.length > 0 &&
           <div className="toolbar-status"><span className="toolbar-busy-spinner" title={lastCommand}>↻</span></div>}
-        <button className="toolbar-button" onClick={onRepoMenu} title="Repository actions">
-          <span className="toolbar-button-label">⋯</span>
-        </button>
       </div>
 
       <div className="repo-content-horizontal" onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
@@ -702,17 +701,15 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
             {/* Sidebar: repo info + branches + locks */}
             <div className="repo-sidebar" style={{ width: `${leftWidth}%` }}>
               <div className="lore-info-card">
-                <div className="lore-info-row">
-                  <span className="lore-info-label">Lore branch</span>
-                  <span className="lore-info-value">{status.branch}</span>
+                <div className="lore-info-card-header">
+                  <span className="lore-repo-name" title={repoPath}>{repoName}</span>
+                  <button className="lore-info-menu" onClick={onRepoMenu} title="Repository actions">⋯</button>
                 </div>
-                <div className="lore-info-row">
-                  <span className="lore-info-label">revision</span>
-                  <span className="lore-info-value">{status.local.number}</span>
-                </div>
-                <div className="lore-info-row">
-                  <span className="lore-info-label">remote</span>
-                  <span className={`lore-badge ${status.syncState}`}>{status.syncState}</span>
+                <div className="lore-info-line"><span className="lore-info-key">Local:</span> <span className="lore-info-local">{repoPath}</span></div>
+                {serverUrl && <div className="lore-info-line"><span className="lore-info-key">Server:</span> <span className="lore-info-origin">{serverUrl}</span></div>}
+                <div className="lore-info-line">
+                  <span className="lore-info-key">Branch:</span> <span className="lore-info-branch">{status.branch}</span>
+                  <span className={`lore-badge ${status.syncState}`} style={{ marginLeft: 6 }}>rev {status.local.number} · {status.syncState}</span>
                 </div>
               </div>
 
