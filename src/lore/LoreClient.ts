@@ -34,6 +34,7 @@ import {
   parseTreeDump,
   parseFileInfo,
   parseFileHistory,
+  parseBisect,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -53,6 +54,7 @@ import {
   LoreTreeNode,
   LoreFileInfo,
   LoreFileHistoryEntry,
+  LoreBisectStep,
 } from './types';
 
 /** Map an operation to its CLI command prefix for resolve/abort. */
@@ -403,6 +405,28 @@ export class LoreClient {
     }
   }
 
+  /**
+   * True when `relPath` is materialized on disk in the working tree. In a sparse or bare clone
+   * many tree paths exist in the revision tree (so they appear in the Files view) but are not
+   * fetched locally; this distinguishes those from genuinely present files.
+   */
+  isFetched(relPath: string): boolean {
+    try {
+      return fs.existsSync(path.join(this.repoPath, relPath));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Read a single file's text content at a specific revision (via `file write`), without
+   * materializing it into the working tree. Used to preview un-fetched files. Null on failure.
+   */
+  async readFileAtRevisionText(relPath: string, revision: string, maxBytes = 2 * 1024 * 1024): Promise<string | null> {
+    const b64 = await this.readFileAtRevisionBase64(relPath, revision, maxBytes);
+    return b64 == null ? null : Buffer.from(b64, 'base64').toString('utf8');
+  }
+
   /** Read a working-tree file as base64 (for asset/image previews). Null if missing/too big. */
   readWorkingFileBase64(relPath: string, maxBytes = 8 * 1024 * 1024): string | null {
     try {
@@ -432,6 +456,15 @@ export class LoreClient {
     if (opts.revision) argv.push(opts.revision);
     if (opts.reset) argv.push('--reset');
     return parseSyncResult((await this.run(argv)).stdout);
+  }
+
+  /**
+   * Run one bisect step between `start` (last known good, exclusive) and `end` (first known bad,
+   * inclusive). Both accept `@N` revision numbers or signatures. This syncs the working tree to
+   * the midpoint; inspect the result and call again with `ifContains`/`ifClean` until `complete`.
+   */
+  async bisect(start: string, end: string): Promise<LoreBisectStep> {
+    return parseBisect((await this.run(['revision', 'bisect', '--start', start, '--end', end])).stdout);
   }
 
   /** Discard local changes to the given paths (revert to the committed revision). */

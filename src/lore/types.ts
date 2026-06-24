@@ -230,6 +230,26 @@ export interface LoreFileHistoryEntry {
   message: string;
 }
 
+/**
+ * One step of an in-progress `revision bisect`. Bisect is a *stateless* step command: each call
+ * syncs the working tree to the midpoint between `start` (last known good) and `end` (first known
+ * bad), then prints the two ranges to use next depending on whether the midpoint contains the
+ * change. The GUI re-invokes with the chosen range until the search narrows to one revision.
+ */
+export interface LoreBisectStep {
+  /** Revision the working tree was synced to for this step (the one to test). */
+  midpoint?: LoreRevisionRef;
+  /** Range to bisect next if the midpoint DOES contain the change (start exclusive, end inclusive). */
+  ifContains?: { start: string; end: string };
+  /** Range to bisect next if the midpoint does NOT contain the change. */
+  ifClean?: { start: string; end: string };
+  /** True once the search has narrowed to a single revision (`culprit` is the answer). */
+  complete: boolean;
+  /** The identified revision (e.g. "@2") when complete. */
+  culprit?: string;
+  raw: string;
+}
+
 /** Per-conflict resolution choice in the interactive resolver. */
 export type ConflictChoice = 'ours' | 'theirs' | 'both-ot' | 'both-to' | 'base';
 

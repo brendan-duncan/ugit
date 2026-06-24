@@ -7,6 +7,8 @@ interface LoreRepositoryTreeProps {
   lockOwners: Map<string, string>;
   /** path -> change marker ('M' | 'A' | 'D' | '!' conflict). */
   statusByPath: Map<string, string>;
+  /** File paths present in the repo tree but not materialized on disk (sparse/bare clone). */
+  unfetchedPaths: Set<string>;
   selectedPath: string | null;
   onSelect: (node: LoreTreeNode) => void;
   /** Directories whose children have been fetched. */
@@ -51,7 +53,7 @@ function buildTree(nodes: LoreTreeNode[]): TreeItem[] {
  * inline lock owners, and change markers. Directories load their children lazily on first
  * expand (via `repository dump --path <dir>`), so huge repos don't materialize the whole tree.
  */
-function LoreRepositoryTree({ nodes, lockOwners, statusByPath, selectedPath, onSelect, loadedDirs, onExpand, onContextMenu, busy }: LoreRepositoryTreeProps) {
+function LoreRepositoryTree({ nodes, lockOwners, statusByPath, unfetchedPaths, selectedPath, onSelect, loadedDirs, onExpand, onContextMenu, busy }: LoreRepositoryTreeProps) {
   const tree = useMemo(() => buildTree(nodes), [nodes]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -66,7 +68,10 @@ function LoreRepositoryTree({ nodes, lockOwners, statusByPath, selectedPath, onS
   };
 
   const renderItems = (items: TreeItem[], depth: number): React.ReactNode => items.map(item => {
-    const status = statusByPath.get(item.path);
+    const unfetched = !item.isDir && unfetchedPaths.has(item.path);
+    // An un-fetched file is absent from disk on purpose (sparse/bare clone), not a real change —
+    // so we hide its scan-derived marker (notably the misleading 'D' on every file in a bare clone).
+    const status = unfetched ? undefined : statusByPath.get(item.path);
     const owner = lockOwners.get(item.path);
     const isOpen = expanded.has(item.path);
     const loading = item.isDir && isOpen && !loadedDirs.has(item.path) && item.children.length === 0;
@@ -74,15 +79,16 @@ function LoreRepositoryTree({ nodes, lockOwners, statusByPath, selectedPath, onS
       <React.Fragment key={item.path}>
         <div
           className={`lore-row ${selectedPath === item.path ? 'selected' : ''}`}
-          style={{ paddingLeft: 6 + depth * 14 }}
+          style={{ paddingLeft: 6 + depth * 14, opacity: unfetched ? 0.6 : 1 }}
           onClick={() => (item.isDir ? toggle(item) : onSelect(item))}
           onContextMenu={(e) => onContextMenu?.(e, item.path, item.isDir)}
-          title={item.path}
+          title={unfetched ? `${item.path} — not fetched (in the repo, not checked out locally)` : item.path}
         >
           <span style={{ width: 12, color: 'var(--text-secondary)' }}>{item.isDir ? (isOpen ? '▾' : '▸') : ''}</span>
           <span>{item.isDir ? '📁' : '📄'}</span>
           {status && <span style={{ color: STATUS_COLOR[status] || 'var(--text-secondary)', fontFamily: 'monospace', fontWeight: 700, width: 10 }}>{status}</span>}
           <span className="lore-row-name">{item.name}</span>
+          {unfetched && <span title="Not fetched — in the repository tree but not checked out on disk" style={{ color: 'var(--text-secondary)', fontSize: 11 }}>☁ not fetched</span>}
           {owner && <span title={`Locked by ${owner}`} style={{ color: 'var(--warning-color)', fontSize: 11 }}>🔒{owner === '<unknown>' ? '' : ` ${owner}`}</span>}
           <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{formatBytes(item.size)}</span>
           {onContextMenu && (

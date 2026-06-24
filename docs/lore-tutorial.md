@@ -96,7 +96,8 @@ Now teammates can clone `lore://<server>/MyGame` and you're all working against 
   branch into the current one.
 - **Locks** section: every locked file with its owner; release from here.
 - **Sparse view** section: view/edit the `.lore/view` filter (see below).
-- **Links / Layers** sections: compose sub-repositories.
+- **Links / Layers** sections: compose sub-repositories (Part 10).
+- **Bisect** section: binary-search history for the revision that introduced a change (Part 11).
 - **History** (right): revisions with **Amend** (latest message), **Revert**, and **Pick**
   (cherry-pick). Click a revision to see its changed files.
 
@@ -104,8 +105,9 @@ Now teammates can clone `lore://<server>/MyGame` and you're all working against 
 The working set as a **sparse tree of the repo** (like a Perforce depot/workspace tree):
 - Folders expand **lazily** (children load on demand), so huge projects stay responsive.
 - Each row shows the **size**, a **🔒 lock owner** if locked, and a **change marker** (A/M/D)
-  if modified. (`D` on *every* file means nothing is checked out on disk — see the bare-clone
-  note in Part 8.)
+  if modified. Files that exist in the repo but aren't checked out on disk (sparse or bare clone)
+  are dimmed and tagged **☁ not fetched** — selecting one still previews it (ugit streams the
+  content from the store on demand). See Part 8.
 - Select a file to see, on the right: its **info** (size/hash/status), an **image preview** (for
   png/jpg/etc.) or a **binary asset card** (for other binaries) or a **text diff**, and its
   **per-file history** — click a revision to diff that asset at that point in time.
@@ -228,16 +230,23 @@ newly-excluded ones), **Sync** afterward. From the CLI that reconciliation is
 
 ### "Bare" clones, and why the Files view shows `D` on everything
 
-The Clone dialog also offers a **Bare** checkbox. A bare clone fetches the latest **revision
-tree** but **zero files** — it's for inspecting history or tooling, not day-to-day editing.
-Because every tracked file is absent from disk, ugit's **Files** view (which scans the working
-tree against the revision tree) marks **every file with a `D`** (deleted). That's expected for a
-bare clone — there's simply nothing checked out, not a real deletion you committed.
+The Clone dialog also offers a **Metadata only (bare)** option. A bare clone fetches the latest
+**revision tree** but **zero files** — it's for inspecting history or tooling, not day-to-day
+editing. Every path still appears in the **Files** tree (it's read from the revision tree, not
+from disk), each dimmed and tagged **☁ not fetched**; clicking one previews its content streamed
+from the store.
 
 To turn a bare clone into a working one, give it a view (Changes → **Sparse view** → **Edit** —
 empty for everything, or a `**`/`!` filter for a subset) and then **Sync** (CLI: `lore sync
 --reset`) to materialize the files. For normal work, prefer a **full** or **sparse** clone over
 bare.
+
+### Browsing un-fetched files
+
+In any sparse or bare clone, files that live in the repository but aren't checked out on disk show
+up dimmed with a **☁ not fetched** tag in the Files tree. You can still **select one to preview**
+it — ugit streams that single file's content from the store at the current revision without
+materializing it. To actually pull files onto disk, widen the **Sparse view** and **Sync** (above).
 
 ---
 
@@ -308,7 +317,30 @@ optionally matched by metadata. Both are advanced features — most day-to-day w
 
 ---
 
-## 11. Troubleshooting & known limits
+## 11. Finding when a change appeared (bisect)
+
+When something broke but you don't know which revision introduced it, **bisect** binary-searches
+the history for you. Lore's bisect is a *step* search: it syncs your working tree to the midpoint
+between a known-good and known-bad revision, you test it and say which side it's on, and it
+narrows — `log₂(n)` steps instead of checking every revision.
+
+In the **Changes** sidebar's **Bisect** section:
+
+1. Pick **Good** — the latest revision you know *doesn't* have the problem.
+2. Pick **Bad** — the earliest revision you know *does*.
+3. Click **Start bisect.** ugit syncs the working tree to the midpoint and asks *"Does this
+   revision contain the change?"*
+4. Test the working tree, then click **Contains it (bad)** or **Clean (good)**. ugit re-bisects the
+   narrower range and repeats.
+5. When the range collapses to one revision, the panel reports **the first revision with the
+   change**. Click **Reset** (or **Done**) to stop.
+
+> Each step changes what's checked out (it syncs to the revision under test), so the sync gauge and
+> Files view follow along. Finish or **Reset** the bisect to return to normal work.
+
+---
+
+## 12. Troubleshooting & known limits
 
 | Symptom | Fix |
 | --- | --- |
@@ -322,15 +354,7 @@ optionally matched by metadata. Both are advanced features — most day-to-day w
 
 **Not yet in the GUI:**
 
-- **`revision bisect`** — Lore has a real binary-search command for finding the revision that
-  introduced a change; ugit doesn't drive it yet.
 - **Some branch operations** — switch / create / merge / archive / reset / protect / unprotect are
   wired; `branch diff` and branch/revision **metadata** editing are not surfaced.
 - **Auth login round-trip** — unverified; needs a secured server with an OIDC/JWK issuer (the dev
   server runs with auth disabled).
-- **Un-fetched files in the Files tree** — the tree already *lists* every path in the repo (it
-  reads the full revision tree via `repository dump`), including files not checked out on disk in a
-  sparse or bare clone. What it doesn't yet do is **visually mark** which files are un-fetched, or
-  **preview them on demand** (selecting an un-fetched file reads from disk and comes up empty). Both
-  are feasible — Lore can stream a single file's content at a revision (`lore file write --path …
-  --revision …`) without materializing it — they're just not implemented. See the note below.

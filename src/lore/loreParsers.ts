@@ -25,6 +25,7 @@ import {
   LoreTreeNode,
   LoreFileInfo,
   LoreFileHistoryEntry,
+  LoreBisectStep,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -326,6 +327,46 @@ export function parseTreeDump(text: string): LoreTreeNode[] {
     nodes.push({ path: p, name: p.split('/').pop() || p, isDir, size: parseInt(m[2], 10) });
   }
   return nodes;
+}
+
+/**
+ * Parse one step of `revision bisect`. While narrowing, the CLI prints two follow-up commands:
+ *
+ *   Synchronized to @4
+ *   If this revision does contain the change being searched for:
+ *       lore revision bisect --start @1 --end @4
+ *   If this revision does not contain the change being searched for:
+ *       lore revision bisect --start @4 --end @7
+ *   Bisect step complete
+ *
+ * When the range holds a single candidate it instead prints "Revision @N contains the change
+ * being searched for / Bisect complete".
+ */
+export function parseBisect(text: string): LoreBisectStep {
+  const ranges = [...text.matchAll(/revision\s+bisect\s+--start\s+(\S+)\s+--end\s+(\S+)/g)];
+  const numM = text.match(/Synchroniz(?:ed|ing) to (?:local revision )?@?(\d+)/);
+  const sigM = text.match(/Synchronizing to (?:local )?revision\s+\d+\s*->\s*([0-9a-fA-F]+)/);
+  const midpoint = numM
+    ? { number: parseInt(numM[1], 10), signature: sigM ? sigM[1] : ZERO_SIGNATURE }
+    : undefined;
+
+  if (ranges.length >= 2) {
+    return {
+      midpoint,
+      ifContains: { start: ranges[0][1], end: ranges[0][2] },
+      ifClean: { start: ranges[1][1], end: ranges[1][2] },
+      complete: false,
+      raw: text,
+    };
+  }
+
+  const culpritM = text.match(/Revision\s+(@?\d+)\s+contains the change/i);
+  return {
+    midpoint,
+    complete: true,
+    culprit: culpritM ? culpritM[1] : midpoint ? `@${midpoint.number}` : undefined,
+    raw: text,
+  };
 }
 
 /** Parse `lore file info` (Key: value lines) into file metadata. */

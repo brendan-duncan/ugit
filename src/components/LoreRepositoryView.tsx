@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLore } from '../hooks/useLore';
 import { useAlert } from '../contexts/AlertContext';
 import { LoreFileChange } from '../lore';
@@ -13,7 +13,7 @@ import LoreStashDialog from './LoreStashDialog';
 import LoreApplyStashDialog from './LoreApplyStashDialog';
 import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
 import { clipboard } from 'electron';
-import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, LoreStashFile, StashInput } from '../lore';
+import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, LoreStashFile, StashInput, LoreBisectStep } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
 
@@ -87,6 +87,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [linkForm, setLinkForm] = useState({ path: '', url: '', src: '/' });
   const [showAddLayer, setShowAddLayer] = useState(false);
   const [layerForm, setLayerForm] = useState({ path: '', repo: '', src: '/' });
+  const [bisectStart, setBisectStart] = useState('');
+  const [bisectEnd, setBisectEnd] = useState('');
+  const [bisect, setBisect] = useState<LoreBisectStep | null>(null);
   const [resolvingPath, setResolvingPath] = useState<string | null>(null);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const anchorRef = useRef<string | null>(null);
@@ -120,6 +123,14 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   status?.unstaged.forEach(f => statusByPath.set(f.path, f.code));
   status?.staged.forEach(f => statusByPath.set(f.path, f.code));
   status?.conflicted.forEach(f => statusByPath.set(f.path, '!'));
+
+  // File nodes that exist in the repo tree but aren't materialized on disk (sparse/bare clone).
+  // Recomputed as the lazy tree grows; cheap synchronous fs.existsSync per file node.
+  const unfetchedPaths = useMemo(() => {
+    const s = new Set<string>();
+    if (client) for (const n of treeNodes) if (!n.isDir && !client.isFetched(n.path)) s.add(n.path);
+    return s;
+  }, [client, treeNodes]);
   const [leftWidth, setLeftWidth] = useState<number>(28);
   const draggingSplitter = useRef(false);
 
@@ -468,15 +479,24 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     clearMedia();
     setDiffLoading(true);
     try {
+      // Un-fetched files (sparse/bare clone) aren't on disk — stream their content from the store
+      // at the current head revision instead of reading the (absent) working file.
+      const fetched = client!.isFetched(node.path);
+      const headRev = status?.local.signature;
       const media = mediaMime(node.path);
       if (media) {
         setMediaKind(media.kind);
-        const b64 = client!.readWorkingFileBase64(node.path);
+        const b64 = fetched
+          ? client!.readWorkingFileBase64(node.path)
+          : (headRev ? await client!.readFileAtRevisionBase64(node.path, headRev) : null);
         setMediaNewUrl(b64 ? `data:${media.mime};base64,${b64}` : null);
       } else if (client!.isProbablyBinary(node.path)) {
         setFileBinary(true);
-      } else {
+      } else if (fetched) {
         try { setFileContent(client!.readWorkingFile(node.path)); } catch { setFileContent(''); }
+      } else {
+        const text = headRev ? await client!.readFileAtRevisionText(node.path, headRev) : null;
+        setFileContent(text ?? '');
       }
       // Best-effort metadata; ignore failures (e.g. no history for an untracked file).
       const [info, hist] = await Promise.all([
@@ -488,7 +508,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     } finally {
       setDiffLoading(false);
     }
-  }, [client]);
+  }, [client, status]);
 
   // Diff a file at a specific point in its history (revision vs the previous one).
   const onSelectFileHistory = useCallback(async (idx: number) => {
@@ -564,6 +584,19 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
 
   const doLock = (path: string) => runAction(async () => { await client!.lockAcquire([path]); });
   const doUnlock = (path: string) => runAction(async () => { await client!.lockRelease([path]); });
+
+  // Bisect: a stateless step search. Start with a good (start) and bad (end) revision; each step
+  // syncs the working tree to the midpoint and we re-invoke with the chosen narrower range.
+  const startBisect = () => runAction(async () => {
+    if (!bisectStart || !bisectEnd) throw new Error('Pick a good (start) and a bad (end) revision first.');
+    setBisect(await client!.bisect(bisectStart, bisectEnd));
+  });
+  const answerBisect = (contains: boolean) => runAction(async () => {
+    const next = contains ? bisect?.ifContains : bisect?.ifClean;
+    if (!next) return;
+    setBisect(await client!.bisect(next.start, next.end));
+  });
+  const resetBisect = () => { setBisect(null); setBisectStart(''); setBisectEnd(''); };
 
   const doLinkAdd = () => runAction(async () => {
     if (!linkForm.path.trim() || !linkForm.url.trim()) throw new Error('Link mount path and repository URL are required');
@@ -865,6 +898,44 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                 ))}
                 {!layers.length && !showAddLayer && <div className="lore-empty">no layers</div>}
               </div>
+
+              <div className="lore-sidebar-section">
+                <div className="lore-section-header">
+                  <span>Bisect</span>
+                  {bisect && <button className="lore-mini-btn" onClick={resetBisect}>Reset</button>}
+                </div>
+                {!bisect ? (
+                  <div style={{ padding: '4px 10px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Good (last revision <em>without</em> the change):</span>
+                    <select className="lore-new-branch-input" value={bisectStart} onChange={(e) => setBisectStart(e.target.value)}>
+                      <option value="">select revision…</option>
+                      {history.map(h => <option key={`s${h.signature}`} value={`@${h.number}`}>@{h.number} {h.message.split('\n')[0]}</option>)}
+                    </select>
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Bad (first revision <em>with</em> the change):</span>
+                    <select className="lore-new-branch-input" value={bisectEnd} onChange={(e) => setBisectEnd(e.target.value)}>
+                      <option value="">select revision…</option>
+                      {history.map(h => <option key={`e${h.signature}`} value={`@${h.number}`}>@{h.number} {h.message.split('\n')[0]}</option>)}
+                    </select>
+                    <button className="lore-mini-btn" disabled={busy || !bisectStart || !bisectEnd} onClick={startBisect}>Start bisect</button>
+                  </div>
+                ) : bisect.complete ? (
+                  <div style={{ padding: '4px 10px 8px' }}>
+                    <div style={{ fontSize: 12 }}>First revision with the change: <strong>{bisect.culprit ?? '?'}</strong></div>
+                    <button className="lore-mini-btn" style={{ marginTop: 6 }} onClick={resetBisect}>Done</button>
+                  </div>
+                ) : (
+                  <div style={{ padding: '4px 10px 8px' }}>
+                    <div style={{ fontSize: 12, marginBottom: 6 }}>
+                      Testing <strong>@{bisect.midpoint?.number ?? '?'}</strong> — the working tree is synced to it.
+                      Does this revision contain the change you're hunting?
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="lore-mini-btn" disabled={busy} onClick={() => answerBisect(true)}>Contains it (bad)</button>
+                      <button className="lore-mini-btn" disabled={busy} onClick={() => answerBisect(false)}>Clean (good)</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="horizontal-splitter-handle" onMouseDown={onSplitterDown}>
@@ -913,6 +984,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                         nodes={treeNodes}
                         lockOwners={lockOwners}
                         statusByPath={statusByPath}
+                        unfetchedPaths={unfetchedPaths}
                         selectedPath={treeFile?.path ?? null}
                         onSelect={onSelectTreeFile}
                         loadedDirs={loadedDirs}
