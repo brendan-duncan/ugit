@@ -181,17 +181,23 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   };
   const onMouseUp = () => { draggingSplitter.current = false; };
 
-  const runAction = useCallback(async (fn: () => Promise<void>) => {
+  // `scan` defaults true (safe): operations that touch the working tree need a fresh fs walk.
+  // Pass `{ scan: false }` for actions that can't change file state (lock, push, metadata, …) to
+  // skip the `status --scan` filesystem walk + dirty-flag persistence on the follow-up refresh.
+  const runAction = useCallback(async (fn: () => Promise<void>, opts?: { scan?: boolean }) => {
     setWorking(true);
     try {
       await fn();
-      await refresh();
+      await refresh(opts);
     } catch (err) {
       showAlert(err instanceof Error ? err.message : String(err), 'Lore error');
     } finally {
       setWorking(false);
     }
   }, [refresh, showAlert]);
+
+  // Shared opts for non-working-tree-mutating actions (locks, push, metadata, protect, gc, …).
+  const NO_SCAN = { scan: false } as const;
 
   const clearMedia = () => { setMediaKind(null); setMediaNewUrl(null); setMediaOldUrl(null); };
 
@@ -270,8 +276,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     } else {
       const n = targets.length > 1 ? ` (${targets.length})` : '';
       items.push({ label: `${staged ? 'Unstage' : 'Stage'}${n}`, onClick: () => runAction(async () => { staged ? await client!.unstage(targets) : await client!.stage(targets); }) });
-      items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire(targets); }) });
-      items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease(targets); }) });
+      items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire(targets); }, NO_SCAN) });
+      items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease(targets); }, NO_SCAN) });
       if (!staged) items.push({ label: `Discard${n}`, onClick: () => runAction(async () => { await client!.discard(targets); }) });
       items.push({ label: `Stash${n}`, onClick: () => doStashSelected(targets) });
       items.push({ separator: true });
@@ -304,8 +310,8 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
         items.push({ separator: true });
       }
       items.push({ label: 'Dependencies…', onClick: () => setDepsPath(path) });
-      items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire([path]); }) });
-      items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease([path]); }) });
+      items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire([path]); }, NO_SCAN) });
+      items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease([path]); }, NO_SCAN) });
       items.push({ label: 'Ignore file', onClick: () => doIgnore(path, false) });
       if (ext) items.push({ label: `Ignore *.${ext}`, onClick: () => runAction(async () => { client!.addToIgnore(`*.${ext}`); }) });
       items.push({ label: 'Ignore custom pattern…', onClick: () => { const p = window.prompt('Ignore pattern (.loreignore):'); if (p && p.trim()) runAction(async () => { client!.addToIgnore(p.trim()); }); } });
@@ -313,7 +319,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setMenu({ x: e.clientX, y: e.clientY, items });
   }, [client]);
 
-  const doGc = () => runAction(async () => { await client!.gc(); showAlert('Garbage collection complete.', 'Repository GC'); });
+  const doGc = () => runAction(async () => { await client!.gc(); showAlert('Garbage collection complete.', 'Repository GC'); }, NO_SCAN);
   const doInstances = async () => { const out = await client!.instances(); showAlert(out.trim() || 'No registered instances.', 'Instances'); };
   const doWatchEvents = async () => {
     const ans = window.prompt('Watch repository events for how many seconds?', '30');
@@ -440,7 +446,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setViewMode('changes');
     setSelectedPath(null); setRevDetail(null); setSelectedStash(null); setTreeFile(null);
     setBranchDiff({ source, target, sourceRevision: r.sourceRevision, targetRevision: r.targetRevision, files: r.files });
-  });
+  }, NO_SCAN);
 
   const onSelectBranchDiffFile = useCallback(async (path: string) => {
     if (!branchDiff) return;
@@ -472,7 +478,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
             const removed = editable.map(e => e.key).filter(k => !newKeys.has(k));
             await client!.branchMetadataSet(branch, pairs);
             if (removed.length) await client!.branchMetadataClear(branch, removed);
-            await refresh();
+            await refresh(NO_SCAN);
           } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
         },
       });
@@ -494,7 +500,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           try {
             await client!.revisionMetadataClear(); // revisions support only clear-all, so reset then re-set
             await client!.revisionMetadataSet(pairs);
-            await refresh();
+            await refresh(NO_SCAN);
           } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
         },
       });
@@ -523,11 +529,11 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       { label: `Merge into ${status?.branch}`, onClick: () => doMerge(branch) },
       { label: `Diff against ${status?.branch}`, onClick: () => doBranchDiff(branch) },
     );
-    items.push({ label: 'Push', onClick: () => runAction(async () => { await client!.push(branch); }) });
+    items.push({ label: 'Push', onClick: () => runAction(async () => { await client!.push(branch); }, NO_SCAN) });
     items.push({ separator: true });
     items.push({ label: 'Edit Metadata…', onClick: () => openBranchMetadata(branch) });
-    items.push({ label: 'Protect', onClick: () => runAction(async () => { await client!.branchProtect(branch); }) });
-    items.push({ label: 'Unprotect', onClick: () => runAction(async () => { await client!.branchUnprotect(branch); }) });
+    items.push({ label: 'Protect', onClick: () => runAction(async () => { await client!.branchProtect(branch); }, NO_SCAN) });
+    items.push({ label: 'Unprotect', onClick: () => runAction(async () => { await client!.branchUnprotect(branch); }, NO_SCAN) });
     if (!isCurrent) items.push({ label: 'Archive', danger: true, onClick: () => runAction(async () => { await client!.branchArchive(branch); }) });
     items.push({ separator: true });
     items.push({ label: 'Copy Branch Name', onClick: () => clipboard.writeText(branch) });
@@ -698,10 +704,10 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     } else {
       showAlert(r.raw.trim() || 'Nothing to push.', 'Lore push');
     }
-  });
+  }, NO_SCAN);
 
-  const doLock = (path: string) => runAction(async () => { await client!.lockAcquire([path]); });
-  const doUnlock = (path: string) => runAction(async () => { await client!.lockRelease([path]); });
+  const doLock = (path: string) => runAction(async () => { await client!.lockAcquire([path]); }, NO_SCAN);
+  const doUnlock = (path: string) => runAction(async () => { await client!.lockRelease([path]); }, NO_SCAN);
 
   // Bisect: a stateless step search. Start with a good (start) and bad (end) revision; each step
   // syncs the working tree to the midpoint and we re-invoke with the chosen narrower range.
@@ -792,7 +798,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
         <div className="loading" style={{ color: 'var(--danger-color)' }}>
           <h3>Lore error</h3>
           <pre style={{ whiteSpace: 'pre-wrap' }}>{error}</pre>
-          <button className="lore-mini-btn" onClick={refresh}>Retry</button>
+          <button className="lore-mini-btn" onClick={() => refresh()}>Retry</button>
         </div>
       </div>
     );
@@ -806,7 +812,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     <div className="repository-view">
       {/* Toolbar (reuses git toolbar styling) */}
       <div className="toolbar">
-        <button className="toolbar-button" onClick={refresh} disabled={busy}>
+        <button className="toolbar-button" onClick={() => refresh()} disabled={busy}>
           <span className={`toolbar-button-icon ${busy ? 'spinning' : ''}`}>↻</span>
           <span className="toolbar-button-label">Refresh</span>
         </button>

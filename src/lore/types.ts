@@ -1,5 +1,5 @@
 // Lore-native types. Deliberately NOT modeled on GitAdapter — Lore is its own VCS
-// (centralized, revision-numbered, sparse-by-default). See docs/lore-support-todo.md.
+// (centralized, revision-numbered, sparse-by-default). See docs/lore.md.
 
 /** Identity of a Lore revision: a monotonically increasing number plus a content-hash signature. */
 export interface LoreRevisionRef {

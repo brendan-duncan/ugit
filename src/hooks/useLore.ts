@@ -27,8 +27,13 @@ interface UseLoreResult {
   isLoading: boolean;
   error: string | null;
   commandState: RunningCommand[];
-  /** Reload status (with --scan), history, branches, locks, links, layers. */
-  refresh: () => Promise<void>;
+  /**
+   * Reload status, history, branches, locks, links, layers, tree, view. `scan` (default true)
+   * runs `status --scan` (a filesystem walk that persists dirty flags) to pick up working-tree
+   * edits; pass `{ scan: false }` after operations that can't change the working tree (lock,
+   * push, metadata, …) to skip that walk.
+   */
+  refresh: (opts?: { scan?: boolean }) => Promise<void>;
 }
 
 /**
@@ -82,14 +87,14 @@ export function useLore({ repoPath, onError }: UseLoreOptions): UseLoreResult {
   }, [repoPath]);
 
   // Stable across renders (no reactive deps) so effects keyed on it don't loop.
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { scan?: boolean }) => {
     const c = clientRef.current;
     if (!c) return;
     try {
       setIsLoading(true);
       setError(null);
       const [st, hist, brs, lks, lnk, lyr, gr, tr, vw] = await Promise.all([
-        c.status({ scan: true }),
+        c.status({ scan: opts?.scan !== false }),
         c.history(),
         c.branchList(),
         c.locks(),
