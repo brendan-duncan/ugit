@@ -390,6 +390,18 @@ export function parseBranchDiff(text: string): { sourceRevision?: string; target
 }
 
 /**
+ * Parse `file dependency list <path>` output: a `<path>:` (or `<path> (depended on by):`) header
+ * followed by indented entry paths. Returns just the entries (the related file paths).
+ */
+export function parseDependencyList(text: string): string[] {
+  const out: string[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    if (/^\s+\S/.test(raw)) out.push(raw.trim()); // indented entry line
+  }
+  return out;
+}
+
+/**
  * Parse aligned `key : value` metadata lines (`branch metadata get` / `revision metadata get`).
  * Skips indented lines (e.g. a commit message) and blanks; preserves order. The caller filters
  * out intrinsic/system keys it doesn't want to expose as editable.

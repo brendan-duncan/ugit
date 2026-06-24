@@ -55,7 +55,8 @@ Stop it with `powershell D:\src\lore-dev\stop-server.ps1`.
 a durable store, real TLS cert, and auth enabled). Everyone points their clones at the same
 `lore://` URL. Auth uses JWT/OIDC — authenticate the CLI once with `lore login` (browser, or
 `--token-type … --token …`); ugit then reuses that identity (there is no separate login form in
-the GUI yet). ugit finds the `lore` CLI via `$LORE_BIN`, then `~/bin`, then `PATH`.
+the GUI yet). ugit finds the `lore` CLI via the **Lore Executable Path** in Settings, then
+`$LORE_BIN`, then `~/bin`, then `PATH`.
 
 ---
 
@@ -117,10 +118,18 @@ The working set as a **sparse tree of the repo** (like a Perforce depot/workspac
 - Select a file to see, on the right: its **info** (size/hash/status), an **image preview** (for
   png/jpg/etc.) or a **binary asset card** (for other binaries) or a **text diff**, and its
   **per-file history** — click a revision to diff that asset at that point in time.
+- Right-click a file → **Dependencies…** to view and edit Lore's per-file dependency graph (the
+  files it depends on, and the files that depend on it). These edges drive dependency-based
+  selective clone/sync.
 
 ### Graph view
 A lane-based **revision graph** across branches, with merges shown, and **HEAD** / **remote**
 markers so you can see exactly what's local-only (unpushed) versus on the server.
+
+### Repository menu (the **…** by the repo name)
+Open/copy paths, **Run Garbage Collection**, **List Instances**, **Clean Working Directory**, and
+**Watch Events…** (subscribe to repository events for a bounded window — handy to see pushes/locks
+from others land in real time).
 
 ---
 
@@ -380,7 +389,7 @@ In the **Changes** sidebar's **Bisect** section:
 | --- | --- |
 | Panel shows a connection error | Server not running — `start-server.ps1`. |
 | Tab opens the git view, not Lore | The folder has no `.lore/` (wrong folder, or not created yet). |
-| "lore not recognized" / spawn error | Set `$env:LORE_BIN` before launching ugit, or put `lore` on PATH. |
+| "lore not recognized" / spawn error | Set the **Lore Executable Path** in Settings, or set `$env:LORE_BIN` / put `lore` on PATH. |
 | `Stage` did nothing from the CLI | The CLI resolves paths against the current directory; the GUI handles this for you. |
 | Lock owner shows `<unknown>` | Expected on the auth-disabled dev server. |
 | Files view shows `D` on **every** file | You did a **bare** clone (no files on disk). Set a view and Sync, or re-clone full/sparse — see Part 8. |

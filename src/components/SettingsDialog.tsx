@@ -18,6 +18,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [externalEditor, setExternalEditor] = useState<string>('code');
   const [lfsWarnEnabled, setLfsWarnEnabled] = useState<boolean>(true);
   const [lfsWarnThresholdMB, setLfsWarnThresholdMB] = useState<number>(100);
+  const [loreBinPath, setLoreBinPath] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Update local state when settings load
@@ -30,6 +31,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       setExternalEditor(settings.externalEditor);
       setLfsWarnEnabled(settings.lfsWarnEnabled);
       setLfsWarnThresholdMB(settings.lfsWarnThresholdMB);
+      setLoreBinPath(settings.loreBinPath ?? '');
     }
   }, [settings]);
 
@@ -62,6 +64,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       await updateSetting('externalEditor', externalEditor);
       await updateSetting('lfsWarnEnabled', lfsWarnEnabled);
       await updateSetting('lfsWarnThresholdMB', lfsWarnThresholdMB);
+      await updateSetting('loreBinPath', loreBinPath.trim());
 
       onClose();
     } catch (err) {
@@ -244,6 +247,24 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
                 />
                 <small>Maximum number of commits to display in lists</small>
               </div>
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <h4 className="settings-section-title">Lore</h4>
+
+            <div className="setting-group">
+              <label htmlFor="loreBinPath">
+                Lore Executable Path
+              </label>
+              <input
+                id="loreBinPath"
+                type="text"
+                value={loreBinPath}
+                onChange={(e) => setLoreBinPath(e.target.value)}
+                placeholder="Auto-detect (LORE_BIN, ~/bin, PATH)"
+              />
+              <small>Full path to the <code>lore</code> binary. Leave blank to auto-detect via <code>LORE_BIN</code>, then <code>~/bin</code>, then <code>PATH</code>.</small>
             </div>
           </div>
         </div>

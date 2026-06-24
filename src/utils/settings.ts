@@ -10,6 +10,8 @@ export interface AppSettings {
   lfsWarnEnabled: boolean;
   /** Size (in MB) at or above which a staged file triggers the LFS warning. */
   lfsWarnThresholdMB: number;
+  /** Path to the `lore` executable. Empty = auto-detect (LORE_BIN, ~/bin, PATH). */
+  loreBinPath: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -21,7 +23,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   externalEditor: 'code',
   theme: 'dark',
   lfsWarnEnabled: true,
-  lfsWarnThresholdMB: 100
+  lfsWarnThresholdMB: 100,
+  loreBinPath: ''
 };
 
 /**
@@ -179,7 +182,8 @@ export class SettingsManager {
       (data.externalEditor === undefined || typeof data.externalEditor === 'string') &&
       (data.theme === undefined || data.theme === 'dark' || data.theme === 'light') &&
       (data.lfsWarnEnabled === undefined || typeof data.lfsWarnEnabled === 'boolean') &&
-      (data.lfsWarnThresholdMB === undefined || typeof data.lfsWarnThresholdMB === 'number')
+      (data.lfsWarnThresholdMB === undefined || typeof data.lfsWarnThresholdMB === 'number') &&
+      (data.loreBinPath === undefined || typeof data.loreBinPath === 'string')
     );
   }
 

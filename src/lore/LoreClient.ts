@@ -38,6 +38,7 @@ import {
   parseSharedStoreInfo,
   parseBranchDiff,
   parseMetadata,
+  parseDependencyList,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -322,6 +323,35 @@ export class LoreClient {
 
   /** Clear all metadata from the STAGED revision (the CLI has no per-key clear for revisions). */
   async revisionMetadataClear(): Promise<void> { await this.run(['revision', 'metadata', 'clear']); }
+
+  // --- File dependencies (per-file dependency graph) ---
+
+  /** List a file's dependencies (or, with `reverse`, its dependents). `recursive` follows edges. */
+  async dependencyList(path: string, opts: { reverse?: boolean; recursive?: boolean } = {}): Promise<string[]> {
+    const argv = ['file', 'dependency', 'list', path];
+    if (opts.reverse) argv.push('--reverse');
+    if (opts.recursive) argv.push('--recursive');
+    return parseDependencyList((await this.run(argv, { skip: true })).stdout);
+  }
+
+  /** Add dependency edges from `source` to one or more files. */
+  async dependencyAdd(source: string, deps: string[]): Promise<void> {
+    if (!deps.length) return;
+    await this.run(['file', 'dependency', 'add', source, ...deps]);
+  }
+
+  /** Remove dependency edges from `source` to one or more files. */
+  async dependencyRemove(source: string, deps: string[]): Promise<void> {
+    if (!deps.length) return;
+    await this.run(['file', 'dependency', 'remove', source, ...deps]);
+  }
+
+  // --- Notifications ---
+
+  /** Subscribe to repository events for a bounded window (seconds), returning what arrived. */
+  async notificationSubscribe(seconds: number): Promise<string> {
+    return (await this.run(['notification', 'subscribe', String(seconds)])).stdout;
+  }
 
   /**
    * Merge `branch` INTO the current branch. Auto-commits when there are no conflicts; otherwise

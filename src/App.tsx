@@ -12,7 +12,7 @@ import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
 import { useSettings } from './contexts/SettingsContext';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
-import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin, createLoreRepository } from './lore';
+import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin, createLoreRepository, setLoreBinOverride } from './lore';
 import { CloneParams } from './components/CloneDialog';
 import { InitParams } from './components/InitRepositoryDialog';
 import { ipcRenderer } from 'electron';
@@ -116,6 +116,11 @@ function App(): React.ReactElement {
   }, [tabs]);
   const { showAlert } = useAlert();
   const { settings, getSetting } = useSettings();
+
+  // Mirror the configured lore binary path into the (sync) resolver used across the Lore code.
+  useEffect(() => {
+    setLoreBinOverride(settings?.loreBinPath ?? null);
+  }, [settings?.loreBinPath]);
 
   // Apply theme class based on setting
   useEffect(() => {

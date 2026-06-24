@@ -12,6 +12,7 @@ import LoreContextMenu, { LoreMenuItem } from './LoreContextMenu';
 import LoreStashDialog from './LoreStashDialog';
 import LoreApplyStashDialog from './LoreApplyStashDialog';
 import MetadataDialog from './MetadataDialog';
+import DependenciesDialog from './DependenciesDialog';
 import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
 import { clipboard } from 'electron';
 import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, LoreStashFile, StashInput, LoreBisectStep, LoreMetadataEntry } from '../lore';
@@ -100,6 +101,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     title: string; subtitle?: string; entries: LoreMetadataEntry[]; readOnlyEntries: LoreMetadataEntry[];
     readOnly: boolean; onSave?: (pairs: [string, string][]) => Promise<void>;
   } | null>(null);
+  const [depsPath, setDepsPath] = useState<string | null>(null);
   const [resolvingPath, setResolvingPath] = useState<string | null>(null);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const anchorRef = useRef<string | null>(null);
@@ -301,6 +303,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
         items.push({ label: 'Check out (fetch to disk)', onClick: () => doCheckout(path, false) });
         items.push({ separator: true });
       }
+      items.push({ label: 'Dependencies…', onClick: () => setDepsPath(path) });
       items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire([path]); }) });
       items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease([path]); }) });
       items.push({ label: 'Ignore file', onClick: () => doIgnore(path, false) });
@@ -312,6 +315,18 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
 
   const doGc = () => runAction(async () => { await client!.gc(); showAlert('Garbage collection complete.', 'Repository GC'); });
   const doInstances = async () => { const out = await client!.instances(); showAlert(out.trim() || 'No registered instances.', 'Instances'); };
+  const doWatchEvents = async () => {
+    const ans = window.prompt('Watch repository events for how many seconds?', '30');
+    if (ans == null) return;
+    const secs = Math.max(1, Math.min(600, parseInt(ans, 10) || 30));
+    setWorking(true);
+    try {
+      const out = await client!.notificationSubscribe(secs);
+      showAlert(out.trim() || `No events in ${secs}s.`, 'Repository events');
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Lore error');
+    } finally { setWorking(false); }
+  };
   const doResetToServer = () => runAction(async () => {
     const ok = await showConfirm('Reset to server: discard ALL local modifications and sync to the latest remote revision?', 'Reset to server');
     if (!ok) return;
@@ -339,6 +354,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       { label: 'Run Garbage Collection', onClick: doGc },
       { label: 'List Instances…', onClick: doInstances },
       { label: 'Clean Working Directory…', onClick: doClean },
+      { label: 'Watch Events…', onClick: doWatchEvents },
       { separator: true },
       { label: 'Reset to Server…', danger: true, onClick: doResetToServer },
     ] });
@@ -1371,6 +1387,15 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           readOnly={metaEditor.readOnly}
           onClose={() => setMetaEditor(null)}
           onSave={metaEditor.onSave}
+        />
+      )}
+
+      {depsPath && client && (
+        <DependenciesDialog
+          client={client}
+          path={depsPath}
+          onClose={() => setDepsPath(null)}
+          onError={(message) => showAlert(message, 'Lore dependency error')}
         />
       )}
 

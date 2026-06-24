@@ -1,9 +1,36 @@
 # TODO: Lore version control support
 
-Status: **planning / not started**
+Status: **implemented** — Lore repositories open in a dedicated `LoreRepositoryView`. The bulk of
+this file is a historical build log (each slice marked **DONE**); the section below tracks what
+remains. User-facing usage lives in [lore.md](lore.md).
 
 Goal: let ugit open and manage [Lore](https://epicgames.github.io/lore/) repositories
 alongside git repositories. A repository tab can be **either git or lore**.
+
+## Current state (2026-06)
+
+Covers the whole [quickstart](https://epicgames.github.io/lore/tutorials/quickstart/) and most of
+the CLI surface: create/clone (full, sparse `--view`, bare, shared-store), status/stage/commit/
+push/sync, branches (switch/create/merge/archive/reset/protect/unprotect/**diff**), revisions
+(history/info/amend/revert/cherry-pick/**bisect**), per-file history & diff, locks, links, layers,
+sparse-view editing + per-file checkout, client-side stash, **branch/revision metadata**, **file
+dependencies**, **shared store** management, **notifications** (bounded subscribe), and a
+configurable **Lore executable path** in Settings.
+
+**Remaining / not done:**
+- **Auth against a secured server** — login flow is wired to the documented JWT/OIDC contract but
+  unverified; needs a real OIDC/JWK issuer to mint+verify tokens (the dev server runs auth-disabled).
+  Out of local scope.
+- **Service process** (`lore service start/stop`) — NOT surfaced: both exit 1 with no message on the
+  dev setup (the warm-store perf path appears non-functional here). Revisit when it works. (`notification
+  subscribe` from the same area does work and is surfaced as **Watch Events…**.)
+- **Partitions** — access-control boundaries; no dedicated client CLI surfaced (server-admin scope).
+- **`status --scan` refresh strategy** — still runs `--scan` (which persists dirty flags) on every
+  refresh; whether `--check-dirty` + targeted `dirty` would be a better UX is unresolved (perf/UX
+  tuning, not a missing feature).
+- **Notifications as a live feed** — only a bounded `subscribe` window is surfaced, not a persistent
+  background event stream.
+- Minor: `dirty move/copy` and `stage move/merge` subcommands aren't surfaced.
 
 ## Design direction (decided)
 
@@ -75,8 +102,9 @@ Stubbed (raw passthrough, no parser yet — need fixtures): `branchListRaw`, `sy
 
 A tab now renders git or lore based on detected repo type. Git path unchanged.
 - `src/utils/repoType.ts` — `detectRepositoryType()` (`.lore` → lore, `.git` → git).
-- `src/lore/resolveLoreBin.ts` — finds the `lore` exe (LORE_BIN → `~/bin` → PATH).
-  TODO: promote to a setting + IPC handler like a configurable git path.
+- `src/lore/resolveLoreBin.ts` — finds the `lore` exe (Settings path → LORE_BIN → `~/bin` → PATH).
+  DONE: a **Lore Executable Path** setting feeds `setLoreBinOverride()` (mirrored from settings in
+  `App.tsx`), so the resolver prefers a user-configured path.
 - `src/hooks/useLore.ts` — creates a `LoreClient`, wires command-state, loads status+history.
 - `src/components/LoreRepositoryView.tsx` — minimal Lore-native panel: header (branch /
   revision number / sync state), staged vs not-staged lists with per-file Stage/Unstage,
@@ -427,10 +455,11 @@ Installed at `$env:USERPROFILE\bin\lore.exe`. Top-level grammar confirmed: nouns
   both take a URL — there is no purely-local "init in this folder" like `git init`. The
   open/clone UX must connect to a server, not just pick a folder.
 
-- **First-class concepts ugit has no UI for yet:** links, layers, file-level dependencies,
-  branch protect/unprotect/archive, branch `diff` (common-ancestor base), metadata at
-  repo/branch/revision level, bisect, locks (`lore lock`), notifications. These justify the
-  dedicated `LoreRepositoryView`.
+- **First-class Lore concepts** that justify the dedicated `LoreRepositoryView` — now surfaced:
+  links, layers, file-level dependencies, branch protect/unprotect/archive, branch `diff`
+  (common-ancestor base), branch/revision metadata, bisect, locks (`lore lock`), shared store,
+  and (bounded) notifications. Repo-level metadata, partitions, and the service process remain
+  unsurfaced (service exits 1 with no message on the dev setup).
 
 ### Auth — ANSWERED
 - `lore login [remote-url]` authenticates the CLI. Interactive opens a browser; `--no-browser`
