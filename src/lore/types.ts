@@ -143,6 +143,13 @@ export interface LoreLayer {
   paths: string;
 }
 
+/** A repository on a Lore server, from `repository list <server-url>`. */
+export interface LoreRemoteRepo {
+  name: string;
+  /** Stable 32-hex repository id (does not change when the repo is renamed — it can't be). */
+  id: string;
+}
+
 export interface LoreBranchRef {
   name: string;
   /** True for the branch marked `*` (the current branch). */

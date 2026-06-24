@@ -656,6 +656,8 @@ ipcMain.handle('show-open-dialog', async (event: any, options: any) => {
 // --- Lore tooling: version detection, install, and local server management ---
 
 const LORE_SERVER_HTTP = 'http://127.0.0.1:41339/health_check';
+// The lore:// protocol endpoint for the local server (QUIC/gRPC on 41337; health is on 41339).
+const LORE_SERVER_URL = 'lore://127.0.0.1:41337';
 
 function loreServerHealthy(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -715,7 +717,7 @@ ipcMain.handle('lore-install', async () => {
 });
 
 ipcMain.handle('lore-server-status', async () => {
-  return { running: await loreServerHealthy() };
+  return { running: await loreServerHealthy(), url: LORE_SERVER_URL };
 });
 
 // Start a durable local Lore server against `dataFolder` (generates config, spawns loreserver,

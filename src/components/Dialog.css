@@ -87,6 +87,24 @@
   cursor: not-allowed;
 }
 
+/* A field laid out as a row: input/select grows, the trailing button (Browse, refresh) sits
+   to its right. An optional leading label keeps a fixed width. */
+.dialog-field-horizontal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dialog-field-horizontal .dialog-input {
+  flex: 1;
+}
+
+.dialog-field-horizontal label {
+  margin-bottom: 0;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
 .dialog-select {
   width: 100%;
   padding: 8px 12px;

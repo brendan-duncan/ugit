@@ -28,6 +28,7 @@ import {
   LoreBisectStep,
   LoreSharedStoreInfo,
   LoreMetadataEntry,
+  LoreRemoteRepo,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -565,6 +566,20 @@ export function parseBranchList(text: string): LoreBranches {
     else result.remote.push(name);
   }
   return result;
+}
+
+/**
+ * Parse `lore repository list <server-url>` — one repo per line as `name (id)`, where id is a
+ * 32-hex identifier (e.g. `test-project (019ef4a9742d79d2bfc58c8735ff05db)`). Lines that don't
+ * match the shape (banners, blanks) are skipped, so an empty/headerless list parses to [].
+ */
+export function parseRemoteRepoList(text: string): LoreRemoteRepo[] {
+  const repos: LoreRemoteRepo[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const m = raw.trim().match(/^(.+?)\s+\(([0-9a-f]{32})\)$/i);
+    if (m) repos.push({ name: m[1].trim(), id: m[2].toLowerCase() });
+  }
+  return repos;
 }
 
 /**

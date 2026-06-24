@@ -40,6 +40,7 @@ import {
   parseMetadata,
   parseDependencyList,
   parseRevisionFind,
+  parseRemoteRepoList,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -63,6 +64,7 @@ import {
   LoreSharedStoreInfo,
   LoreMetadataEntry,
   LoreFileChange,
+  LoreRemoteRepo,
 } from './types';
 
 /** Map an operation to its CLI command prefix for resolve/abort. */
@@ -800,6 +802,18 @@ export async function cloneLoreRepositoryStreaming(
   if (options.sharedStorePath) argv.push('--shared-store-path', options.sharedStorePath);
   const { stdout } = await runLoreStreaming({ bin, cwd: parentFolder, argv, throwOnError: true, onLine: onProgress });
   return { output: stdout, path: target };
+}
+
+/**
+ * List the repositories hosted on a Lore server. `serverUrl` is the bare server URL
+ * (e.g. `lore://host:port`) with no repo path. Returns an empty array when the server hosts
+ * none; throws (via runLore) when the server can't be reached.
+ */
+export async function listRemoteRepositories(bin: string, serverUrl: string): Promise<LoreRemoteRepo[]> {
+  const { stdout } = await runLore({
+    bin, cwd: os.homedir(), argv: ['repository', 'list', serverUrl], throwOnError: true,
+  });
+  return parseRemoteRepoList(stdout);
 }
 
 // --- Lore-native: shared store (one on-disk content store backing many worktrees) ---

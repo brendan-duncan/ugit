@@ -12,6 +12,7 @@ export {
   createLoreRepository,
   cloneLoreRepository,
   cloneLoreRepositoryStreaming,
+  listRemoteRepositories,
   loreLogin,
   loreAuthList,
   loreAuthInfo,
