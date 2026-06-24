@@ -1,7 +1,7 @@
 .worktree-list {
   background-color: var(--bg-primary);
   border-radius: 4px;
-  padding: 16px;
+  padding: 12px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -10,7 +10,7 @@
 
 .worktree-list-content {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
+  font-size: 13px;
   overflow-y: auto;
   flex: 1;
 }
@@ -24,7 +24,7 @@
 .worktree-item {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 3px;
   transition: all 0.2s;
   gap: 6px;

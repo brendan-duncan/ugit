@@ -1743,15 +1743,13 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
 
   return (
     <div className="repository-view">
-      <Toolbar 
-        runningCommands={commandState} 
-        onRefresh={handleRefreshClick} 
-        onFetch={handleFetchClick} 
-        onPull={() => showPullDialog()} 
-        onPush={() => showPushDialog(currentBranch)} 
-        onStash={hasLocalChanges ? () => showStashDialog() : null} 
-        onCreateBranch={() => showCreateBranchDialog()} 
-        refreshing={refreshing} 
+      <Toolbar
+        runningCommands={commandState}
+        onRefresh={handleRefreshClick}
+        onFetch={handleFetchClick}
+        onPull={() => showPullDialog()}
+        onPush={() => showPushDialog(currentBranch)}
+        refreshing={refreshing}
         currentBranch={currentBranch}
         branchStatus={branchStatus}
       />
@@ -1831,6 +1829,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                   onOpenWorktree={handleOpenWorktree}
                   onAddWorktree={handleAddWorktree}
                   onWorktreeAction={handleWorktreeAction}
+                  onAddBranch={() => showCreateBranchDialog()}
+                  onStashAll={() => showStashDialog()}
+                  canStash={hasLocalChanges}
                 />
               </div>
             </div>

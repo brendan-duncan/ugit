@@ -11,9 +11,11 @@ interface StashListProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onStashContextMenu: (action: string, stash: StashInfo, stashIndex: number) => void;
+  onStashAll?: () => void;
+  canStash?: boolean;
 }
 
-function StashList({ stashes, onSelectStash, onDoubleClick, selectedItem, collapsed, onToggleCollapse, onStashContextMenu }: StashListProps) {
+function StashList({ stashes, onSelectStash, onDoubleClick, selectedItem, collapsed, onToggleCollapse, onStashContextMenu, onStashAll, canStash }: StashListProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; stash: StashInfo; index: number } | null>(null);
 
   const handleStashContextMenu = (e: React.MouseEvent, stash: StashInfo, index: number) => {
@@ -53,9 +55,17 @@ function StashList({ stashes, onSelectStash, onDoubleClick, selectedItem, collap
       <div className="stash-list">
         <div className="panel-header">
           <h3>Stashes</h3>
-          <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
-            {collapsed ? '▶' : '▼'}
-          </button>
+          <div className="panel-header-buttons">
+            {onStashAll && (
+              <button className="add-button" onClick={onStashAll} disabled={!canStash}
+                title={canStash ? "Stash all changes" : "No local changes to stash"}>
+                <span>+</span>
+              </button>
+            )}
+            <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
+              {collapsed ? '▶' : '▼'}
+            </button>
+          </div>
         </div>
         {!collapsed && <div className="stash-list-empty">No stashes found</div>}
       </div>
@@ -66,9 +76,17 @@ function StashList({ stashes, onSelectStash, onDoubleClick, selectedItem, collap
     <div className="stash-list">
       <div className="panel-header">
         <h3>Stashes</h3>
-        <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
-          {collapsed ? '▶' : '▼'}
-        </button>
+        <div className="panel-header-buttons">
+          {onStashAll && (
+            <button className="add-button" onClick={onStashAll} disabled={!canStash}
+              title={canStash ? "Stash all changes" : "No local changes to stash"}>
+              <span>+</span>
+            </button>
+          )}
+          <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
+            {collapsed ? '▶' : '▼'}
+          </button>
+        </div>
       </div>
       {!collapsed && (
         <div className="stash-list-content">

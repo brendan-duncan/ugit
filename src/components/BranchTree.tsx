@@ -31,6 +31,7 @@ interface BranchTreeProps {
   onContextMenu: (action: string, branchName: string, currentBranch: string) => void;
   stashes: Array<any>;
   lockedPatterns?: ReadonlyArray<string>;
+  onAddBranch?: () => void;
 }
 
 function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
@@ -159,7 +160,7 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
 }
 
 function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem,
-      collapsed, onToggleCollapse, onContextMenu, stashes, lockedPatterns }: BranchTreeProps) {
+      collapsed, onToggleCollapse, onContextMenu, stashes, lockedPatterns, onAddBranch }: BranchTreeProps) {
   const lockPatterns = lockedPatterns || [];
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -247,9 +248,16 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
     <div className="branch-tree">
       <div className="panel-header">
         <h3>Branches</h3>
-        <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
-          {collapsed ? '▶' : '▼'}
-        </button>
+        <div className="panel-header-buttons">
+          {onAddBranch && (
+            <button className="add-button" onClick={onAddBranch} title="New Branch">
+              <span>+</span>
+            </button>
+          )}
+          <button className="collapse-button" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
+            {collapsed ? '▶' : '▼'}
+          </button>
+        </div>
       </div>
       {!collapsed && (
         <>

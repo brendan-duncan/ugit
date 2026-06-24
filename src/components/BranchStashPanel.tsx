@@ -30,12 +30,15 @@ interface BranchStashPanelProps {
   onOpenWorktree: (worktreePath: string) => void;
   onAddWorktree: () => void;
   onWorktreeAction: (action: string, worktree: WorktreeInfo) => void;
+  onAddBranch: () => void;
+  onStashAll: () => void;
+  canStash: boolean;
 }
 
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
       onBranchSelect, stashes, onSelectStash, onStashDoubleClick, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
       remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded, lockedPatterns,
-      worktrees, onOpenWorktree, onAddWorktree, onWorktreeAction }: BranchStashPanelProps) {
+      worktrees, onOpenWorktree, onAddWorktree, onWorktreeAction, onAddBranch, onStashAll, canStash }: BranchStashPanelProps) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
   const [worktreesCollapsed, setWorktreesCollapsed] = useState(false);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
@@ -57,6 +60,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           onContextMenu={onBranchContextMenu}
           stashes={stashes}
           lockedPatterns={lockedPatterns}
+          onAddBranch={onAddBranch}
         />
       </div>
       {!branchesCollapsed && !worktreesCollapsed && (
@@ -115,6 +119,8 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           collapsed={stashesCollapsed}
           onToggleCollapse={() => setStashesCollapsed(!stashesCollapsed)}
           onStashContextMenu={onStashContextMenu}
+          onStashAll={onStashAll}
+          canStash={canStash}
         />
       </div>
     </div>

@@ -161,7 +161,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
         <div className="dialog-content">
           <div className="settings-section">
             <h4 className="settings-section-title">Editor</h4>
-            
+
             <div className="setting-group">
               <label htmlFor="externalEditor">
                 External Editor Command
@@ -284,18 +284,18 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
             <h4 className="settings-section-title">Lore</h4>
 
             <div className="setting-group">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem' }}>
+              <div className="settings-detect">
+                <span>
                   <strong>lore CLI:</strong>{' '}
                   {detect == null ? 'checking…' : detect.loreVersion
-                    ? <span style={{ color: 'var(--success-color, #3c3)' }}>{detect.loreVersion}</span>
-                    : <span style={{ color: 'var(--danger-color, #c33)' }}>not found</span>}
+                    ? <span className="detect-ok">{detect.loreVersion}</span>
+                    : <span className="detect-missing">not found</span>}
                 </span>
-                <span style={{ fontSize: '0.85rem' }}>
+                <span>
                   <strong>loreserver:</strong>{' '}
                   {detect == null ? 'checking…' : detect.serverVersion
-                    ? <span style={{ color: 'var(--success-color, #3c3)' }}>{detect.serverVersion}</span>
-                    : <span style={{ color: 'var(--danger-color, #c33)' }}>not found</span>}
+                    ? <span className="detect-ok">{detect.serverVersion}</span>
+                    : <span className="detect-missing">not found</span>}
                 </span>
                 <button type="button" className="button-secondary" disabled={installing} onClick={installLore}>
                   {installing ? 'Installing…' : (detect && detect.loreVersion ? 'Reinstall Lore' : 'Install Lore')}

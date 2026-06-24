@@ -1,7 +1,7 @@
 .stash-list {
   background-color: var(--bg-primary);
   border-radius: 4px;
-  padding: 16px;
+  padding: 12px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -12,15 +12,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 
 .panel-header h3 {
   color: var(--text-highlight);
-  font-size: 1.0rem;
+  font-size: 0.9rem;
   margin: 0;
 }
 
@@ -46,14 +46,14 @@
 
 .stash-list h3 {
   color: var(--text-highlight);
-  font-size: 1.0rem;
-  padding-bottom: 8px;
+  font-size: 0.9rem;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .stash-list-content {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
+  font-size: 13px;
   overflow-y: auto;
   flex: 1;
 }
@@ -67,7 +67,7 @@
 .stash-item {
   display: flex;
   align-items: center;
-  padding: 4px 12px;
+  padding: 3px 12px;
   border-radius: 3px;
   transition: all 0.2s;
   gap: 12px;
