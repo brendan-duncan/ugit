@@ -38,6 +38,8 @@ UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It pro
 2. Select a folder
 3. The folder becomes a Git repository
 
+### [Lore Repositories (Experimental)](lore.md)
+
 ---
 
 ## Interface Overview

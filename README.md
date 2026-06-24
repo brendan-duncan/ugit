@@ -4,7 +4,8 @@
 <img src="assets/icon.png" style="width:100px; display:block; margin: 0 auto;">
 </div>
 
-UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It provides a visual interface for managing Git repositories, handling common Git operations like staging, committing, branching, and syncing with remotes.
+UGit is a free, open-source Git / Lore VCS GUI client for Windows. macOS, and Linux. 
+It provides a visual interface for managing Git and Lore repositories.
 
 ### [Install](https://github.com/brendan-duncan/ugit/releases/latest)
 ### [Documentation](https://brendan-duncan.github.io/ugit)
@@ -30,6 +31,3 @@ UGit is a free, open-source Git GUI client for Windows. macOS, and Linux. It pro
   * `npm run build:main`
   * `npm run build:dist`
     * The output will be put into release/ and will include an installer and sub-folder with the executable.
-
-
-
