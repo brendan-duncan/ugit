@@ -241,7 +241,74 @@ bare.
 
 ---
 
-## 9. Troubleshooting & known limits
+## 9. Locks (Perforce-style exclusive checkout)
+
+Some files can't be merged — a binary `.uasset`, a texture, a packed mesh. Lore's answer is the
+same as Perforce's: **lock the file before you edit it** so nobody else can commit a conflicting
+change. Part 6 covers *why* this matters for a team; this section is the *how* in ugit.
+
+**Locking and unlocking.** Select a file (in either the **Changes** list or the **Files** tree)
+and use **Lock** / **Unlock** — both are on each row's controls and on the right-click menu (you
+can multi-select in the Files tree to lock several at once). Under the hood ugit runs
+`lore lock acquire <paths>` / `lore lock release <paths>`.
+
+**Seeing who holds what.** Locked files show a **🔒 with the owner's name** wherever they appear
+— the Changes list, the Files tree, and a dedicated **Locks** section in the Changes sidebar that
+lists every lock in the repo. The Locks section is your "what's checked out right now" board;
+release a lock from there too. (ugit reads this from `lore lock query`.)
+
+**The flow.** Lock → edit → Stage → Commit → Push → **Unlock**. Hold the lock only while you're
+actively changing the file, and release it as soon as you've pushed so teammates can take their
+turn.
+
+> On the auth-disabled dev server the owner shows as `<unknown>` (there's no identity to attribute
+> the lock to). A real, authenticated server shows real names.
+
+---
+
+## 10. Links & Layers (composing repositories)
+
+Big projects are rarely one repository. Lore composes them two ways — both surfaced in the
+**Changes** sidebar, each with a **+ Link** / **+ Layer** form and a list with **Remove**.
+
+### Links — pinned sub-repository mounts (like submodules)
+
+A **link** mounts a subtree of *another* Lore repo at a path inside this one, **pinned** to a
+branch or a specific revision. It's part of your repository's committed structure, so everyone who
+clones gets the same composition at the same pin — the Lore equivalent of a git submodule.
+
+In the **Links** section click **+ Link** and fill in:
+- **mount path** — where it appears in this repo, e.g. `vendor/SharedArt`.
+- **repository URL** — `lore://host:port/SharedArt`.
+- **source path** — which subtree of that repo to mount (default `/`, the whole thing).
+
+ugit runs `lore link add <mount> <url> <source>` (pin defaults to the latest revision on the
+linked repo's main branch). Use a link when you want a **stable, shared dependency** — a common
+asset library, an engine module — that updates only when you deliberately re-pin it (`lore link
+update`).
+
+### Layers — local overlays
+
+A **layer** overlays another repository's content on top of yours at a path, resolved **locally**
+rather than pinned into the committed tree. Layers can be matched to revisions by a **metadata
+key**, which makes them useful for variant/stream-style composition (overlay the matching slice of
+another repo).
+
+In the **Layers** section click **+ Layer** and fill in:
+- **mount path** — where the overlay applies.
+- **repository** — the layer repo's **id or name** (it's resolved against the server, not a URL).
+- **source path** — subtree to overlay (default `/`).
+
+ugit runs `lore layer add <path> <repository> <source>`. You can also add layers at clone time
+(`clone --layer <repo> --layer-metadata <key>`).
+
+**Rule of thumb:** reach for a **link** when the dependency should be **pinned and shared with
+everyone** (committed composition); reach for a **layer** when you want a **local overlay**,
+optionally matched by metadata. Both are advanced features — most day-to-day work touches neither.
+
+---
+
+## 11. Troubleshooting & known limits
 
 | Symptom | Fix |
 | --- | --- |
@@ -253,6 +320,17 @@ bare.
 | Files view shows `D` on **every** file | You did a **bare** clone (no files on disk). Set a view and Sync, or re-clone full/sparse — see Part 8. |
 | Sparse clone fetched everything | The view filter was empty or didn't start with `**`. Excludes-then-`!`re-includes; a blank box = full checkout. |
 
-**Not yet in the GUI:** non-default branch operations beyond switch/create/merge; bisect; the
-auth login round-trip is unverified (needs a secured server with an OIDC/JWK issuer); the file
-tree shows the materialized/sparse view (not un-fetched paths).
+**Not yet in the GUI:**
+
+- **`revision bisect`** — Lore has a real binary-search command for finding the revision that
+  introduced a change; ugit doesn't drive it yet.
+- **Some branch operations** — switch / create / merge / archive / reset / protect / unprotect are
+  wired; `branch diff` and branch/revision **metadata** editing are not surfaced.
+- **Auth login round-trip** — unverified; needs a secured server with an OIDC/JWK issuer (the dev
+  server runs with auth disabled).
+- **Un-fetched files in the Files tree** — the tree already *lists* every path in the repo (it
+  reads the full revision tree via `repository dump`), including files not checked out on disk in a
+  sparse or bare clone. What it doesn't yet do is **visually mark** which files are un-fetched, or
+  **preview them on demand** (selecting an un-fetched file reads from disk and comes up empty). Both
+  are feasible — Lore can stream a single file's content at a revision (`lore file write --path …
+  --revision …`) without materializing it — they're just not implemented. See the note below.
