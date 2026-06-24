@@ -16,6 +16,9 @@ export {
   loreAuthList,
   loreAuthInfo,
   writeTempViewFile,
+  sharedStoreCreate,
+  sharedStoreInfo,
+  sharedStoreSetUseAutomatically,
 } from './LoreClient';
 export type { LoreClientOptions, LoreCommandStateCallback } from './LoreClient';
 export { resolveLoreBin } from './resolveLoreBin';

@@ -250,6 +250,23 @@ export interface LoreBisectStep {
   raw: string;
 }
 
+/** One configured shared store (from `shared-store info`). */
+export interface LoreSharedStore {
+  /** Remote URL the store backs (e.g. "127.0.0.1:41337"). */
+  remoteUrl: string;
+  /** On-disk path of the store. */
+  path: string;
+  /** Whether the store directory currently exists. */
+  exists: boolean;
+}
+
+/** Parsed `shared-store info`: the global auto-use flag plus the configured stores. */
+export interface LoreSharedStoreInfo {
+  /** True when clones use the shared store automatically without `--use-shared-store`. */
+  useAutomatically: boolean;
+  stores: LoreSharedStore[];
+}
+
 /** Per-conflict resolution choice in the interactive resolver. */
 export type ConflictChoice = 'ours' | 'theirs' | 'both-ot' | 'both-to' | 'base';
 

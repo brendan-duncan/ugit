@@ -26,6 +26,7 @@ import {
   LoreFileInfo,
   LoreFileHistoryEntry,
   LoreBisectStep,
+  LoreSharedStoreInfo,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -367,6 +368,36 @@ export function parseBisect(text: string): LoreBisectStep {
     culprit: culpritM ? culpritM[1] : midpoint ? `@${midpoint.number}` : undefined,
     raw: text,
   };
+}
+
+/**
+ * Parse `shared-store info`:
+ *
+ *   Shared store will be used automatically: false
+ *   Remote URL: 127.0.0.1:41337
+ *     Path: C:\…\shared_store
+ *     Exists: true
+ *
+ * Zero or more `Remote URL:` blocks may follow the auto-use line.
+ */
+export function parseSharedStoreInfo(text: string): LoreSharedStoreInfo {
+  const useAutomatically = /used automatically:\s*true/i.test(text);
+  const stores: LoreSharedStoreInfo['stores'] = [];
+  let cur: { remoteUrl: string; path: string; exists: boolean } | null = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const remote = raw.match(/^\s*Remote URL:\s*(.+?)\s*$/i);
+    if (remote) {
+      cur = { remoteUrl: remote[1], path: '', exists: false };
+      stores.push(cur);
+      continue;
+    }
+    if (!cur) continue;
+    const p = raw.match(/^\s*Path:\s*(.+?)\s*$/i);
+    if (p) { cur.path = p[1]; continue; }
+    const ex = raw.match(/^\s*Exists:\s*(true|false)/i);
+    if (ex) { cur.exists = ex[1].toLowerCase() === 'true'; continue; }
+  }
+  return { useAutomatically, stores };
 }
 
 /** Parse `lore file info` (Key: value lines) into file metadata. */

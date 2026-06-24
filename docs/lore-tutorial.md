@@ -97,7 +97,7 @@ Now teammates can clone `lore://<server>/MyGame` and you're all working against 
 - **Locks** section: every locked file with its owner; release from here.
 - **Sparse view** section: view/edit the `.lore/view` filter (see below).
 - **Links / Layers** sections: compose sub-repositories (Part 10).
-- **Bisect** section: binary-search history for the revision that introduced a change (Part 11).
+- **Bisect** section: binary-search history for the revision that introduced a change (Part 12).
 - **History** (right): revisions with **Amend** (latest message), **Revert**, and **Pick**
   (cherry-pick). Click a revision to see its changed files.
 
@@ -323,7 +323,29 @@ optionally matched by metadata. Both are advanced features — most day-to-day w
 
 ---
 
-## 11. Finding when a change appeared (bisect)
+## 11. Shared store (one content store for many worktrees)
+
+If you keep several worktrees of the same project on one machine, each clone normally stores its
+own copy of the content under `.lore/`. A **shared store** is a single on-disk content store that
+many worktrees draw from, so they don't each duplicate it. Because Lore deduplicates fragments,
+even *similar* files share the parts they have in common — not just byte-for-byte duplicates.
+
+Manage stores from **File → Lore Shared Stores…**:
+
+- **Configured stores** — lists each store (the server it backs, its on-disk path, and whether it
+  exists), read from `lore shared-store info`.
+- **Create a store** — give a **Server URL** (`lore://host:port`) and optionally a location, and
+  whether to make it the **default** for that server. Runs `lore shared-store create`.
+- **Use the shared store automatically for new clones** — toggles `lore shared-store
+  set-use-automatically`; when on, clones use the default store without any extra option.
+
+Then, when cloning a Lore repo (**File → Clone…**), tick **Use shared store** to clone against the
+default store (`clone --use-shared-store`) instead of duplicating its content. Create the store
+first if you haven't — the option needs a default store to draw from.
+
+---
+
+## 12. Finding when a change appeared (bisect)
 
 When something broke but you don't know which revision introduced it, **bisect** binary-searches
 the history for you. Lore's bisect is a *step* search: it syncs your working tree to the midpoint
@@ -346,7 +368,7 @@ In the **Changes** sidebar's **Bisect** section:
 
 ---
 
-## 12. Troubleshooting & known limits
+## 13. Troubleshooting & known limits
 
 | Symptom | Fix |
 | --- | --- |

@@ -6,6 +6,7 @@ import { detectRepositoryType, RepoType } from './utils/repoType';
 import CloneDialog from './components/CloneDialog';
 import CloneProgressView from './components/CloneProgressView';
 import InitRepositoryDialog from './components/InitRepositoryDialog';
+import SharedStoreDialog from './components/SharedStoreDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
@@ -46,6 +47,7 @@ interface Tab {
   // Lore-specific clone parameters (for retry of a background Lore clone).
   cloneViewContent?: string;
   cloneBare?: boolean;
+  cloneUseSharedStore?: boolean;
   // Non-null once a background clone has failed.
   cloneError?: string | null;
 }
@@ -75,6 +77,7 @@ function App(): React.ReactElement {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
+  const [showSharedStoreDialog, setShowSharedStoreDialog] = useState<boolean>(false);
   const [initRepoPath, setInitRepoPath] = useState<string | null>(null);
   // Bumped per repo path to force the corresponding RepositoryView to reload from git.
   const [refreshSignal, setRefreshSignal] = useState<Record<string, number>>({});
@@ -217,10 +220,15 @@ function App(): React.ReactElement {
       setShowSettings(true);
     };
 
+    const handleShowSharedStoreDialog = () => {
+      setShowSharedStoreDialog(true);
+    };
+
     ipcRenderer.on('init-repository', handleInitRepo);
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
     ipcRenderer.on('show-settings-dialog', handleShowSettingsDialog);
+    ipcRenderer.on('show-shared-store-dialog', handleShowSharedStoreDialog);
 
     const handleFetch = () => {
       if (activeTabId !== null && tabs.length > 0) {
@@ -273,6 +281,7 @@ function App(): React.ReactElement {
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
       ipcRenderer.removeListener('show-clone-dialog', handleShowCloneDialog);
       ipcRenderer.removeListener('show-settings-dialog', handleShowSettingsDialog);
+      ipcRenderer.removeListener('show-shared-store-dialog', handleShowSharedStoreDialog);
       ipcRenderer.removeListener('refresh-repository', handleRefresh);
       ipcRenderer.removeListener('fetch-repository', handleFetch);
       ipcRenderer.removeListener('pull-repository', handlePull);
@@ -459,10 +468,10 @@ function App(): React.ReactElement {
 
   const handleClone = async (params: CloneParams): Promise<void> => {
     setShowCloneDialog(false);
-    const { type, repoUrl, parentFolder, name: repoName, depth, viewContent, bare } = params;
+    const { type, repoUrl, parentFolder, name: repoName, depth, viewContent, bare, useSharedStore } = params;
 
     if (type === 'lore') {
-      handleStartLoreClone(repoUrl, parentFolder, repoName, viewContent, bare);
+      handleStartLoreClone(repoUrl, parentFolder, repoName, viewContent, bare, useSharedStore);
       return;
     }
 
@@ -502,13 +511,13 @@ function App(): React.ReactElement {
 
   // Run a Lore clone in the background (renderer), streaming progress into the tab's
   // CloneProgressView. Mirrors startClone but for the Lore CLI.
-  const startLoreClone = useCallback((tabId: string, url: string, parentFolder: string, repoName: string, viewContent?: string, bare?: boolean) => {
+  const startLoreClone = useCallback((tabId: string, url: string, parentFolder: string, repoName: string, viewContent?: string, bare?: boolean, useSharedStore?: boolean) => {
     setCloneProgress(prev => { const next = { ...prev }; delete next[tabId]; return next; });
     setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, cloning: true, cloneError: null } : tab));
 
     const viewPath = viewContent && viewContent.trim() ? writeTempViewFile(viewContent) : undefined;
     cloneLoreRepositoryStreaming(
-      resolveLoreBin(), parentFolder, url, repoName, { view: viewPath, bare },
+      resolveLoreBin(), parentFolder, url, repoName, { view: viewPath, bare, useSharedStore },
       (line) => setCloneProgress(prev => ({ ...prev, [tabId]: { stage: line, progress: loreClonePct(line) } })),
     )
       .then((result) => {
@@ -523,7 +532,7 @@ function App(): React.ReactElement {
       });
   }, []);
 
-  const handleStartLoreClone = (url: string, parentFolder: string, repoName: string, viewContent: string, bare: boolean): void => {
+  const handleStartLoreClone = (url: string, parentFolder: string, repoName: string, viewContent: string, bare: boolean, useSharedStore = false): void => {
     const sep = parentFolder.includes('\\') ? '\\' : '/';
     const targetPath = `${parentFolder.replace(/[\\/]+$/, '')}${sep}${repoName}`;
 
@@ -541,11 +550,12 @@ function App(): React.ReactElement {
       cloneParentFolder: parentFolder,
       cloneViewContent: viewContent || undefined,
       cloneBare: bare,
+      cloneUseSharedStore: useSharedStore,
       cloneError: null,
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(tabId);
-    startLoreClone(tabId, url, parentFolder, repoName, viewContent, bare);
+    startLoreClone(tabId, url, parentFolder, repoName, viewContent, bare, useSharedStore);
   };
 
   // Save open tabs to recent repos when tabs change
@@ -668,7 +678,7 @@ function App(): React.ReactElement {
                     onRetry={() => {
                       if (tab.cloneUrl && tab.cloneParentFolder) {
                         if (tab.type === 'lore') {
-                          startLoreClone(tab.id, tab.cloneUrl, tab.cloneParentFolder, tab.name, tab.cloneViewContent, tab.cloneBare);
+                          startLoreClone(tab.id, tab.cloneUrl, tab.cloneParentFolder, tab.name, tab.cloneViewContent, tab.cloneBare, tab.cloneUseSharedStore);
                         } else {
                           startClone(tab.id, tab.cloneUrl, tab.cloneParentFolder, tab.name, tab.cloneDepth || 0);
                         }
@@ -705,6 +715,12 @@ function App(): React.ReactElement {
         <CloneDialog
           onClose={() => setShowCloneDialog(false)}
           onClone={handleClone}
+        />
+      )}
+      {showSharedStoreDialog && (
+        <SharedStoreDialog
+          onClose={() => setShowSharedStoreDialog(false)}
+          onError={(message) => showAlert(message, 'Shared store error')}
         />
       )}
       {initRepoPath && (

@@ -17,6 +17,8 @@ export interface CloneParams {
   viewContent: string;
   /** Lore: bare clone. */
   bare: boolean;
+  /** Lore: clone against the default shared store (--use-shared-store). */
+  useSharedStore: boolean;
 }
 
 interface CloneDialogProps {
@@ -66,6 +68,7 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
   const [depth, setDepth] = useState<number>(1);
   const [scope, setScope] = useState<LoreScope>('all');
   const [includePaths, setIncludePaths] = useState<string>('');
+  const [useSharedStore, setUseSharedStore] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
@@ -118,6 +121,7 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
         depth: type === 'git' && shallow && depth > 0 ? Math.floor(depth) : 0,
         viewContent: type === 'lore' && scope === 'paths' ? buildLoreView(includePaths) : '',
         bare: type === 'lore' && scope === 'bare',
+        useSharedStore: type === 'lore' && useSharedStore,
       });
     } finally { setLoading(false); }
   };
@@ -217,6 +221,15 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
                   until you set a view and sync. For inspection/tooling, not editing.
                 </small>
               )}
+
+              <label className="dialog-checkbox-label" style={{ display: 'block', marginTop: 12 }}>
+                <input type="checkbox" checked={useSharedStore} onChange={(e) => setUseSharedStore(e.target.checked)} />
+                <span>Use shared store</span>
+              </label>
+              <small style={{ display: 'block', marginTop: 4, marginLeft: 22, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                Draw content from a machine-wide shared store instead of duplicating it in this clone.
+                Requires a default store — create one via <strong>File → Lore Shared Stores…</strong>
+              </small>
             </div>
           )}
         </div>

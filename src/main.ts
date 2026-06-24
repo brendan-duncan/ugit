@@ -203,6 +203,14 @@ function createMenu(): void {
             initRepository();
           }
         },
+        {
+          label: 'Lore Shared Stores...',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('show-shared-store-dialog');
+            }
+          }
+        },
         { type: 'separator' },
         {
           label: 'Recent Repositories',

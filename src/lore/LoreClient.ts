@@ -35,6 +35,7 @@ import {
   parseFileInfo,
   parseFileHistory,
   parseBisect,
+  parseSharedStoreInfo,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -55,6 +56,7 @@ import {
   LoreFileInfo,
   LoreFileHistoryEntry,
   LoreBisectStep,
+  LoreSharedStoreInfo,
 } from './types';
 
 /** Map an operation to its CLI command prefix for resolve/abort. */
@@ -615,7 +617,7 @@ export async function cloneLoreRepository(
   parentFolder: string,
   url: string,
   name: string,
-  options: { view?: string; branch?: string; bare?: boolean } = {},
+  options: { view?: string; branch?: string; bare?: boolean; useSharedStore?: boolean; sharedStorePath?: string } = {},
 ): Promise<{ output: string; path: string }> {
   fs.mkdirSync(parentFolder, { recursive: true });
   const target = path.join(parentFolder, name);
@@ -623,6 +625,8 @@ export async function cloneLoreRepository(
   if (options.view) argv.push('--view', options.view);
   if (options.branch) argv.push('--branch', options.branch);
   if (options.bare) argv.push('--bare');
+  if (options.useSharedStore) argv.push('--use-shared-store');
+  if (options.sharedStorePath) argv.push('--shared-store-path', options.sharedStorePath);
   const { stdout } = await runLore({ bin, cwd: parentFolder, argv, throwOnError: true });
   return { output: stdout, path: target };
 }
@@ -636,7 +640,7 @@ export async function cloneLoreRepositoryStreaming(
   parentFolder: string,
   url: string,
   name: string,
-  options: { view?: string; branch?: string; bare?: boolean } = {},
+  options: { view?: string; branch?: string; bare?: boolean; useSharedStore?: boolean; sharedStorePath?: string } = {},
   onProgress?: (line: string) => void,
 ): Promise<{ output: string; path: string }> {
   fs.mkdirSync(parentFolder, { recursive: true });
@@ -645,8 +649,42 @@ export async function cloneLoreRepositoryStreaming(
   if (options.view) argv.push('--view', options.view);
   if (options.branch) argv.push('--branch', options.branch);
   if (options.bare) argv.push('--bare');
+  if (options.useSharedStore) argv.push('--use-shared-store');
+  if (options.sharedStorePath) argv.push('--shared-store-path', options.sharedStorePath);
   const { stdout } = await runLoreStreaming({ bin, cwd: parentFolder, argv, throwOnError: true, onLine: onProgress });
   return { output: stdout, path: target };
+}
+
+// --- Lore-native: shared store (one on-disk content store backing many worktrees) ---
+
+/**
+ * Create a shared store backing `remoteUrl` (e.g. lore://host:port). With `makeDefault` (the CLI
+ * default) it becomes the global default used by `clone --use-shared-store`. Returns raw output.
+ */
+export async function sharedStoreCreate(
+  bin: string,
+  remoteUrl: string,
+  options: { path?: string; makeDefault?: boolean } = {},
+): Promise<string> {
+  const argv = ['shared-store', 'create', remoteUrl];
+  if (options.path) argv.push('--path', options.path);
+  if (options.makeDefault != null) argv.push('--make-default', String(options.makeDefault));
+  const { stdout } = await runLore({ bin, cwd: os.homedir(), argv, throwOnError: true });
+  return stdout;
+}
+
+/** Read the global shared-store configuration (`shared-store info`). */
+export async function sharedStoreInfo(bin: string): Promise<LoreSharedStoreInfo> {
+  const { stdout } = await runLore({ bin, cwd: os.homedir(), argv: ['shared-store', 'info'], throwOnError: false });
+  return parseSharedStoreInfo(stdout);
+}
+
+/** Toggle whether clones use the shared store automatically (`shared-store set-use-automatically`). */
+export async function sharedStoreSetUseAutomatically(bin: string, enabled: boolean): Promise<string> {
+  const { stdout } = await runLore({
+    bin, cwd: os.homedir(), argv: ['shared-store', 'set-use-automatically', String(enabled)], throwOnError: true,
+  });
+  return stdout;
 }
 
 // --- Authentication (best-effort; see docs — the dev server runs with auth disabled, so the
