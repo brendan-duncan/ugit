@@ -53,9 +53,9 @@ Stop it with `powershell D:\src\lore-dev\stop-server.ps1`.
 
 **For a team**, the server is shared infrastructure (often run via the `loreserver` binary with
 a durable store, real TLS cert, and auth enabled). Everyone points their clones at the same
-`lore://` URL. Auth uses JWT/OIDC — `lore login` (browser, or `--token-type … --token …`); ugit
-exposes a Login form in the New/Clone dialog. ugit finds the `lore` CLI via `$LORE_BIN`, then
-`~/bin`, then `PATH`.
+`lore://` URL. Auth uses JWT/OIDC — authenticate the CLI once with `lore login` (browser, or
+`--token-type … --token …`); ugit then reuses that identity (there is no separate login form in
+the GUI yet). ugit finds the `lore` CLI via `$LORE_BIN`, then `~/bin`, then `PATH`.
 
 ---
 
@@ -64,11 +64,10 @@ exposes a Login form in the New/Clone dialog. ugit finds the `lore` CLI via `$LO
 Say you have `D:\games\MyGame` full of source and assets and no version control yet.
 
 1. Make sure the server is running (Part 2).
-2. In ugit: **File → New/Clone Lore Repository…**
-3. Choose **Create new**.
+2. In ugit: **File → Init New Repository…**, then pick the folder `D:\games\MyGame`.
+3. In the dialog, choose **Lore** (the type radio at the top):
    - **Server URL:** `lore://127.0.0.1:41337/`
-   - **Name:** `MyGame`
-   - **Parent Folder:** `D:\games` (so it targets the existing `D:\games\MyGame`)
+   - **Repository Name:** `MyGame` (the dialog shows the full `lore://…/MyGame` it will create)
    - Click **Create**.
 4. ugit creates the repo on the server and a `.lore/` in your folder, then opens it as a violet
    **Lore tab**. Your existing files show up as untracked.
@@ -105,7 +104,8 @@ Now teammates can clone `lore://<server>/MyGame` and you're all working against 
 The working set as a **sparse tree of the repo** (like a Perforce depot/workspace tree):
 - Folders expand **lazily** (children load on demand), so huge projects stay responsive.
 - Each row shows the **size**, a **🔒 lock owner** if locked, and a **change marker** (A/M/D)
-  if modified.
+  if modified. (`D` on *every* file means nothing is checked out on disk — see the bare-clone
+  note in Part 8.)
 - Select a file to see, on the right: its **info** (size/hash/status), an **image preview** (for
   png/jpg/etc.) or a **binary asset card** (for other binaries) or a **text diff**, and its
   **per-file history** — click a revision to diff that asset at that point in time.
@@ -151,8 +151,8 @@ This is where Lore's centralized, lock-oriented model matters. From Lore's persp
   often; push when you've committed something others need. If you try to push and you're behind,
   sync first.
 
-- **Sparse views for big projects.** Nobody needs the whole multi-hundred-GB project on disk.
-  Use a **sparse view** so each person checks out only their area (see Part 8). Lazy fetch pulls
+- **Sparse clones for big projects.** Nobody needs the whole multi-hundred-GB project on disk.
+  Use a **sparse view** so each person clones only their area (see Part 8). Lazy fetch pulls
   assets on demand.
 
 Concrete example — an artist and a programmer share `MyGame`:
@@ -179,20 +179,65 @@ When you **Merge** a branch and text files conflict, the panel enters a merge st
 
 ---
 
-## 8. Sparse views (checking out part of a big repo)
+## 8. Sparse clones & views (checking out part of a big repo)
 
-A Lore checkout can be a subset of the repository. In the **Changes** view's **Sparse view**
-section, click **Edit** to set a gitignore-style filter (`.lore/view`):
+A Lore working copy can hold just a **subset** of a huge repository — you don't need the whole
+multi-hundred-GB project on disk. Which files get materialized is controlled by a **view filter**:
+a gitignore-style file stored at `.lore/view`.
+
+The filter reads top-down:
+
+- `**` — exclude everything.
+- `!pattern` — **re-include** matching paths.
+
+So you typically start by excluding everything, then add back the areas you want:
 
 ```
 **
-!Content/Characters/**
-!Source/**
+!Content/*.ts
+!Content/*.material
 ```
 
-`**` excludes everything; each `!pattern` re-includes a path. This example checks out only the
-characters and source. The view applies on clone and to future syncs. (You can also paste a view
-filter when cloning, in the New/Clone dialog.)
+That checks out only the `.ts` scripts and `.material` files under `Content/`. (Cloning the
+56-file `TPS_Demo` with that filter materializes just the 10 matching files.) Anything excluded
+is simply absent — and because Lore knows it's *outside your view*, those files do **not** show
+up as changes. A blank filter means a full checkout.
+
+### Clone sparsely from the start
+
+This is the normal way to get a partial checkout:
+
+1. **File → Clone…**
+2. Pick **Lore** (auto-selected once the URL starts with `lore://`).
+   - **Repository URL:** `lore://127.0.0.1:41337/TPS_Demo`
+   - **Parent Folder / Name:** where to put the local folder.
+3. In the **Sparse view filter (optional)** box, paste your `**` / `!pattern` filter (leave it
+   blank for a full clone).
+4. **Clone.** Only the matching files are fetched and written.
+
+From the CLI this is `lore repository clone <url> <path> --view <file>` (the file must be
+BOM-free; ugit handles that for you).
+
+### Change the view later
+
+Open the repo, go to the **Changes** view's **Sparse view** section, and click **Edit**. Set the
+same gitignore-style filter and save. Editing the view governs **future** syncs — it does *not*
+retroactively re-materialize the current checkout. To pull in newly-included files (or drop
+newly-excluded ones), **Sync** afterward. From the CLI that reconciliation is
+`lore sync --reset`.
+
+### "Bare" clones, and why the Files view shows `D` on everything
+
+The Clone dialog also offers a **Bare** checkbox. A bare clone fetches the latest **revision
+tree** but **zero files** — it's for inspecting history or tooling, not day-to-day editing.
+Because every tracked file is absent from disk, ugit's **Files** view (which scans the working
+tree against the revision tree) marks **every file with a `D`** (deleted). That's expected for a
+bare clone — there's simply nothing checked out, not a real deletion you committed.
+
+To turn a bare clone into a working one, give it a view (Changes → **Sparse view** → **Edit** —
+empty for everything, or a `**`/`!` filter for a subset) and then **Sync** (CLI: `lore sync
+--reset`) to materialize the files. For normal work, prefer a **full** or **sparse** clone over
+bare.
 
 ---
 
@@ -205,6 +250,8 @@ filter when cloning, in the New/Clone dialog.)
 | "lore not recognized" / spawn error | Set `$env:LORE_BIN` before launching ugit, or put `lore` on PATH. |
 | `Stage` did nothing from the CLI | The CLI resolves paths against the current directory; the GUI handles this for you. |
 | Lock owner shows `<unknown>` | Expected on the auth-disabled dev server. |
+| Files view shows `D` on **every** file | You did a **bare** clone (no files on disk). Set a view and Sync, or re-clone full/sparse — see Part 8. |
+| Sparse clone fetched everything | The view filter was empty or didn't start with `**`. Excludes-then-`!`re-includes; a blank box = full checkout. |
 
 **Not yet in the GUI:** non-default branch operations beyond switch/create/merge; bisect; the
 auth login round-trip is unverified (needs a secured server with an OIDC/JWK issuer); the file

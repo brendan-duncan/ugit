@@ -24,6 +24,25 @@ interface CloneDialogProps {
   onClone: (params: CloneParams) => Promise<void>;
 }
 
+type LoreScope = 'all' | 'paths' | 'bare';
+
+/**
+ * Turn a newline-separated list of include paths into a Lore view filter (`.lore/view`):
+ * exclude everything, then re-include each path. A bare folder (no glob) becomes `path/**`,
+ * a trailing slash becomes `.../**`, and explicit globs are kept as-is.
+ */
+function buildLoreView(includePaths: string): string {
+  const lines = includePaths.split('\n').map(s => s.trim()).filter(Boolean);
+  if (lines.length === 0) return '';
+  const includes = lines.map(raw => {
+    let p = raw.replace(/^!+/, '').replace(/^\/+/, '');
+    if (p.endsWith('/')) p = p + '**';
+    else if (!p.includes('*')) p = p + '/**';
+    return '!' + p;
+  });
+  return ['**', ...includes].join('\n');
+}
+
 /** Extract a default local folder name from a clone URL (handles git .git and lore:// URLs). */
 function extractName(url: string): string {
   let s = url.trim().replace(/\/+$/, '');
@@ -45,8 +64,8 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
   const [type, setType] = useState<RepoKind>('git');
   const [shallow, setShallow] = useState<boolean>(false);
   const [depth, setDepth] = useState<number>(1);
-  const [viewContent, setViewContent] = useState<string>('');
-  const [bare, setBare] = useState<boolean>(false);
+  const [scope, setScope] = useState<LoreScope>('all');
+  const [includePaths, setIncludePaths] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
@@ -84,7 +103,8 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
     } catch (error) { console.error('Error browsing folder:', error); }
   };
 
-  const isValid = repoUrl.trim() && parentFolder.trim() && name.trim();
+  const isValid = repoUrl.trim() && parentFolder.trim() && name.trim()
+    && (type !== 'lore' || scope !== 'paths' || includePaths.trim());
 
   const handleClone = async () => {
     if (!isValid) return;
@@ -96,8 +116,8 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
         parentFolder: parentFolder.trim(),
         name: name.trim(),
         depth: type === 'git' && shallow && depth > 0 ? Math.floor(depth) : 0,
-        viewContent: type === 'lore' ? viewContent : '',
-        bare: type === 'lore' ? bare : false,
+        viewContent: type === 'lore' && scope === 'paths' ? buildLoreView(includePaths) : '',
+        bare: type === 'lore' && scope === 'bare',
       });
     } finally { setLoading(false); }
   };
@@ -165,22 +185,39 @@ function CloneDialog({ onClose, onClone }: CloneDialogProps) {
           )}
 
           {type === 'lore' && (
-            <>
-              <div className="dialog-field">
-                <label htmlFor="lore-view">Sparse view filter (optional):</label>
-                <textarea id="lore-view" className="dialog-input" style={{ minHeight: 56, resize: 'vertical', fontFamily: 'monospace' }}
-                  placeholder={'**\n!src/**'} value={viewContent} onChange={(e) => setViewContent(e.target.value)} />
-                <small style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                  gitignore-style: <code>**</code> excludes all, <code>!path/**</code> re-includes. Leave blank for a full checkout.
+            <div className="dialog-field" style={{ display: 'block' }}>
+              <label style={{ marginBottom: 6 }}>What to check out:</label>
+              <label className="dialog-checkbox-label" style={{ display: 'block', marginBottom: 4 }}>
+                <input type="radio" name="lore-scope" checked={scope === 'all'} onChange={() => setScope('all')} />
+                <span>Everything (full clone)</span>
+              </label>
+              <label className="dialog-checkbox-label" style={{ display: 'block', marginBottom: 4 }}>
+                <input type="radio" name="lore-scope" checked={scope === 'paths'} onChange={() => setScope('paths')} />
+                <span>Only these paths (sparse)</span>
+              </label>
+              {scope === 'paths' && (
+                <div style={{ margin: '4px 0 8px 22px' }}>
+                  <textarea id="lore-include" className="dialog-input"
+                    style={{ minHeight: 56, resize: 'vertical', fontFamily: 'monospace' }}
+                    placeholder={'Content/Characters\nSource/\nContent/*.material'}
+                    value={includePaths} onChange={(e) => setIncludePaths(e.target.value)} />
+                  <small style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                    One path per line — a folder pulls in everything under it; globs (<code>*.material</code>) are kept as-is.
+                    {includePaths.trim() && <> Becomes: <code>{buildLoreView(includePaths).replace(/\n/g, ' ')}</code></>}
+                  </small>
+                </div>
+              )}
+              <label className="dialog-checkbox-label" style={{ display: 'block' }}>
+                <input type="radio" name="lore-scope" checked={scope === 'bare'} onChange={() => setScope('bare')} />
+                <span>Metadata only (bare)</span>
+              </label>
+              {scope === 'bare' && (
+                <small style={{ display: 'block', marginTop: 4, marginLeft: 22, color: 'var(--text-warning, #c08000)', fontSize: '0.8rem' }}>
+                  ⚠ Fetches the revision tree but no files — the Files view will show every file as <code>D</code> (deleted)
+                  until you set a view and sync. For inspection/tooling, not editing.
                 </small>
-              </div>
-              <div className="dialog-field" style={{ display: 'block' }}>
-                <label className="dialog-checkbox-label">
-                  <input type="checkbox" checked={bare} onChange={(e) => setBare(e.target.checked)} />
-                  <span>Bare (fetch latest revision tree, no files)</span>
-                </label>
-              </div>
-            </>
+              )}
+            </div>
           )}
         </div>
 
