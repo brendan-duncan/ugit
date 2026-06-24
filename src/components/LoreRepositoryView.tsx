@@ -146,6 +146,10 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   }, [client, treeNodes]);
   const [leftWidth, setLeftWidth] = useState<number>(28);
   const draggingSplitter = useRef(false);
+  // Width (%) of the changes/tree column within the content viewer; the detail/diff column fills
+  // the rest. Resizable via the splitter between them.
+  const [contentLeftWidth, setContentLeftWidth] = useState<number>(48);
+  const draggingContent = useRef(false);
 
   const busy = isLoading || working;
   const ahead = status ? Math.max(0, status.local.number - status.remote.number) : 0;
@@ -189,6 +193,26 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const onMouseUp = () => {
     if (!draggingSplitter.current) return;
     draggingSplitter.current = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  };
+
+  // Splitter between the content column (changes/tree) and the detail/diff column.
+  const onContentSplitterDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingContent.current = true;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  };
+  const onContentMouseMove = (e: React.MouseEvent) => {
+    if (!draggingContent.current) return;
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    setContentLeftWidth(Math.min(80, Math.max(15, pct)));
+  };
+  const onContentMouseUp = () => {
+    if (!draggingContent.current) return;
+    draggingContent.current = false;
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
   };
@@ -1202,8 +1226,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   </div>
                 </div>
               ) : viewMode === 'files' ? (
-                <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
-                  <div className="lore-changes-col" style={{ width: '50%' }}>
+                <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}
+                  onMouseMove={onContentMouseMove} onMouseUp={onContentMouseUp} onMouseLeave={onContentMouseUp}>
+                  <div className="lore-changes-col" style={{ width: `${contentLeftWidth}%`, flexShrink: 0 }}>
                     <div className="lore-changes-group-header"><span>Repository tree</span></div>
                     <div className="lore-changes-scroll">
                       <LoreRepositoryTree
@@ -1219,6 +1244,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                         busy={busy}
                       />
                     </div>
+                  </div>
+                  <div className="horizontal-splitter-handle" onMouseDown={onContentSplitterDown}>
+                    <div className="horizontal-splitter-line" />
                   </div>
                   <div className="lore-detail-col">
                     <div className="lore-detail-header">{treeFile ? treeFile.path : 'File'}</div>
@@ -1281,8 +1309,9 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   </div>
                 </div>
               ) : (
-              <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}>
-                <div className="lore-changes-col">
+              <div className="lore-content-cols" style={{ flex: 1, minHeight: 0 }}
+                onMouseMove={onContentMouseMove} onMouseUp={onContentMouseUp} onMouseLeave={onContentMouseUp}>
+                <div className="lore-changes-col" style={{ width: `${contentLeftWidth}%`, flexShrink: 0 }}>
                   <div className="lore-changes-scroll">
                     {status.conflicted.length > 0 && (
                       <>
@@ -1344,6 +1373,10 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       </button>
                     </div>
                   </div>
+                </div>
+
+                <div className="horizontal-splitter-handle" onMouseDown={onContentSplitterDown}>
+                  <div className="horizontal-splitter-line" />
                 </div>
 
                 <div className="lore-detail-col">

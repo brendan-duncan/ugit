@@ -151,7 +151,6 @@
   min-width: 240px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border-color);
 }
 .lore-changes-scroll { flex: 1; overflow: auto; }
 .lore-changes-group-header {
