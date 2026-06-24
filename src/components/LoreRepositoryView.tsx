@@ -172,15 +172,26 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     }
   }, [refreshSignal, refresh]);
 
-  // Sidebar splitter drag.
-  const onSplitterDown = () => { draggingSplitter.current = true; };
+  // Sidebar splitter drag. preventDefault on mousedown stops the browser from starting a text
+  // selection, and user-select:none on the body keeps a drag from selecting content underneath.
+  const onSplitterDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingSplitter.current = true;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  };
   const onMouseMove = (e: React.MouseEvent) => {
     if (!draggingSplitter.current) return;
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const pct = ((e.clientX - rect.left) / rect.width) * 100;
     setLeftWidth(Math.min(60, Math.max(15, pct)));
   };
-  const onMouseUp = () => { draggingSplitter.current = false; };
+  const onMouseUp = () => {
+    if (!draggingSplitter.current) return;
+    draggingSplitter.current = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  };
 
   // `scan` defaults true (safe): operations that touch the working tree need a fresh fs walk.
   // Pass `{ scan: false }` for actions that can't change file state (lock, push, metadata, …) to
