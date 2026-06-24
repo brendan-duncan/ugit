@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import './TabBar.css';
+import gitIcon from '../../assets/Git-Icon-White.svg';
+import loreIcon from '../../assets/Lore_Icon_White_V1.svg';
 
 interface Tab {
   id: string;
@@ -89,6 +91,14 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
           >
             {tab.cloning && <span className="tab-clone-spinner" title="Cloning…">⟳</span>}
             {tab.cloneError && <span className="tab-clone-error" title={tab.cloneError}>⚠</span>}
+            <span
+              className={`tab-icon ${tab.type === 'lore' ? 'lore' : 'git'}`}
+              style={{
+                maskImage: `url(${tab.type === 'lore' ? loreIcon : gitIcon})`,
+                WebkitMaskImage: `url(${tab.type === 'lore' ? loreIcon : gitIcon})`,
+              }}
+              aria-hidden="true"
+            />
             <span className="tab-name" title={tab.path}>{tab.name}</span>
             {status && (status.ahead > 0 || status.behind > 0) && (
               <span className="tab-status">

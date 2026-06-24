@@ -44,6 +44,12 @@ module.exports = {
       {
         test: /\.css$/,
         use: ['style-loader', 'css-loader']
+      },
+      {
+        // Inline SVGs as data URIs so they bundle into the renderer (used as CSS masks for
+        // tintable tab icons). No file-path resolution needed at runtime.
+        test: /\.svg$/,
+        type: 'asset/inline'
       }
     ]
   },

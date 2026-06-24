@@ -38,19 +38,32 @@
   border-bottom: 2px solid var(--accent-color);
 }
 
-/* Lore repositories get a bold violet fill so they stand out clearly from git tabs. */
-.tab.lore {
-  --lore-color: #9d4edd;
-  background-color: color-mix(in srgb, var(--lore-color) 32%, var(--bg-tertiary));
+/* A tintable type icon (the white source SVG is used as a CSS mask; the tint comes from
+   background-color). Git is brand-orange; Lore follows the theme (white on dark, black on light). */
+.tab-icon {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-right: 7px;
+  display: inline-block;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
-.tab.lore:hover {
-  background-color: color-mix(in srgb, var(--lore-color) 42%, var(--bg-tertiary));
+.tab-icon.git {
+  background-color: #f05133;
 }
 
-.tab.lore.active {
-  background-color: color-mix(in srgb, var(--lore-color) 50%, var(--bg-primary));
-  border-bottom-color: var(--lore-color);
+.tab-icon.lore {
+  background-color: #ffffff;
+}
+
+body.light-theme .tab-icon.lore {
+  background-color: #000000;
 }
 
 .tab-name {
@@ -86,23 +99,6 @@
   margin-left: 6px;
   font-size: 11px;
   font-weight: 500;
-}
-
-/* On the violet Lore-tab fill the sync count (esp. the salmon "behind") loses contrast — give it
-   a dark pill so it stays legible against any tab state, and brighten the colors slightly. */
-.tab.lore .tab-status {
-  gap: 4px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.tab.lore .status-ahead {
-  color: #eafbe7;
-}
-
-.tab.lore .status-behind {
-  color: #ffb4a2;
 }
 
 .tab-close {
