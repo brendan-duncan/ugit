@@ -12,6 +12,10 @@ export interface AppSettings {
   lfsWarnThresholdMB: number;
   /** Path to the `lore` executable. Empty = auto-detect (LORE_BIN, ~/bin, PATH). */
   loreBinPath: string;
+  /** Path to the `loreserver` executable. Empty = auto-detect (LORE_SERVER_BIN, ~/bin, PATH). */
+  loreServerPath: string;
+  /** Data folder for the local Lore server (store/logs/config live here). */
+  loreServerDataFolder: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -24,7 +28,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   lfsWarnEnabled: true,
   lfsWarnThresholdMB: 100,
-  loreBinPath: ''
+  loreBinPath: '',
+  loreServerPath: '',
+  loreServerDataFolder: ''
 };
 
 /**
@@ -183,7 +189,9 @@ export class SettingsManager {
       (data.theme === undefined || data.theme === 'dark' || data.theme === 'light') &&
       (data.lfsWarnEnabled === undefined || typeof data.lfsWarnEnabled === 'boolean') &&
       (data.lfsWarnThresholdMB === undefined || typeof data.lfsWarnThresholdMB === 'number') &&
-      (data.loreBinPath === undefined || typeof data.loreBinPath === 'string')
+      (data.loreBinPath === undefined || typeof data.loreBinPath === 'string') &&
+      (data.loreServerPath === undefined || typeof data.loreServerPath === 'string') &&
+      (data.loreServerDataFolder === undefined || typeof data.loreServerDataFolder === 'string')
     );
   }
 

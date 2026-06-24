@@ -7,12 +7,13 @@ import CloneDialog from './components/CloneDialog';
 import CloneProgressView from './components/CloneProgressView';
 import InitRepositoryDialog from './components/InitRepositoryDialog';
 import SharedStoreDialog from './components/SharedStoreDialog';
+import LocalServerDialog from './components/LocalServerDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
 import { useSettings } from './contexts/SettingsContext';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
-import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin, createLoreRepository, setLoreBinOverride } from './lore';
+import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin, createLoreRepository, setLoreBinOverride, setLoreServerOverride } from './lore';
 import { CloneParams } from './components/CloneDialog';
 import { InitParams } from './components/InitRepositoryDialog';
 import { ipcRenderer } from 'electron';
@@ -78,6 +79,7 @@ function App(): React.ReactElement {
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
   const [showSharedStoreDialog, setShowSharedStoreDialog] = useState<boolean>(false);
+  const [showLocalServerDialog, setShowLocalServerDialog] = useState<boolean>(false);
   const [initRepoPath, setInitRepoPath] = useState<string | null>(null);
   // Bumped per repo path to force the corresponding RepositoryView to reload from git.
   const [refreshSignal, setRefreshSignal] = useState<Record<string, number>>({});
@@ -117,10 +119,13 @@ function App(): React.ReactElement {
   const { showAlert } = useAlert();
   const { settings, getSetting } = useSettings();
 
-  // Mirror the configured lore binary path into the (sync) resolver used across the Lore code.
+  // Mirror the configured lore binary paths into the (sync) resolvers used across the Lore code.
   useEffect(() => {
     setLoreBinOverride(settings?.loreBinPath ?? null);
   }, [settings?.loreBinPath]);
+  useEffect(() => {
+    setLoreServerOverride(settings?.loreServerPath ?? null);
+  }, [settings?.loreServerPath]);
 
   // Apply theme class based on setting
   useEffect(() => {
@@ -229,11 +234,16 @@ function App(): React.ReactElement {
       setShowSharedStoreDialog(true);
     };
 
+    const handleShowLocalServerDialog = () => {
+      setShowLocalServerDialog(true);
+    };
+
     ipcRenderer.on('init-repository', handleInitRepo);
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
     ipcRenderer.on('show-settings-dialog', handleShowSettingsDialog);
     ipcRenderer.on('show-shared-store-dialog', handleShowSharedStoreDialog);
+    ipcRenderer.on('show-local-server-dialog', handleShowLocalServerDialog);
 
     const handleFetch = () => {
       if (activeTabId !== null && tabs.length > 0) {
@@ -287,6 +297,7 @@ function App(): React.ReactElement {
       ipcRenderer.removeListener('show-clone-dialog', handleShowCloneDialog);
       ipcRenderer.removeListener('show-settings-dialog', handleShowSettingsDialog);
       ipcRenderer.removeListener('show-shared-store-dialog', handleShowSharedStoreDialog);
+      ipcRenderer.removeListener('show-local-server-dialog', handleShowLocalServerDialog);
       ipcRenderer.removeListener('refresh-repository', handleRefresh);
       ipcRenderer.removeListener('fetch-repository', handleFetch);
       ipcRenderer.removeListener('pull-repository', handlePull);
@@ -726,6 +737,12 @@ function App(): React.ReactElement {
         <SharedStoreDialog
           onClose={() => setShowSharedStoreDialog(false)}
           onError={(message) => showAlert(message, 'Shared store error')}
+        />
+      )}
+      {showLocalServerDialog && (
+        <LocalServerDialog
+          onClose={() => setShowLocalServerDialog(false)}
+          onError={(message) => showAlert(message, 'Lore server error')}
         />
       )}
       {initRepoPath && (

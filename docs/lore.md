@@ -31,32 +31,50 @@ unmergeable binary assets you **lock before you edit** so two people can't clobb
 
 ---
 
-## 2. The Lore server (CLI)
+## 2. Installing Lore and running a server
 
-You need a server before you can create or clone a repo. For a real team this is a hosted,
-durable, authenticated `loreserver`; for development you run a local one.
+### Install the Lore tools
 
-**Start the local dev server** (PowerShell):
+ugit drives the `lore` CLI (and, for a local server, `loreserver`). Get them either way:
 
-```powershell
-powershell D:\src\lore-dev\start-server.ps1
+- **From ugit:** **Settings → Lore**. If the tools aren't found, click **Install Lore** — ugit runs
+  Epic's official installer for your platform and re-detects the binaries.
+- **By hand** (Epic's [install script](https://epicgames.github.io/lore/how-to/install-lore-cli/)):
+  - macOS/Linux: `curl -fsSL https://raw.githubusercontent.com/EpicGames/lore/main/scripts/install.sh | bash`
+  - Windows (PowerShell): `irm https://raw.githubusercontent.com/EpicGames/lore/main/scripts/install.ps1 | iex`
+
+  The installer downloads `lore` (and `loreserver`) and adds them to your PATH. Verify with
+  `lore --version`.
+
+**Where ugit looks for the binaries:** the **Lore Executable Path** / **Lore Server Path** in
+Settings first, then the `LORE_BIN` / `LORE_SERVER_BIN` environment variables, then `~/bin`, then
+`PATH`. Set the Settings path if your install lives somewhere non-standard.
+
+### Run a local server
+
+You need a server before you can create or clone a repo. For a real team this is shared,
+durable, authenticated infrastructure; for trying things out you run a local one.
+
+- **From ugit:** **File → Local Lore Server…** — pick a **data folder** (where the store lives) and
+  click **Start**. ugit launches `loreserver` against that folder, shows a live **health status**,
+  and offers **Stop**. The repo URL is `lore://127.0.0.1:41337/`.
+- **By CLI:** the demo install starts one for you (re-run the install script with the demo flag —
+  `LORE_DEMO=1` on Windows, `--demo` on macOS/Linux), or run `loreserver` directly.
+
+Either way the server listens on **41337** (QUIC + gRPC) and **41339** (HTTP). Check it any time:
+
+```
+curl -i http://127.0.0.1:41339/health_check     # healthy → HTTP 200, empty body
 ```
 
-It listens on **41337** (QUIC + gRPC) and **41339** (HTTP), stores data durably under
-`D:\src\lore-dev\store`, runs with **auth disabled**, and uses a self-signed cert. Check it:
+A local server runs **single-node** with an ephemeral self-signed cert and **auth disabled** — fine
+for localhost. ugit's server keeps your data **durable** under the data folder's `store/`, so repos
+survive restarts.
 
-```powershell
-Invoke-WebRequest http://127.0.0.1:41339/health_check -UseBasicParsing | Select-Object StatusCode
-```
-
-Stop it with `powershell D:\src\lore-dev\stop-server.ps1`.
-
-**For a team**, the server is shared infrastructure (often run via the `loreserver` binary with
-a durable store, real TLS cert, and auth enabled). Everyone points their clones at the same
-`lore://` URL. Auth uses JWT/OIDC — authenticate the CLI once with `lore login` (browser, or
-`--token-type … --token …`); ugit then reuses that identity (there is no separate login form in
-the GUI yet). ugit finds the `lore` CLI via the **Lore Executable Path** in Settings, then
-`$LORE_BIN`, then `~/bin`, then `PATH`.
+**For a team**, the server is shared infrastructure (a durable store, real TLS cert, auth enabled).
+Everyone points their clones at the same `lore://` URL. Auth uses JWT/OIDC — authenticate the CLI
+once with `lore login` (browser, or `--token-type … --token …`); ugit then reuses that identity
+(there is no separate login form in the GUI yet).
 
 ---
 
@@ -426,7 +444,7 @@ the ignore rules with the team.
 
 | Symptom | Fix |
 | --- | --- |
-| Panel shows a connection error | Server not running — `start-server.ps1`. |
+| Panel shows a connection error | Server not running — start one via **File → Local Lore Server** (Part 2). |
 | Tab opens the git view, not Lore | The folder has no `.lore/` (wrong folder, or not created yet). |
 | "lore not recognized" / spawn error | Set the **Lore Executable Path** in Settings, or set `$env:LORE_BIN` / put `lore` on PATH. |
 | `Stage` did nothing from the CLI | The CLI resolves paths against the current directory; the GUI handles this for you. |

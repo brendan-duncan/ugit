@@ -21,4 +21,4 @@ export {
   sharedStoreSetUseAutomatically,
 } from './LoreClient';
 export type { LoreClientOptions, LoreCommandStateCallback } from './LoreClient';
-export { resolveLoreBin, setLoreBinOverride } from './resolveLoreBin';
+export { resolveLoreBin, setLoreBinOverride, resolveLoreServerBin, setLoreServerOverride } from './resolveLoreBin';

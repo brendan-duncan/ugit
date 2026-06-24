@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ipcRenderer } from 'electron';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
+import { resolveLoreBin, resolveLoreServerBin, setLoreBinOverride, setLoreServerOverride } from '../lore';
 import './Dialog.css';
 import './SettingsDialog.css';
 
@@ -19,7 +21,33 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [lfsWarnEnabled, setLfsWarnEnabled] = useState<boolean>(true);
   const [lfsWarnThresholdMB, setLfsWarnThresholdMB] = useState<number>(100);
   const [loreBinPath, setLoreBinPath] = useState<string>('');
+  const [loreServerPath, setLoreServerPath] = useState<string>('');
+  const [detect, setDetect] = useState<{ loreVersion: string | null; serverVersion: string | null } | null>(null);
+  const [installing, setInstalling] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Detect installed lore/loreserver using the currently-entered (or resolved) paths.
+  const runDetect = useCallback(async () => {
+    setLoreBinOverride(loreBinPath.trim() || null);
+    setLoreServerOverride(loreServerPath.trim() || null);
+    try {
+      const r = await ipcRenderer.invoke('lore-detect', resolveLoreBin(), resolveLoreServerBin());
+      setDetect({ loreVersion: r.loreVersion, serverVersion: r.serverVersion });
+    } catch { setDetect({ loreVersion: null, serverVersion: null }); }
+  }, [loreBinPath, loreServerPath]);
+
+  useEffect(() => { runDetect(); }, [runDetect]);
+
+  const installLore = async () => {
+    setInstalling(true);
+    try {
+      const res = await ipcRenderer.invoke('lore-install');
+      await runDetect();
+      showConfirm(res.ok ? 'Lore installed. You may need to restart ugit if the binaries still aren\'t found.' : `Install failed:\n\n${res.output}`, 'Install Lore');
+    } catch (err) {
+      showConfirm(err instanceof Error ? err.message : String(err), 'Install Lore');
+    } finally { setInstalling(false); }
+  };
 
   // Update local state when settings load
   React.useEffect(() => {
@@ -32,6 +60,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       setLfsWarnEnabled(settings.lfsWarnEnabled);
       setLfsWarnThresholdMB(settings.lfsWarnThresholdMB);
       setLoreBinPath(settings.loreBinPath ?? '');
+      setLoreServerPath(settings.loreServerPath ?? '');
     }
   }, [settings]);
 
@@ -65,6 +94,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       await updateSetting('lfsWarnEnabled', lfsWarnEnabled);
       await updateSetting('lfsWarnThresholdMB', lfsWarnThresholdMB);
       await updateSetting('loreBinPath', loreBinPath.trim());
+      await updateSetting('loreServerPath', loreServerPath.trim());
 
       onClose();
     } catch (err) {
@@ -254,17 +284,50 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
             <h4 className="settings-section-title">Lore</h4>
 
             <div className="setting-group">
-              <label htmlFor="loreBinPath">
-                Lore Executable Path
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem' }}>
+                  <strong>lore CLI:</strong>{' '}
+                  {detect == null ? 'checking…' : detect.loreVersion
+                    ? <span style={{ color: 'var(--success-color, #3c3)' }}>{detect.loreVersion}</span>
+                    : <span style={{ color: 'var(--danger-color, #c33)' }}>not found</span>}
+                </span>
+                <span style={{ fontSize: '0.85rem' }}>
+                  <strong>loreserver:</strong>{' '}
+                  {detect == null ? 'checking…' : detect.serverVersion
+                    ? <span style={{ color: 'var(--success-color, #3c3)' }}>{detect.serverVersion}</span>
+                    : <span style={{ color: 'var(--danger-color, #c33)' }}>not found</span>}
+                </span>
+                <button type="button" className="button-secondary" disabled={installing} onClick={installLore}>
+                  {installing ? 'Installing…' : (detect && detect.loreVersion ? 'Reinstall Lore' : 'Install Lore')}
+                </button>
+              </div>
+              <small>Install runs Epic's official installer for your platform (downloads <code>lore</code> + <code>loreserver</code> onto your PATH).</small>
+            </div>
+
+            <div className="setting-group">
+              <label htmlFor="loreBinPath">Lore Executable Path</label>
               <input
                 id="loreBinPath"
                 type="text"
                 value={loreBinPath}
                 onChange={(e) => setLoreBinPath(e.target.value)}
+                onBlur={runDetect}
                 placeholder="Auto-detect (LORE_BIN, ~/bin, PATH)"
               />
               <small>Full path to the <code>lore</code> binary. Leave blank to auto-detect via <code>LORE_BIN</code>, then <code>~/bin</code>, then <code>PATH</code>.</small>
+            </div>
+
+            <div className="setting-group">
+              <label htmlFor="loreServerPath">Lore Server Path</label>
+              <input
+                id="loreServerPath"
+                type="text"
+                value={loreServerPath}
+                onChange={(e) => setLoreServerPath(e.target.value)}
+                onBlur={runDetect}
+                placeholder="Auto-detect (LORE_SERVER_BIN, ~/bin, PATH)"
+              />
+              <small>Full path to the <code>loreserver</code> binary (used by <strong>File → Local Lore Server</strong>). Leave blank to auto-detect.</small>
             </div>
           </div>
         </div>
