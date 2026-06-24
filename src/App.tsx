@@ -4,7 +4,6 @@ import RepositoryView from './components/RepositoryView';
 import LoreRepositoryView from './components/LoreRepositoryView';
 import { detectRepositoryType, RepoType } from './utils/repoType';
 import CloneDialog from './components/CloneDialog';
-import LoreRepoDialog from './components/LoreRepoDialog';
 import CloneProgressView from './components/CloneProgressView';
 import InitRepositoryDialog from './components/InitRepositoryDialog';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -12,7 +11,9 @@ import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
 import { useSettings } from './contexts/SettingsContext';
 import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
-import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin } from './lore';
+import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin, createLoreRepository } from './lore';
+import { CloneParams } from './components/CloneDialog';
+import { InitParams } from './components/InitRepositoryDialog';
 import { ipcRenderer } from 'electron';
 import fs from 'fs';
 import './App.css';
@@ -74,7 +75,6 @@ function App(): React.ReactElement {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
-  const [showLoreRepoDialog, setShowLoreRepoDialog] = useState<boolean>(false);
   const [initRepoPath, setInitRepoPath] = useState<string | null>(null);
   // Bumped per repo path to force the corresponding RepositoryView to reload from git.
   const [refreshSignal, setRefreshSignal] = useState<Record<string, number>>({});
@@ -213,10 +213,6 @@ function App(): React.ReactElement {
       setShowCloneDialog(true);
     };
 
-    const handleShowLoreRepoDialog = () => {
-      setShowLoreRepoDialog(true);
-    };
-
     const handleShowSettingsDialog = () => {
       setShowSettings(true);
     };
@@ -224,7 +220,6 @@ function App(): React.ReactElement {
     ipcRenderer.on('init-repository', handleInitRepo);
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
-    ipcRenderer.on('show-lore-repo-dialog', handleShowLoreRepoDialog);
     ipcRenderer.on('show-settings-dialog', handleShowSettingsDialog);
 
     const handleFetch = () => {
@@ -277,7 +272,6 @@ function App(): React.ReactElement {
       ipcRenderer.removeListener('init-repository', handleInitRepo);
       ipcRenderer.removeListener('open-repository', handleOpenRepo);
       ipcRenderer.removeListener('show-clone-dialog', handleShowCloneDialog);
-      ipcRenderer.removeListener('show-lore-repo-dialog', handleShowLoreRepoDialog);
       ipcRenderer.removeListener('show-settings-dialog', handleShowSettingsDialog);
       ipcRenderer.removeListener('refresh-repository', handleRefresh);
       ipcRenderer.removeListener('fetch-repository', handleFetch);
@@ -298,16 +292,31 @@ function App(): React.ReactElement {
     }
   }, [hasLoadedRecent]);
 
-  const handleInit = async (remoteName: string, remoteUrl: string, branchName: string) => {
+  const handleInit = async (params: InitParams) => {
     if (!initRepoPath) {
       return;
     }
+    const repoPath = initRepoPath;
+
+    if (params.type === 'lore') {
+      try {
+        const url = `${params.serverUrl.replace(/\/+$/, '')}/${params.repoName}`;
+        await createLoreRepository(resolveLoreBin(), repoPath, url);
+        setInitRepoPath(null);
+        openRepository(repoPath);
+        setRefreshSignal(prev => ({ ...prev, [repoPath]: (prev[repoPath] || 0) + 1 }));
+      } catch (error) {
+        showAlert(`Failed to create Lore repository: ${(error as Error).message}`, 'Error');
+      }
+      return;
+    }
+
     try {
       const result: CloneResult = await ipcRenderer.invoke('init-repository', {
-        repoPath: initRepoPath,
-        remoteName,
-        remoteUrl,
-        branchName,
+        repoPath,
+        remoteName: params.remoteName,
+        remoteUrl: params.remoteUrl,
+        branchName: params.branchName,
       });
 
       if (result.success && result.path) {
@@ -448,7 +457,15 @@ function App(): React.ReactElement {
       });
   }, []);
 
-  const handleClone = async (repoUrl: string, parentFolder: string, repoName: string, depth: number): Promise<void> => {
+  const handleClone = async (params: CloneParams): Promise<void> => {
+    setShowCloneDialog(false);
+    const { type, repoUrl, parentFolder, name: repoName, depth, viewContent, bare } = params;
+
+    if (type === 'lore') {
+      handleStartLoreClone(repoUrl, parentFolder, repoName, viewContent, bare);
+      return;
+    }
+
     // Compute the intended target path so the tab can be matched/deduped immediately.
     // Use the parent folder's own separator so the path matches what the main process
     // (path.join) produces on this platform.
@@ -461,7 +478,6 @@ function App(): React.ReactElement {
     const existingTab = tabsRef.current.find(tab => tab.path === targetPath);
     if (existingTab) {
       setActiveTabId(existingTab.id);
-      setShowCloneDialog(false);
       return;
     }
 
@@ -470,6 +486,7 @@ function App(): React.ReactElement {
       id: tabId,
       path: targetPath,
       name: repoName,
+      type: 'git',
       cloning: true,
       cloneUrl: repoUrl,
       cloneParentFolder: parentFolder,
@@ -479,7 +496,6 @@ function App(): React.ReactElement {
 
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(tabId);
-    setShowCloneDialog(false);
 
     startClone(tabId, repoUrl, parentFolder, repoName, depth);
   };
@@ -512,7 +528,7 @@ function App(): React.ReactElement {
     const targetPath = `${parentFolder.replace(/[\\/]+$/, '')}${sep}${repoName}`;
 
     const existingTab = tabsRef.current.find(tab => tab.path === targetPath);
-    if (existingTab) { setActiveTabId(existingTab.id); setShowLoreRepoDialog(false); return; }
+    if (existingTab) { setActiveTabId(existingTab.id); return; }
 
     const tabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const newTab: Tab = {
@@ -529,7 +545,6 @@ function App(): React.ReactElement {
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(tabId);
-    setShowLoreRepoDialog(false);
     startLoreClone(tabId, url, parentFolder, repoName, viewContent, bare);
   };
 
@@ -690,14 +705,6 @@ function App(): React.ReactElement {
         <CloneDialog
           onClose={() => setShowCloneDialog(false)}
           onClone={handleClone}
-        />
-      )}
-      {showLoreRepoDialog && (
-        <LoreRepoDialog
-          onClose={() => setShowLoreRepoDialog(false)}
-          onCreated={(repoPath) => openRepository(repoPath)}
-          onStartClone={handleStartLoreClone}
-          onError={(message) => showAlert(message, 'Lore error')}
         />
       )}
       {initRepoPath && (

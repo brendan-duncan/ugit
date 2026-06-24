@@ -205,14 +205,6 @@ function createMenu(): void {
         },
         { type: 'separator' },
         {
-          label: 'New/Clone Lore Repository...',
-          click: () => {
-            if (mainWindow) {
-              mainWindow.webContents.send('show-lore-repo-dialog');
-            }
-          }
-        },
-        {
           label: 'Recent Repositories',
           submenu: recentSubmenu
         },

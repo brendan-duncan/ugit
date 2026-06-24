@@ -4,248 +4,191 @@ import './Dialog.css';
 
 const PARENT_FOLDER_KEY = 'ugit-clone-parent-folder';
 
-interface CloneDialogProps {
-  onClose: () => void;
-  onClone: (repoUrl: string, parentFolder: string, repoName: string, depth: number) => Promise<void>;
+export type RepoKind = 'git' | 'lore';
+
+export interface CloneParams {
+  type: RepoKind;
+  repoUrl: string;
+  parentFolder: string;
+  name: string;
+  /** Git: shallow depth (0 = full). */
+  depth: number;
+  /** Lore: gitignore-style sparse view filter (empty = full checkout). */
+  viewContent: string;
+  /** Lore: bare clone. */
+  bare: boolean;
 }
 
+interface CloneDialogProps {
+  onClose: () => void;
+  onClone: (params: CloneParams) => Promise<void>;
+}
+
+/** Extract a default local folder name from a clone URL (handles git .git and lore:// URLs). */
+function extractName(url: string): string {
+  let s = url.trim().replace(/\/+$/, '');
+  if (s.endsWith('.git')) s = s.slice(0, -4);
+  const last = s.split('/').pop() || '';
+  if (url.startsWith('git@')) {
+    const colon = last.indexOf(':');
+    if (colon !== -1) return last.substring(colon + 1);
+  }
+  return last;
+}
+
+/** Unified clone dialog for Git and Lore. The type is detected from the URL (lore://) and can
+ *  be overridden; the shown settings change per type. */
 function CloneDialog({ onClose, onClone }: CloneDialogProps) {
   const [repoUrl, setRepoUrl] = useState<string>('');
   const [parentFolder, setParentFolder] = useState<string>('');
-  const [repoName, setRepoName] = useState<string>('');
+  const [name, setName] = useState<string>('');
+  const [type, setType] = useState<RepoKind>('git');
   const [shallow, setShallow] = useState<boolean>(false);
   const [depth, setDepth] = useState<number>(1);
+  const [viewContent, setViewContent] = useState<string>('');
+  const [bare, setBare] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Load saved parent folder on mount
   useEffect(() => {
-    const savedParentFolder = localStorage.getItem(PARENT_FOLDER_KEY);
-    if (savedParentFolder) {
-      setParentFolder(savedParentFolder);
-    }
+    const saved = localStorage.getItem(PARENT_FOLDER_KEY);
+    if (saved) setParentFolder(saved);
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Auto-fill URL from clipboard on mount
+  // Auto-fill URL from clipboard on mount.
   useEffect(() => {
-    const tryReadClipboard = async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        // Check if clipboard content looks like a git URL
-        if (text && (text.startsWith('http') || text.startsWith('git@') || text.includes('://'))) {
-          setRepoUrl(text);
-          // Try to extract repo name from URL
-          const urlParts = text.split('/');
-          const lastPart = urlParts[urlParts.length - 1];
-          if (lastPart.endsWith('.git')) {
-            setRepoName(lastPart.replace('.git', ''));
-          } else if (lastPart) {
-            setRepoName(lastPart);
-          }
-        }
-      } catch (error) {
-        // Clipboard access failed, ignore
-        console.log('Clipboard access not available:', error);
+    navigator.clipboard.readText().then(text => {
+      if (text && (text.startsWith('http') || text.startsWith('git@') || text.startsWith('lore://') || text.includes('://'))) {
+        setRepoUrl(text);
       }
-    };
-    tryReadClipboard();
+    }).catch(() => { /* clipboard unavailable */ });
   }, []);
 
-  // Save parent folder when it changes
-  useEffect(() => {
-    if (parentFolder) {
-      localStorage.setItem(PARENT_FOLDER_KEY, parentFolder);
-    }
-  }, [parentFolder]);
+  useEffect(() => { if (parentFolder) localStorage.setItem(PARENT_FOLDER_KEY, parentFolder); }, [parentFolder]);
 
-  // Update name field when URL changes
+  // Detect a Lore URL; switch type and derive the name. (A git URL leaves a manual Lore choice.)
   useEffect(() => {
-    // Extract repository name from URL
-    const extractRepoName = (url: string): string => {
-      try {
-        // Handle different URL formats
-        let cleanUrl = url.trim();
-        
-        // Remove .git suffix if present
-        if (cleanUrl.endsWith('.git')) {
-          cleanUrl = cleanUrl.slice(0, -4);
-        }
-        
-        // Split by / and get last part
-        const parts = cleanUrl.split('/');
-        const lastPart = parts[parts.length - 1];
-        
-        // Handle git@ URLs (remove domain part)
-        if (url.startsWith('git@')) {
-          const colonIndex = lastPart.indexOf(':');
-          if (colonIndex !== -1) {
-            return lastPart.substring(colonIndex + 1);
-          }
-        }
-        
-        return lastPart || '';
-      } catch (error) {
-        console.warn('Error extracting repo name from URL:', error);
-        return '';
-      }
-    };
-    
-    if (repoUrl) {
-      const extractedName = extractRepoName(repoUrl);
-      // Always replace name field when URL field is edited
-      setRepoName(extractedName);
-    }
+    if (repoUrl.trim().startsWith('lore://')) setType('lore');
+    if (repoUrl) setName(extractName(repoUrl));
   }, [repoUrl]);
 
-  // Handle Escape key for cancel
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
-
-  const handleBrowseFolder = async () => {
+  const browseFolder = async () => {
     try {
-      const result = await ipcRenderer.invoke('show-open-dialog', {
-        properties: ['openDirectory'],
-        title: 'Select Parent Folder'
-      });
-      if (!result.canceled && result.filePaths.length > 0) {
-        setParentFolder(result.filePaths[0]);
-      }
-    } catch (error) {
-      console.error('Error browsing folder:', error);
-    }
+      const result = await ipcRenderer.invoke('show-open-dialog', { properties: ['openDirectory'], title: 'Select Parent Folder' });
+      if (!result.canceled && result.filePaths.length > 0) setParentFolder(result.filePaths[0]);
+    } catch (error) { console.error('Error browsing folder:', error); }
   };
+
+  const isValid = repoUrl.trim() && parentFolder.trim() && name.trim();
 
   const handleClone = async () => {
-    if (!repoUrl.trim() || !parentFolder.trim() || !repoName.trim()) {
-      return;
-    }
-
-    const effectiveDepth = shallow && depth > 0 ? Math.floor(depth) : 0;
-
+    if (!isValid) return;
     setLoading(true);
     try {
-      await onClone(repoUrl.trim(), parentFolder.trim(), repoName.trim(), effectiveDepth);
-    } finally {
-      setLoading(false);
-    }
+      await onClone({
+        type,
+        repoUrl: repoUrl.trim(),
+        parentFolder: parentFolder.trim(),
+        name: name.trim(),
+        depth: type === 'git' && shallow && depth > 0 ? Math.floor(depth) : 0,
+        viewContent: type === 'lore' ? viewContent : '',
+        bare: type === 'lore' ? bare : false,
+      });
+    } finally { setLoading(false); }
   };
-
-  const isFormValid = repoUrl.trim() && parentFolder.trim() && repoName.trim();
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <h3>Clone</h3>
-        </div>
+        <div className="dialog-header"><h3>Clone</h3></div>
 
         <div className="dialog-body">
-          <div className="dialog-message">
-            Clone remote repository into a local folder
+          <div className="dialog-field" style={{ display: 'block' }}>
+            <label className="dialog-checkbox-label" style={{ marginRight: 16 }}>
+              <input type="radio" name="clone-type" checked={type === 'git'} onChange={() => setType('git')} />
+              <span>Git</span>
+            </label>
+            <label className="dialog-checkbox-label">
+              <input type="radio" name="clone-type" checked={type === 'lore'} onChange={() => setType('lore')} />
+              <span>Lore</span>
+            </label>
           </div>
 
           <div className="dialog-field">
-            <label htmlFor="repo-url">Repository Url:</label>
-            <input
-              id="repo-url"
-              type="text"
-              className="dialog-input"
-              placeholder="Git Repository Url"
-              value={repoUrl}
-              onChange={(e) => setRepoUrl(e.target.value)}
-            />
+            <label htmlFor="repo-url">Repository URL:</label>
+            <input id="repo-url" type="text" className="dialog-input"
+              placeholder={type === 'lore' ? 'lore://server:port/repo-name' : 'Git repository URL'}
+              value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} />
           </div>
 
           <div className="dialog-field">
             <label htmlFor="parent-folder">Parent Folder:</label>
             <div className="dialog-field-horizontal">
-              <input
-                id="parent-folder"
-                type="text"
-                className="dialog-input"
-                placeholder="Select parent folder"
-                value={parentFolder}
-                onChange={(e) => setParentFolder(e.target.value)}
-              />
-              <button
-                type="button"
-                className="dialog-button dialog-button-browse"
-                onClick={handleBrowseFolder}
-              >
-                Browse...
-              </button>
+              <input id="parent-folder" type="text" className="dialog-input" placeholder="Select parent folder"
+                value={parentFolder} onChange={(e) => setParentFolder(e.target.value)} />
+              <button type="button" className="dialog-button dialog-button-browse" onClick={browseFolder}>Browse...</button>
             </div>
           </div>
 
           <div className="dialog-field">
             <label htmlFor="repo-name">Name:</label>
-            <input
-              id="repo-name"
-              type="text"
-              className="dialog-input"
-              placeholder="Repository name"
-              value={repoName}
-              onChange={(e) => setRepoName(e.target.value)}
-            />
-          </div>
-
-          <div className="dialog-field" style={{ display: 'block' }}>
-            <label className="dialog-checkbox-label">
-              <input
-                type="checkbox"
-                checked={shallow}
-                onChange={(e) => setShallow(e.target.checked)}
-              />
-              <span>Shallow clone</span>
-            </label>
-            {shallow && (
-              <div className="dialog-field-horizontal" style={{ marginTop: 8 }}>
-                <label htmlFor="clone-depth" style={{ marginBottom: 0 }}>Depth:</label>
-                <input
-                  id="clone-depth"
-                  type="number"
-                  min="1"
-                  max="100000"
-                  className="dialog-input"
-                  value={depth}
-                  onChange={(e) => setDepth(parseInt(e.target.value) || 1)}
-                />
-              </div>
-            )}
-            <small style={{ display: 'block', marginTop: 8, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Fetch only the most recent commits (--depth). Leave unchecked for a full clone.
+            <input id="repo-name" type="text" className="dialog-input"
+              placeholder={type === 'lore' ? 'Local folder name (defaults to the repo name)' : 'Repository name'}
+              value={name} onChange={(e) => setName(e.target.value)} />
+            <small style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              Clones into <code>{(parentFolder || '<parent>').replace(/[\\/]+$/, '')}/{name || '<name>'}</code>
             </small>
           </div>
+
+          {type === 'git' && (
+            <div className="dialog-field" style={{ display: 'block' }}>
+              <label className="dialog-checkbox-label">
+                <input type="checkbox" checked={shallow} onChange={(e) => setShallow(e.target.checked)} />
+                <span>Shallow clone</span>
+              </label>
+              {shallow && (
+                <div className="dialog-field-horizontal" style={{ marginTop: 8 }}>
+                  <label htmlFor="clone-depth" style={{ marginBottom: 0 }}>Depth:</label>
+                  <input id="clone-depth" type="number" min="1" max="100000" className="dialog-input"
+                    value={depth} onChange={(e) => setDepth(parseInt(e.target.value) || 1)} />
+                </div>
+              )}
+              <small style={{ display: 'block', marginTop: 8, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                Fetch only the most recent commits (--depth). Leave unchecked for a full clone.
+              </small>
+            </div>
+          )}
+
+          {type === 'lore' && (
+            <>
+              <div className="dialog-field">
+                <label htmlFor="lore-view">Sparse view filter (optional):</label>
+                <textarea id="lore-view" className="dialog-input" style={{ minHeight: 56, resize: 'vertical', fontFamily: 'monospace' }}
+                  placeholder={'**\n!src/**'} value={viewContent} onChange={(e) => setViewContent(e.target.value)} />
+                <small style={{ display: 'block', marginTop: 6, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                  gitignore-style: <code>**</code> excludes all, <code>!path/**</code> re-includes. Leave blank for a full checkout.
+                </small>
+              </div>
+              <div className="dialog-field" style={{ display: 'block' }}>
+                <label className="dialog-checkbox-label">
+                  <input type="checkbox" checked={bare} onChange={(e) => setBare(e.target.checked)} />
+                  <span>Bare (fetch latest revision tree, no files)</span>
+                </label>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="dialog-footer">
-          <button 
-            className="dialog-button dialog-button-primary" 
-            onClick={handleClone}
-            disabled={!isFormValid || loading}
-          >
+          <button className="dialog-button dialog-button-primary" onClick={handleClone} disabled={!isValid || loading}>
             {loading ? 'Cloning...' : 'Clone'}
           </button>
-          <button className="dialog-button dialog-button-cancel" onClick={onClose}>
-            Cancel
-          </button>
+          <button className="dialog-button dialog-button-cancel" onClick={onClose}>Cancel</button>
         </div>
       </div>
     </div>
