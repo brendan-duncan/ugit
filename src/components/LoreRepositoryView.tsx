@@ -11,9 +11,10 @@ import LoreMediaView from './LoreMediaView';
 import LoreContextMenu, { LoreMenuItem } from './LoreContextMenu';
 import LoreStashDialog from './LoreStashDialog';
 import LoreApplyStashDialog from './LoreApplyStashDialog';
+import MetadataDialog from './MetadataDialog';
 import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
 import { clipboard } from 'electron';
-import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, LoreStashFile, StashInput, LoreBisectStep } from '../lore';
+import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, LoreStashFile, StashInput, LoreBisectStep, LoreMetadataEntry } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';
 
@@ -29,6 +30,10 @@ const CODE_COLORS: Record<string, string> = {
   M: 'var(--accent-color)',
   D: 'var(--danger-color)',
 };
+
+// Intrinsic keys returned by `metadata get` that aren't user-editable attributes.
+const BRANCH_SYSTEM_KEYS = new Set(['name', 'creator', 'created', 'protect']);
+const REVISION_SYSTEM_KEYS = new Set(['Branch', 'Date', 'Revision', 'Signature', 'Merge', 'Parent', 'Author', 'Message']);
 
 function changeColor(code: string): string {
   return CODE_COLORS[code[0]?.toUpperCase()] || 'var(--text-secondary)';
@@ -90,6 +95,11 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const [bisectStart, setBisectStart] = useState('');
   const [bisectEnd, setBisectEnd] = useState('');
   const [bisect, setBisect] = useState<LoreBisectStep | null>(null);
+  const [branchDiff, setBranchDiff] = useState<{ source: string; target: string; sourceRevision?: string; targetRevision?: string; files: LoreFileChange[] } | null>(null);
+  const [metaEditor, setMetaEditor] = useState<{
+    title: string; subtitle?: string; entries: LoreMetadataEntry[]; readOnlyEntries: LoreMetadataEntry[];
+    readOnly: boolean; onSave?: (pairs: [string, string][]) => Promise<void>;
+  } | null>(null);
   const [resolvingPath, setResolvingPath] = useState<string | null>(null);
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const anchorRef = useRef<string | null>(null);
@@ -406,6 +416,88 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   };
 
   // Branch row context menu.
+  // Diff another branch against the current one: show the changes `source` has that current lacks.
+  const doBranchDiff = (source: string) => runAction(async () => {
+    const target = status?.branch;
+    if (!target) return;
+    const r = await client!.branchDiff(target, source);
+    setViewMode('changes');
+    setSelectedPath(null); setRevDetail(null); setSelectedStash(null); setTreeFile(null);
+    setBranchDiff({ source, target, sourceRevision: r.sourceRevision, targetRevision: r.targetRevision, files: r.files });
+  });
+
+  const onSelectBranchDiffFile = useCallback(async (path: string) => {
+    if (!branchDiff) return;
+    setSelectedPath(path);
+    setDiffLoading(true);
+    try {
+      setDiffText(await client!.diffText([path], branchDiff.targetRevision, branchDiff.sourceRevision));
+    } catch (err) {
+      showAlert(err instanceof Error ? err.message : String(err), 'Lore diff error');
+    } finally {
+      setDiffLoading(false);
+    }
+  }, [client, branchDiff, showAlert]);
+
+  // Open a key/value metadata editor for a branch (intrinsic keys shown read-only).
+  const openBranchMetadata = async (branch: string) => {
+    try {
+      const all = await client!.branchMetadataGet(branch);
+      const editable = all.filter(e => !BRANCH_SYSTEM_KEYS.has(e.key));
+      setMetaEditor({
+        title: `Branch metadata — ${branch}`,
+        subtitle: 'Key/value attributes stored on the branch. Intrinsic fields are shown read-only.',
+        entries: editable,
+        readOnlyEntries: all.filter(e => BRANCH_SYSTEM_KEYS.has(e.key)),
+        readOnly: false,
+        onSave: async (pairs) => {
+          try {
+            const newKeys = new Set(pairs.map(([k]) => k));
+            const removed = editable.map(e => e.key).filter(k => !newKeys.has(k));
+            await client!.branchMetadataSet(branch, pairs);
+            if (removed.length) await client!.branchMetadataClear(branch, removed);
+            await refresh();
+          } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+        },
+      });
+    } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+  };
+
+  // Edit metadata on the staged revision (only the staged, not-yet-committed revision is editable).
+  const openStagedRevisionMetadata = async () => {
+    try {
+      const all = await client!.revisionMetadataGet();
+      const editable = all.filter(e => !REVISION_SYSTEM_KEYS.has(e.key));
+      setMetaEditor({
+        title: 'Revision metadata (staged)',
+        subtitle: 'Attributes attached to the revision you are about to commit.',
+        entries: editable,
+        readOnlyEntries: all.filter(e => REVISION_SYSTEM_KEYS.has(e.key)),
+        readOnly: false,
+        onSave: async (pairs) => {
+          try {
+            await client!.revisionMetadataClear(); // revisions support only clear-all, so reset then re-set
+            await client!.revisionMetadataSet(pairs);
+            await refresh();
+          } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+        },
+      });
+    } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+  };
+
+  // View (read-only) the metadata stored on a committed revision.
+  const viewRevisionMetadata = async (signature: string, number: number) => {
+    try {
+      const all = await client!.revisionMetadataGet(signature);
+      setMetaEditor({
+        title: `Revision ${number} metadata`,
+        entries: all.filter(e => !REVISION_SYSTEM_KEYS.has(e.key)),
+        readOnlyEntries: all.filter(e => REVISION_SYSTEM_KEYS.has(e.key)),
+        readOnly: true,
+      });
+    } catch (err) { showAlert(err instanceof Error ? err.message : String(err), 'Lore metadata error'); }
+  };
+
   const onBranchMenu = (e: React.MouseEvent, branch: string) => {
     e.preventDefault();
     const isCurrent = branch === status?.branch;
@@ -413,9 +505,11 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     if (!isCurrent) items.push(
       { label: 'Switch to Branch', onClick: () => doSwitchBranch(branch) },
       { label: `Merge into ${status?.branch}`, onClick: () => doMerge(branch) },
+      { label: `Diff against ${status?.branch}`, onClick: () => doBranchDiff(branch) },
     );
     items.push({ label: 'Push', onClick: () => runAction(async () => { await client!.push(branch); }) });
     items.push({ separator: true });
+    items.push({ label: 'Edit Metadata…', onClick: () => openBranchMetadata(branch) });
     items.push({ label: 'Protect', onClick: () => runAction(async () => { await client!.branchProtect(branch); }) });
     items.push({ label: 'Unprotect', onClick: () => runAction(async () => { await client!.branchUnprotect(branch); }) });
     if (!isCurrent) items.push({ label: 'Archive', danger: true, onClick: () => runAction(async () => { await client!.branchArchive(branch); }) });
@@ -436,6 +530,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       { label: 'Revert', onClick: () => doRevert(rev.signature) },
     ];
     if (isLatest) items.push({ label: 'Amend Message…', onClick: () => { const m = window.prompt('New commit message:', rev.message); if (m && m.trim()) runAction(async () => { await client!.amend(m.trim()); }); } });
+    items.push({ label: 'View Metadata…', onClick: () => viewRevisionMetadata(rev.signature, rev.number) });
     items.push({ separator: true });
     items.push({ label: 'Copy Signature', onClick: () => clipboard.writeText(rev.signature) });
     items.push({ label: 'Copy Info', onClick: () => clipboard.writeText(`revision ${rev.number}\n${rev.signature}\n${rev.message}`) });
@@ -446,6 +541,7 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
     setSelectedPath(null);
     setSelectedStash(null);
     setRevDetail(null);
+    setBranchDiff(null);
     try {
       setRevDetail(await client!.revisionInfo(rev.signature));
     } catch (err) {
@@ -1122,13 +1218,19 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       onChange={(e) => setCommitMessage(e.target.value)}
                       placeholder="Commit message"
                     />
-                    <button
-                      className="lore-primary-btn"
-                      onClick={doCommit}
-                      disabled={busy || !status.staged.length || (!commitMessage.trim() && !status.merge?.inProgress)}
-                    >
-                      {status.merge?.inProgress ? 'Complete merge' : 'Commit'} {status.staged.length ? `(${status.staged.length})` : ''}
-                    </button>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <button
+                        className="lore-primary-btn"
+                        onClick={doCommit}
+                        disabled={busy || !status.staged.length || (!commitMessage.trim() && !status.merge?.inProgress)}
+                      >
+                        {status.merge?.inProgress ? 'Complete merge' : 'Commit'} {status.staged.length ? `(${status.staged.length})` : ''}
+                      </button>
+                      <button className="lore-mini-btn" disabled={busy || !status.staged.length}
+                        title="Edit key/value metadata on the staged revision" onClick={openStagedRevisionMetadata}>
+                        Metadata…
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1136,10 +1238,14 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                   <div className="lore-detail-header">
                     {selectedStash ? `Stash: ${selectedStash.message}`
                       : selectedPath ? `Diff: ${selectedPath}`
+                      : branchDiff ? `Branch diff: ${branchDiff.source} → ${branchDiff.target}`
                       : revDetail ? `Revision ${revDetail.revision.number}`
                       : 'Diff'}
-                    {selectedPath && revDetail && (
-                      <button className="lore-mini-btn" style={{ marginLeft: 8 }} onClick={() => setSelectedPath(null)}>← revision</button>
+                    {selectedPath && (revDetail || branchDiff) && (
+                      <button className="lore-mini-btn" style={{ marginLeft: 8 }} onClick={() => setSelectedPath(null)}>← back</button>
+                    )}
+                    {branchDiff && !selectedPath && (
+                      <button className="lore-mini-btn" style={{ marginLeft: 8 }} onClick={() => setBranchDiff(null)}>Close</button>
                     )}
                   </div>
                   <div className="lore-diff-area">
@@ -1179,6 +1285,19 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
                       <LoreMediaView kind={mediaKind} name={selectedPath.split('/').pop() || selectedPath} newUrl={mediaNewUrl} oldUrl={mediaOldUrl} loadingOld={mediaLoadingOld} />
                     ) : selectedPath ? (
                       diffLoading ? <div className="lore-empty">Loading diff…</div> : <LoreDiffView diff={diffText} />
+                    ) : branchDiff ? (
+                      <div style={{ padding: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                          Changes on <strong>{branchDiff.source}</strong> not in <strong>{branchDiff.target}</strong> (since their common ancestor).
+                        </div>
+                        <div className="lore-changes-group-header"><span>Changed files ({branchDiff.files.length})</span></div>
+                        {branchDiff.files.length ? branchDiff.files.map(f => (
+                          <div key={f.path} className="lore-row" onClick={() => onSelectBranchDiffFile(f.path)} title={f.path}>
+                            <span className="lore-code" style={{ color: changeColor(f.code) }}>{f.code}</span>
+                            <span className="lore-row-name">{f.path}</span>
+                          </div>
+                        )) : <div className="lore-empty">no differences</div>}
+                      </div>
                     ) : revDetail ? (
                       <div style={{ padding: 8 }}>
                         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
@@ -1240,6 +1359,18 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
           stash={applyStashTarget}
           onClose={() => setApplyStashTarget(null)}
           onApply={async (pop) => { await applyStash(applyStashTarget.id, pop); if (pop) { setSelectedStash(null); setStashFile(null); } }}
+        />
+      )}
+
+      {metaEditor && (
+        <MetadataDialog
+          title={metaEditor.title}
+          subtitle={metaEditor.subtitle}
+          entries={metaEditor.entries}
+          readOnlyEntries={metaEditor.readOnlyEntries}
+          readOnly={metaEditor.readOnly}
+          onClose={() => setMetaEditor(null)}
+          onSave={metaEditor.onSave}
         />
       )}
 

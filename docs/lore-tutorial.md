@@ -93,7 +93,13 @@ Now teammates can clone `lore://<server>/MyGame` and you're all working against 
   **Lock/Unlock**. Click a file to see its diff (text) on the right.
 - A **commit box** at the bottom; commit creates a new local revision (push to publish).
 - **Branches** in the sidebar: switch by clicking, **+ New** to create, and **Merge** to merge a
-  branch into the current one.
+  branch into the current one. Right-click a branch for more: **Diff against \<current\>** (lists
+  what that branch has that the current one doesn't — click a file to diff it), protect/unprotect,
+  archive, and **Edit Metadata…** (key/value attributes on the branch).
+- **Metadata** is editable as key/value pairs: per branch (right-click → **Edit Metadata…**) and
+  on the revision you're about to commit (the **Metadata…** button by the commit box). Right-click
+  any past revision → **View Metadata…** to inspect it (committed revisions are read-only — Lore
+  only lets you set metadata on the *staged* revision).
 - **Locks** section: every locked file with its owner; release from here.
 - **Sparse view** section: view/edit the `.lore/view` filter (see below).
 - **Links / Layers** sections: compose sub-repositories (Part 10).
@@ -382,7 +388,5 @@ In the **Changes** sidebar's **Bisect** section:
 
 **Not yet in the GUI:**
 
-- **Some branch operations** — switch / create / merge / archive / reset / protect / unprotect are
-  wired; `branch diff` and branch/revision **metadata** editing are not surfaced.
 - **Auth login round-trip** — unverified; needs a secured server with an OIDC/JWK issuer (the dev
   server runs with auth disabled).

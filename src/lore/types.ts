@@ -250,6 +250,23 @@ export interface LoreBisectStep {
   raw: string;
 }
 
+/** One key/value metadata entry on a branch or revision (from `… metadata get`). */
+export interface LoreMetadataEntry {
+  key: string;
+  value: string;
+}
+
+/** Result of `branch diff`: the changes in `source` that aren't in `target`. */
+export interface LoreBranchDiff {
+  sourceBranch: string;
+  targetBranch: string;
+  /** Latest revision signatures of each branch, parsed from the diff header (for per-file diffs). */
+  sourceRevision?: string;
+  targetRevision?: string;
+  files: LoreFileChange[];
+  raw: string;
+}
+
 /** One configured shared store (from `shared-store info`). */
 export interface LoreSharedStore {
   /** Remote URL the store backs (e.g. "127.0.0.1:41337"). */

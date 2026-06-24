@@ -27,6 +27,7 @@ import {
   LoreFileHistoryEntry,
   LoreBisectStep,
   LoreSharedStoreInfo,
+  LoreMetadataEntry,
   ZERO_SIGNATURE,
 } from './types';
 
@@ -368,6 +369,39 @@ export function parseBisect(text: string): LoreBisectStep {
     culprit: culpritM ? culpritM[1] : midpoint ? `@${midpoint.number}` : undefined,
     raw: text,
   };
+}
+
+/**
+ * Parse `branch diff` output. The header carries each branch's latest revision; the changed-file
+ * rows (`A path`, `M path`, `D path`) follow a `Found N changes` line.
+ */
+export function parseBranchDiff(text: string): { sourceRevision?: string; targetRevision?: string; files: LoreFileChange[] } {
+  const files: LoreFileChange[] = [];
+  const revs = text.match(/Revision diff base \S+ source (\S+) target (\S+)/);
+  let started = false;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    if (/Found\s+\d+\s+changes/i.test(line)) { started = true; continue; }
+    if (!started) continue;
+    const row = line.match(/^([A-Z]{1,2})\s+(.+?)\s*$/);
+    if (row) files.push({ path: row[2], change: changeTypeFromCode(row[1]), code: row[1], section: 'staged' });
+  }
+  return { sourceRevision: revs?.[1], targetRevision: revs?.[2], files };
+}
+
+/**
+ * Parse aligned `key : value` metadata lines (`branch metadata get` / `revision metadata get`).
+ * Skips indented lines (e.g. a commit message) and blanks; preserves order. The caller filters
+ * out intrinsic/system keys it doesn't want to expose as editable.
+ */
+export function parseMetadata(text: string): LoreMetadataEntry[] {
+  const out: LoreMetadataEntry[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    if (!rawLine.trim() || /^\s/.test(rawLine)) continue; // blank or indented (message body)
+    const m = rawLine.match(/^(\S[^:]*?)\s*:\s*(.*)$/);
+    if (m) out.push({ key: m[1].trim(), value: m[2].trim() });
+  }
+  return out;
 }
 
 /**

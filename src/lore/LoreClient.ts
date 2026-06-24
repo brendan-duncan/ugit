@@ -36,6 +36,8 @@ import {
   parseFileHistory,
   parseBisect,
   parseSharedStoreInfo,
+  parseBranchDiff,
+  parseMetadata,
 } from './loreParsers';
 import {
   LoreStatus,
@@ -57,6 +59,8 @@ import {
   LoreFileHistoryEntry,
   LoreBisectStep,
   LoreSharedStoreInfo,
+  LoreMetadataEntry,
+  LoreFileChange,
 } from './types';
 
 /** Map an operation to its CLI command prefix for resolve/abort. */
@@ -266,6 +270,58 @@ export class LoreClient {
   async branchUnprotect(branch: string): Promise<void> { await this.run(['branch', 'unprotect', branch]); }
   /** Archive a branch (Lore's reversible "delete"). */
   async branchArchive(branch: string): Promise<void> { await this.run(['branch', 'archive', branch]); }
+
+  /**
+   * Diff two branches via their common ancestor: the changes in `source` that are NOT in `target`.
+   * Returns the changed files plus each branch's latest revision signature (for per-file diffs).
+   */
+  async branchDiff(target: string, source: string, autoResolve = false): Promise<{ sourceRevision?: string; targetRevision?: string; files: LoreFileChange[] }> {
+    const argv = ['branch', 'diff', target, '--source', source];
+    if (autoResolve) argv.push('--auto-resolve');
+    return parseBranchDiff((await this.run(argv, { skip: true })).stdout);
+  }
+
+  // --- Metadata (branch + revision key/value attributes) ---
+
+  /** Read a branch's metadata (defaults to the current branch). Includes intrinsic keys. */
+  async branchMetadataGet(branch?: string): Promise<LoreMetadataEntry[]> {
+    const argv = ['branch', 'metadata', 'get'];
+    if (branch) argv.push('--branch', branch);
+    return parseMetadata((await this.run(argv, { skip: true })).stdout);
+  }
+
+  /** Set key/value pairs on a branch's metadata (pairs are passed as separate args: `key value`). */
+  async branchMetadataSet(branch: string, pairs: [string, string][]): Promise<void> {
+    if (!pairs.length) return;
+    const argv = ['branch', 'metadata', 'set'];
+    for (const [k, v] of pairs) argv.push(k, v);
+    argv.push('--branch', branch);
+    await this.run(argv);
+  }
+
+  /** Clear specific keys from a branch's metadata. */
+  async branchMetadataClear(branch: string, keys: string[]): Promise<void> {
+    if (!keys.length) return;
+    await this.run(['branch', 'metadata', 'clear', ...keys, '--branch', branch]);
+  }
+
+  /** Read a revision's metadata (defaults to the staged revision). */
+  async revisionMetadataGet(revision?: string): Promise<LoreMetadataEntry[]> {
+    const argv = ['revision', 'metadata', 'get'];
+    if (revision) argv.push('--revision', revision);
+    return parseMetadata((await this.run(argv, { skip: true })).stdout);
+  }
+
+  /** Set key/value pairs on the STAGED revision's metadata (only the staged revision is editable). */
+  async revisionMetadataSet(pairs: [string, string][]): Promise<void> {
+    if (!pairs.length) return;
+    const argv = ['revision', 'metadata', 'set'];
+    for (const [k, v] of pairs) argv.push(k, v);
+    await this.run(argv);
+  }
+
+  /** Clear all metadata from the STAGED revision (the CLI has no per-key clear for revisions). */
+  async revisionMetadataClear(): Promise<void> { await this.run(['revision', 'metadata', 'clear']); }
 
   /**
    * Merge `branch` INTO the current branch. Auto-commits when there are no conflicts; otherwise
