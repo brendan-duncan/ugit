@@ -106,8 +106,8 @@ The working set as a **sparse tree of the repo** (like a Perforce depot/workspac
 - Folders expand **lazily** (children load on demand), so huge projects stay responsive.
 - Each row shows the **size**, a **🔒 lock owner** if locked, and a **change marker** (A/M/D)
   if modified. Files that exist in the repo but aren't checked out on disk (sparse or bare clone)
-  are dimmed and tagged **☁ not fetched** — selecting one still previews it (ugit streams the
-  content from the store on demand). See Part 8.
+  are dimmed and tagged **☁ not fetched** — selecting one still previews it, and right-clicking
+  offers **Check out (fetch to disk)** to pull it down. See Part 8.
 - Select a file to see, on the right: its **info** (size/hash/status), an **image preview** (for
   png/jpg/etc.) or a **binary asset card** (for other binaries) or a **text diff**, and its
   **per-file history** — click a revision to diff that asset at that point in time.
@@ -141,7 +141,7 @@ This is where Lore's centralized, lock-oriented model matters. From Lore's persp
   anyone until you **Push**; you see others' work when you **Sync**.
 
 - **Lock unmergeable assets before editing.** Two people can't meaningfully merge a binary
-  `.uasset` or a texture. The Lore workflow is **exclusive locking**: before editing such a file,
+  file or a texture. The Lore workflow is **exclusive locking**: before editing such a file,
   select it and click **Lock**. Everyone else sees `🔒 <your name>` on that file in the Files
   tree and Changes list, so they know not to touch it. Commit, push, then **Unlock**. (On the
   auth-disabled dev server the owner shows as `<unknown>`; a real server shows real identities.)
@@ -158,7 +158,7 @@ This is where Lore's centralized, lock-oriented model matters. From Lore's persp
   assets on demand.
 
 Concrete example — an artist and a programmer share `MyGame`:
-- The **artist** locks `Content/Meshes/hero.uasset`, edits it in their DCC tool, commits, pushes,
+- The **artist** locks `Content/Meshes/hero.glb`, edits it in their DCC tool, commits, pushes,
   unlocks. The programmer saw the lock the whole time and left it alone.
 - The **programmer** edits `Source/*.cpp` on a `feature/ai` branch, commits, pushes the branch,
   then merges to `main` — resolving any `.cpp` conflicts in the resolver.
@@ -241,18 +241,24 @@ empty for everything, or a `**`/`!` filter for a subset) and then **Sync** (CLI:
 --reset`) to materialize the files. For normal work, prefer a **full** or **sparse** clone over
 bare.
 
-### Browsing un-fetched files
+### Browsing and checking out un-fetched files
 
 In any sparse or bare clone, files that live in the repository but aren't checked out on disk show
 up dimmed with a **☁ not fetched** tag in the Files tree. You can still **select one to preview**
 it — ugit streams that single file's content from the store at the current revision without
-materializing it. To actually pull files onto disk, widen the **Sparse view** and **Sync** (above).
+materializing it.
+
+To actually pull a file onto disk, **right-click it in the Files tree → Check out (fetch to
+disk)** (or **Check out folder…** on a directory). ugit adds the path to your sparse view and
+syncs, materializing just that file — it won't drop anything already checked out (the underlying
+`sync --reset` is additive). The row loses its **☁ not fetched** tag once it's on disk. You can
+also widen the **Sparse view** filter directly and **Sync** to pull a whole set at once.
 
 ---
 
 ## 9. Locks (Perforce-style exclusive checkout)
 
-Some files can't be merged — a binary `.uasset`, a texture, a packed mesh. Lore's answer is the
+Some files can't be merged — a binary data file, a texture, a packed mesh. Lore's answer is the
 same as Perforce's: **lock the file before you edit it** so nobody else can commit a conflicting
 change. Part 6 covers *why* this matters for a team; this section is the *how* in ugit.
 

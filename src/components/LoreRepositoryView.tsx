@@ -283,8 +283,14 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
       { separator: true },
     ];
     if (isDir) {
+      items.push({ label: 'Check out folder (fetch to disk)', onClick: () => doCheckout(path, true) });
+      items.push({ separator: true });
       items.push({ label: 'Ignore folder', onClick: () => doIgnore(path, true) });
     } else {
+      if (!client!.isFetched(path)) {
+        items.push({ label: 'Check out (fetch to disk)', onClick: () => doCheckout(path, false) });
+        items.push({ separator: true });
+      }
       items.push({ label: 'Lock', onClick: () => runAction(async () => { await client!.lockAcquire([path]); }) });
       items.push({ label: 'Unlock', onClick: () => runAction(async () => { await client!.lockRelease([path]); }) });
       items.push({ label: 'Ignore file', onClick: () => doIgnore(path, false) });
@@ -645,6 +651,18 @@ function LoreRepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshS
   const doSaveView = () => runAction(async () => {
     await client!.writeView(viewDraft);
     setEditingView(false);
+  });
+
+  // Check out (materialize) an un-fetched path from the Files view: add it to the sparse view and
+  // sync. `sync --reset` is additive — it fetches the newly-included path without dropping anything
+  // already on disk — so this is safe even when the current view is unknown/empty.
+  const doCheckout = (p: string, isDir: boolean) => runAction(async () => {
+    const include = isDir ? `!${p}/**` : `!${p}`;
+    const lines = ((await client!.readView()) ?? '').split('\n').map(s => s.trim()).filter(Boolean);
+    if (!lines.includes('**')) lines.unshift('**'); // exclude-all base, so the `!` re-includes mean something
+    if (!lines.includes(include)) lines.push(include);
+    await client!.writeView(lines.join('\n'));
+    await client!.sync({ reset: true });
   });
 
   const stageAll = () => runAction(async () => { await client!.stage((status?.unstaged ?? []).map(f => f.path)); });
