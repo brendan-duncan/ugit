@@ -91,8 +91,10 @@ Now teammates can clone `lore://<server>/MyGame` and you're all working against 
 
 ### Changes view (the commit flow)
 - **Changes not staged** / **Staged for commit** lists. Each row has **Stage/Unstage** and
-  **Lock/Unlock**. Click a file to see its diff (text) on the right.
+  **Lock/Unlock**. Click a file to see its diff (text) on the right. Right-click for more —
+  **Discard** (revert a file to the committed revision), **Stash**, and **Ignore** (see Parts 13–14).
 - A **commit box** at the bottom; commit creates a new local revision (push to publish).
+- **Stashes** section: set aside work-in-progress and restore it later (Part 13).
 - **Branches** in the sidebar: switch by clicking, **+ New** to create, and **Merge** to merge a
   branch into the current one. Right-click a branch for more: **Diff against \<current\>** (lists
   what that branch has that the current one doesn't — click a file to diff it), protect/unprotect,
@@ -383,7 +385,39 @@ In the **Changes** sidebar's **Bisect** section:
 
 ---
 
-## 13. Troubleshooting & known limits
+## 13. Stash (set work aside)
+
+Lore has **no native stash**, so ugit emulates one locally: a stash captures the bytes of selected
+(or all) changed files and rolls those files back, giving you a clean tree to do something else;
+later you restore them. Stashes live under `.lore/stashes/` — they're **local-only** (never pushed)
+and invisible to Lore's own operations.
+
+- **Create:** the toolbar **Stash** button (or right-click a changed file → **Stash**) opens a
+  dialog for a short name + optional description, with a **keep** checkbox (stash a copy but leave
+  the working tree as-is).
+- **Restore:** in the **Stashes** sidebar section, click a stash to see its contents; double-click
+  or right-click → **Apply…** to restore it (with a **pop** option to delete it after applying).
+- **Manage:** right-click a stash to **Rename** or **Delete**.
+
+Because stashes are a ugit-side convenience (not a Lore feature), they don't sync between machines —
+they're for parking local work in progress.
+
+---
+
+## 14. `.loreignore` (keeping files out of the repo)
+
+`.loreignore` is Lore's **outbound** filter — gitignore-style patterns for files that should *never*
+be committed/pushed (build output, local caches, secrets). It's the complement of the **sparse
+view** (Part 8), which is the *inbound* filter for what you check out.
+
+In the **Files** tree or the **Changes** list, right-click a file or folder → **Ignore**:
+**Ignore file**, **Ignore \*.ext**, **Ignore folder**, or **Ignore custom pattern…**. ugit appends
+the pattern to `.loreignore` (BOM-free). `.loreignore` itself is tracked, so committing it shares
+the ignore rules with the team.
+
+---
+
+## 15. Troubleshooting & known limits
 
 | Symptom | Fix |
 | --- | --- |
@@ -395,7 +429,16 @@ In the **Changes** sidebar's **Bisect** section:
 | Files view shows `D` on **every** file | You did a **bare** clone (no files on disk). Set a view and Sync, or re-clone full/sparse — see Part 8. |
 | Sparse clone fetched everything | The view filter was empty or didn't start with `**`. Excludes-then-`!`re-includes; a blank box = full checkout. |
 
-**Not yet in the GUI:**
+**Not yet in the GUI** (Lore capabilities ugit doesn't surface):
 
-- **Auth login round-trip** — unverified; needs a secured server with an OIDC/JWK issuer (the dev
-  server runs with auth disabled).
+- **Auth login round-trip** — wired but unverified; needs a secured server with an OIDC/JWK issuer
+  (the dev server runs with auth disabled). Authenticate the CLI with `lore login` and ugit reuses it.
+- **Repository- and file-level metadata** — ugit edits *branch* and *revision* metadata; the
+  `repository metadata` and `file metadata` levels aren't surfaced.
+- **Dependency-based selective clone/sync** — the per-file dependency graph is editable (Part 4),
+  but cloning/syncing *by* it (`--root-file`, `--dependency-tag`) isn't exposed.
+- **Link re-pin / layer metadata matching** — links/layers can be added/removed but not re-pinned
+  (`link update`) or metadata-matched.
+- **Other CLI-only operations** — `repository verify` / `info` / `delete`, `revision find` /
+  `restore`, `branch latest`, `file obliterate` / `hash`, `service` (warm-store process; exits 1 on
+  the dev setup), virtual/prefetch clone modes, and partitions.

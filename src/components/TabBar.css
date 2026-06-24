@@ -88,6 +88,23 @@
   font-weight: 500;
 }
 
+/* On the violet Lore-tab fill the sync count (esp. the salmon "behind") loses contrast — give it
+   a dark pill so it stays legible against any tab state, and brighten the colors slightly. */
+.tab.lore .tab-status {
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.tab.lore .status-ahead {
+  color: #eafbe7;
+}
+
+.tab.lore .status-behind {
+  color: #ffb4a2;
+}
+
 .tab-close {
   margin-left: 8px;
   background: none;
