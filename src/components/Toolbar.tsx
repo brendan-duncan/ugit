@@ -20,13 +20,15 @@ interface ToolbarProps {
   onFetch: () => void;
   onPull: () => void;
   onPush: () => void;
+  onStash: (() => void) | null;
   refreshing: boolean;
   currentBranch: string;
   branchStatus: BranchStatus;
+  onCreateBranch: () => void;
   runningCommands: RunningCommand[];
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onRefresh, onFetch, onPull, onPush, refreshing, currentBranch, branchStatus, runningCommands }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onRefresh, onFetch, onPull, onPush, onStash, refreshing, currentBranch, branchStatus, onCreateBranch, runningCommands }) => {
   const [showRepositoryMenu, setShowRepositoryMenu] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -78,6 +80,15 @@ const Toolbar: React.FC<ToolbarProps> = ({ onRefresh, onFetch, onPull, onPush, r
       <button className="toolbar-button" onClick={onPush} disabled={!onPush}>
         <span className="toolbar-button-icon">⬆</span>
         <span className="toolbar-button-label">{pushLabel}</span>
+      </button>
+      <div className="toolbar-separator"></div>
+      <button className="toolbar-button" onClick={onStash} disabled={!onStash}>
+        <span className="toolbar-button-icon">📦</span>
+        <span className="toolbar-button-label">Stash</span>
+      </button>
+      <button className="toolbar-button" onClick={onCreateBranch} disabled={!currentBranch}>
+        <span className="toolbar-button-icon">🌿</span>
+        <span className="toolbar-button-label">Branch</span>
       </button>
       <div className="toolbar-separator"></div>
       {runningCommands.length > 0 &&

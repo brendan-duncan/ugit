@@ -1749,6 +1749,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         onFetch={handleFetchClick}
         onPull={() => showPullDialog()}
         onPush={() => showPushDialog(currentBranch)}
+        onStash={hasLocalChanges ? () => showStashDialog() : null}
+        onCreateBranch={() => showCreateBranchDialog()}
         refreshing={refreshing}
         currentBranch={currentBranch}
         branchStatus={branchStatus}
