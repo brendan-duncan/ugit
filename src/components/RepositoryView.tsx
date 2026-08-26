@@ -60,6 +60,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [busyMessage, setBusyMessage] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState<string | undefined>(undefined);
   const [rebaseStatus, setRebaseStatus] = useState<RebaseStatus | null>(null);
 
   const activeSplitter = useRef<number | string | null>(null);
@@ -175,8 +176,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   
   const hasLocalChanges = unstagedFiles.length > 0 || stagedFiles.length > 0;
 
-  const setErrorWithDialog = useCallback((err: string) => {
+  const setErrorWithDialog = useCallback((err: string, title?: string) => {
     setError(err);
+    setErrorTitle(title);
     showErrorDialog();
   }, [showErrorDialog]);
 
@@ -510,18 +512,41 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
 
     try {
       setIsBusy(true);
-      setBusyMessage(pushAllTags 
-        ? `git push origin ${branch}:${remoteBranch} --tags`
-        : `git push origin ${branch}:${remoteBranch}`
-      );
-      
-      const pushOutput = pushAllTags
-        ? await gitAdapter.push('origin', `${branch}:${remoteBranch}`, ['--tags'])
-        : await gitAdapter.push('origin', `${branch}:${remoteBranch}`);
+      // The branch and the tags are pushed as separate commands. Combining them into
+      // 'git push <branch> --tags' makes git exit non-zero when any single tag is
+      // rejected, which reports the whole push as failed even though the branch went up.
+      setBusyMessage(`git push origin ${branch}:${remoteBranch}`);
+      const pushOutput = await gitAdapter.push('origin', `${branch}:${remoteBranch}`);
 
       const prUrlMatch = pushOutput.match(/https?:\/\/[^\s\)]+\/pull\/new\/[^\s\)]+/);
       if (prUrlMatch) {
         showPullRequestDialog(prUrlMatch[0], branch);
+      }
+
+      if (pushAllTags) {
+        setBusyMessage('git ls-remote --tags origin');
+        const tags = await gitAdapter.compareTags('origin');
+
+        if (tags.toPush.length > 0) {
+          setBusyMessage(`git push origin ${tags.toPush.length} tag${tags.toPush.length === 1 ? '' : 's'}`);
+          await gitAdapter.pushTags('origin', tags.toPush);
+        }
+
+        // Tags origin already has under a different commit can only be pushed by
+        // overwriting the remote tag, so skip them and say which ones were skipped.
+        if (tags.conflicting.length > 0) {
+          const shown = tags.conflicting.slice(0, 10).join(', ');
+          const rest = tags.conflicting.length - 10;
+          setErrorWithDialog(
+            `Pushed ${branch} to origin/${remoteBranch}.\n\n` +
+            `${tags.conflicting.length} tag${tags.conflicting.length === 1 ? '' : 's'} ` +
+            `not pushed because origin already has ${tags.conflicting.length === 1 ? 'it' : 'them'} ` +
+            `at a different commit:\n${shown}${rest > 0 ? `, and ${rest} more` : ''}\n\n` +
+            `Your local tags are probably out of date. Run 'git fetch --tags --force' to ` +
+            `reset them to origin, or 'git push origin --tags --force' to overwrite the ` +
+            `tags on origin instead.`,
+            'Push Completed with Warnings');
+        }
       }
 
       await loadRepoData(true);
@@ -1822,7 +1847,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         {error && dialogStates.showErrorDialog && (
           <ErrorDialog
             error={error}
-            onClose={() => { setError(null); hideErrorDialog(); }}
+            title={errorTitle}
+            onClose={() => { setError(null); setErrorTitle(undefined); hideErrorDialog(); }}
           />
         )}
         {!loading && !error && (

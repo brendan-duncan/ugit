@@ -171,6 +171,17 @@ export interface WorktreeInfo {
   prunable: boolean;
 }
 
+export interface TagComparison {
+  // Tags the remote doesn't have at all. These can be pushed as-is.
+  toPush: string[];
+  // Tags the remote already has, but pointing at a different commit than the local
+  // tag. Pushing these is rejected by git with "(already exists)" unless forced,
+  // which would rewrite the remote tag, so they are skipped and reported instead.
+  conflicting: string[];
+  // Tags the remote already has at the same commit. Nothing to do for these.
+  upToDate: string[];
+}
+
 /**
  * Abstract base class for Git operations
  * Defines the interface that all Git adapters must implement
@@ -333,11 +344,37 @@ export abstract class GitAdapter {
   /**
    * Push to remote branch
    * @param remote - Remote name (e.g., 'origin')
-   * @param refspec - Refspec (e.g., 'main:main')
+   * @param refspec - Refspec (e.g., 'main:main'), or several to push in one command
    * @param options - Additional options (e.g., ['--tags'])
    * @returns Push result with stdout/stderr output
    */
-  abstract push(remote: string, refspec: string, options?: string[]): Promise<string>;
+  abstract push(remote: string, refspec: string | string[], options?: string[]): Promise<string>;
+
+  /**
+   * Compare local tags against the tags the remote already has, so a tag push can
+   * skip the ones that would be rejected instead of failing the whole push.
+   * Annotated tags are peeled, so a local annotated tag and a remote lightweight
+   * tag on the same commit count as up to date.
+   * @param remote - Remote name (e.g., 'origin')
+   */
+  abstract compareTags(remote: string): Promise<TagComparison>;
+
+  /**
+   * Push the named tags to a remote. Sent in batches so repositories with a large
+   * number of tags don't overflow the OS command line length limit.
+   * @param remote - Remote name (e.g., 'origin')
+   * @param tags - Short tag names (e.g., ['v1.5.1', 'v1.6.0'])
+   * @returns Combined push output of every batch
+   */
+  async pushTags(remote: string, tags: string[]): Promise<string> {
+    const batchSize = 100;
+    const output: string[] = [];
+    for (let i = 0; i < tags.length; i += batchSize) {
+      const batch = tags.slice(i, i + batchSize).map(tag => `refs/tags/${tag}`);
+      output.push(await this.push(remote, batch));
+    }
+    return output.join('\n');
+  }
 
   /**
    * Create a stash

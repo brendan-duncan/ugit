@@ -11,6 +11,7 @@ import GitAdapter, {
   SearchQuery,
   SearchLogResult,
   WorktreeInfo,
+  TagComparison,
   CloneProgress } from './GitAdapter';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
@@ -350,11 +351,11 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
-  async push(remote: string, refspec: string, options: string[] = []): Promise<string> {
+  async push(remote: string, refspec: string | string[], options: string[] = []): Promise<string> {
     const startTime = performance.now();
     let result = '';
 
-    const args = ['push', remote, refspec];
+    const args = ['push', remote, ...(Array.isArray(refspec) ? refspec : [refspec])];
     if (options.length > 0) {
       args.push(...options);
     }
@@ -379,7 +380,7 @@ export class SimpleGitAdapter extends GitAdapter {
       // Combine stdout and stderr as PR URLs typically appear in stderr
       result = stdout + '\n' + stderr;
     } catch (error: any) {
-      console.error(`Error pushing to ${remote} ${refspec}:`, error);
+      console.error(`Error pushing to ${remote} ${args.slice(2).join(' ')}:`, error);
 
       // Capture stdout and stderr from error (exec includes these even on failure)
       result = (error.stdout || '') + '\n' + (error.stderr || '');
@@ -390,6 +391,64 @@ export class SimpleGitAdapter extends GitAdapter {
     }
 
     return result;
+  }
+
+  async compareTags(remote: string): Promise<TagComparison> {
+    const comparison: TagComparison = { toPush: [], conflicting: [], upToDate: [] };
+
+    // '%(*objectname)' is the commit an annotated tag dereferences to and is empty for
+    // lightweight tags, so peeling is just "use the dereferenced hash if there is one".
+    const localTags = new Map<string, string>();
+    const localArgs = ['for-each-ref', '--format=%(refname:strip=2)%09%(objectname)%09%(*objectname)',
+      'refs/tags'];
+    const localStart = performance.now();
+    const localId = this._startCommand(`git ${localArgs.join(' ')}`, localStart);
+    try {
+      const output = await this.git.raw(localArgs);
+      for (const line of output.split('\n')) {
+        const [name, objectName, peeled] = line.trim().split('\t');
+        if (name)
+          localTags.set(name, peeled || objectName);
+      }
+    } finally {
+      this._endCommand(localId, localStart);
+    }
+
+    if (localTags.size === 0)
+      return comparison;
+
+    // `git ls-remote --tags` lists an extra 'refs/tags/<name>^{}' row for annotated tags
+    // holding the commit they point at; prefer that over the tag object's own hash.
+    const remoteTags = new Map<string, string>();
+    const remoteArgs = ['ls-remote', '--tags', remote];
+    const remoteStart = performance.now();
+    const remoteId = this._startCommand(`git ${remoteArgs.join(' ')}`, remoteStart);
+    try {
+      const output = await this.git.raw(remoteArgs);
+      for (const line of output.split('\n')) {
+        const [hash, ref] = line.trim().split('\t');
+        if (!hash || !ref || !ref.startsWith('refs/tags/'))
+          continue;
+        const isPeeled = ref.endsWith('^{}');
+        const name = ref.slice('refs/tags/'.length, isPeeled ? -3 : undefined);
+        if (isPeeled || !remoteTags.has(name))
+          remoteTags.set(name, hash);
+      }
+    } finally {
+      this._endCommand(remoteId, remoteStart);
+    }
+
+    for (const [name, hash] of localTags) {
+      const remoteHash = remoteTags.get(name);
+      if (!remoteHash)
+        comparison.toPush.push(name);
+      else if (remoteHash === hash)
+        comparison.upToDate.push(name);
+      else
+        comparison.conflicting.push(name);
+    }
+
+    return comparison;
   }
 
   async stashPush(message: string, filePaths: string[] | null = null, keepChanges: boolean = false): Promise<void> {

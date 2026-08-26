@@ -3,10 +3,12 @@ import './ErrorDialog.css';
 
 interface ErrorDialogProps {
   error: string;
+  // Header text, for messages that aren't failures (e.g. 'Push Completed with Warnings')
+  title?: string;
   onClose: () => void;
 }
 
-function ErrorDialog({ error, onClose }: ErrorDialogProps) {
+function ErrorDialog({ error, title = 'Error', onClose }: ErrorDialogProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
@@ -21,7 +23,7 @@ function ErrorDialog({ error, onClose }: ErrorDialogProps) {
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
-          <h3>Error</h3>
+          <h3>{title}</h3>
         </div>
         <div className="dialog-body">
           <div className="error-message">{error}</div>
