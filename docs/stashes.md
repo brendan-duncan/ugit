@@ -115,6 +115,22 @@ Stashes can only be deleted one at a time through the UI.
 
 ---
 
+## Saving a Stash as a Patch
+
+Export a stash's changes to a `.patch` file you can share or apply elsewhere.
+
+1. Right-click on a stash
+2. Select **Save as Patch...**
+3. Choose where to save the file
+
+If the stash also captured untracked files, a second command, **Save as Patch (include untracked)...**,
+appears; it adds those files to the patch as new-file diffs. Note that applying such a patch fails if
+those files already exist in the target working directory.
+
+Patch files can be applied from the repository **...** menu → **Apply Patch...**, or with `git apply`.
+
+---
+
 ## Stash Workflows
 
 ### Workflow 1: Switch Branches with Uncommitted Work
@@ -160,6 +176,8 @@ Stashes can only be deleted one at a time through the UI.
 | `git stash apply` | Apply stash without removing |
 | `git stash drop` | Delete a specific stash |
 | `git stash clear` | Delete all stashes |
+| `git stash show -p --no-include-untracked stash@{n}` | Save a stash as a patch |
+| `git stash show -p --include-untracked stash@{n}` | Save a stash as a patch, including untracked files |
 
 ---
 

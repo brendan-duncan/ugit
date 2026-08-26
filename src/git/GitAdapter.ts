@@ -98,6 +98,10 @@ export interface StashInfo {
   date: string;
   merge: string;
   message: string;
+
+  // True when the stash captured untracked files (they are stored in a third
+  // parent commit). Only populated by `stashList`.
+  hasUntracked?: boolean;
 }
 
 export interface StashListResponse {
@@ -479,6 +483,15 @@ export abstract class GitAdapter {
    * @param isStaged - Whether to create patch from staged changes
    */
   abstract createPatch(filePaths: string[], outputPath: string, isStaged?: boolean): Promise<void>;
+
+  /**
+   * Create a patch file from a stash entry
+   * @param stashIndex - The stash index
+   * @param outputPath - Path where to save the patch file
+   * @param includeUntracked - Whether to include the stash's untracked files in the patch
+   * @returns False if the stash produced an empty patch, in which case no file is written
+   */
+  abstract createStashPatch(stashIndex: number, outputPath: string, includeUntracked?: boolean): Promise<boolean>;
 
   /**
    * Clone a repository

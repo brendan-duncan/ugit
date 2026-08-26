@@ -26,6 +26,7 @@ import PullRequestDialog from './PullRequestDialog';
 import ConfirmDialog from './ConfirmDialog';
 import CreateWorktreeDialog, { CreateWorktreeParams } from './CreateWorktreeDialog';
 import { ipcRenderer } from 'electron';
+import path from 'path';
 import { useGitAdapter, useRepositoryData } from '../hooks/useGit';
 import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
@@ -1083,6 +1084,38 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       showPushDialog, showMergeBranchDialog, showRebaseBranchDialog, showCreateBranchDialog,
       showCreateTagFromCommitDialog, showRenameBranchDialog, showDeleteBranchDialog, showCreateWorktreeDialog]);
 
+  const saveStashAsPatch = useCallback(async (stash: any, stashIndex: number, includeUntracked: boolean) => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      const name = stash.message.replace(/^On [^:]+:\s*/, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 60);
+      const result = await ipcRenderer.invoke('show-save-dialog', {
+        title: 'Save Patch As',
+        defaultPath: path.join(gitAdapter.repoPath, name ? `${name}.patch` : `stash-${stashIndex}.patch`),
+        filters: [
+          { name: 'Patch Files', extensions: ['patch'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+
+      if (result.canceled || !result.filePath)
+        return;
+
+      const saved = await gitAdapter.createStashPatch(stashIndex, result.filePath, includeUntracked);
+      if (!saved) {
+        showAlert(stash.hasUntracked && !includeUntracked
+          ? 'This stash contains only untracked files.\n\nUse "Save as Patch (include untracked)..." to export them.'
+          : 'This stash has no changes to export.', 'Nothing to save');
+        return;
+      }
+      console.log(`Saved patch to ${result.filePath}`);
+    } catch (error) {
+      console.error('Error saving stash as patch:', error);
+      setErrorWithDialog(`Failed to save stash as patch: ${(error as Error).message}`);
+    }
+  }, [gitAdapter, showAlert, setErrorWithDialog]);
+
   const handleStashContextMenu = useCallback((action: string, stash: any, stashIndex: number) => {
     switch (action) {
       case 'apply':
@@ -1094,8 +1127,14 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       case 'delete':
         showDeleteStashDialog({ message: stash.message, index: stashIndex });
         break;
+      case 'save-patch':
+        saveStashAsPatch(stash, stashIndex, false);
+        break;
+      case 'save-patch-untracked':
+        saveStashAsPatch(stash, stashIndex, true);
+        break;
     }
-  }, [showApplyStashDialog, showRenameStashDialog, showDeleteStashDialog]);
+  }, [showApplyStashDialog, showRenameStashDialog, showDeleteStashDialog, saveStashAsPatch]);
 
   const handleApplyStashDialog = useCallback(async ({ stashIndex, deleteAfterApplying }: { stashIndex: number; deleteAfterApplying: boolean }) => {
     hideApplyStashDialog();

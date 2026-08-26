@@ -246,12 +246,34 @@ export class SimpleGitAdapter extends GitAdapter {
     
     // Convert simple-git stash list format to our interface
     const stashItems = result?.all || [];
+    const parentCounts = stashItems.length > 0 ? await this._stashParentCounts() : [];
     return {
-      all: stashItems.map((item: any) => ({
+      all: stashItems.map((item: any, index: number) => ({
         hash: item.hash || '',
-        message: item.message || ''
+        message: item.message || '',
+        // A stash that captured untracked files stores them in a third parent commit.
+        hasUntracked: (parentCounts[index] || 0) >= 3
       }))
     };
+  }
+
+  /**
+   * Number of parents of each stash entry, in the same order as `git stash list`.
+   */
+  private async _stashParentCounts(): Promise<number[]> {
+    const startTime = performance.now();
+    const id = this._startCommand('git stash list --format=%P', startTime);
+    let counts: number[] = [];
+    try {
+      const output = await this.git.raw(['stash', 'list', '--format=%P']);
+      counts = output.split('\n')
+        .filter(line => line.trim().length > 0)
+        .map(line => line.trim().split(/\s+/).length);
+    } catch (error) {
+      console.error('Error getting stash parents:', error);
+    }
+    this._endCommand(id, startTime);
+    return counts;
   }
 
   async fetch(remote: string, options?: string[]): Promise<void> {
@@ -976,6 +998,33 @@ export class SimpleGitAdapter extends GitAdapter {
 
     fsSync.writeFileSync(outputPath, patchContent, 'utf8');
     this._endCommand(id, startTime);
+  }
+
+  async createStashPatch(stashIndex: number, outputPath: string, includeUntracked: boolean = false): Promise<boolean> {
+    const stashRef = `stash@{${stashIndex}}`;
+    // Pass the untracked flag explicitly so the patch doesn't depend on the
+    // user's stash.showIncludeUntracked setting.
+    const args = ['stash', 'show', '-p', includeUntracked ? '--include-untracked' : '--no-include-untracked', stashRef];
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')} > ${outputPath}`, startTime);
+    let patchContent: string;
+    try {
+      patchContent = await this.git.raw(args);
+    } catch (error) {
+      console.error(`Error creating patch from ${stashRef}:`, error);
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+
+    // A stash holding only untracked files has nothing to show without
+    // --include-untracked; don't leave an empty patch file behind.
+    if (patchContent.trim().length === 0)
+      return false;
+
+    fsSync.writeFileSync(outputPath, patchContent, 'utf8');
+    return true;
   }
 
   async show(commitHash: string, filePath: string): Promise<string> {

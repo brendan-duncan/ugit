@@ -130,6 +130,14 @@ function StashList({ stashes, onSelectStash, onDoubleClick, selectedItem, collap
           <div className="context-menu-item" onClick={() => handleContextMenuAction('delete')}>
             Delete '{contextMenu.stash.message.replace(/^On [^:]+:\s*/, '')}'...
           </div>
+          <div className="context-menu-item" onClick={() => handleContextMenuAction('save-patch')}>
+            Save as Patch...
+          </div>
+          {contextMenu.stash.hasUntracked && (
+            <div className="context-menu-item" onClick={() => handleContextMenuAction('save-patch-untracked')}>
+              Save as Patch (include untracked)...
+            </div>
+          )}
         </div>
       )}
     </div>
