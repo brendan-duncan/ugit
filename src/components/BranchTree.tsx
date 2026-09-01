@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { SelectedItem } from './types';
 import { isBranchLocked } from '../utils/settings';
 import './BranchTree.css';
@@ -32,6 +32,7 @@ interface BranchTreeProps {
   stashes: Array<any>;
   lockedPatterns?: ReadonlyArray<string>;
   onAddBranch?: () => void;
+  originUrl?: string | null;
 }
 
 function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
@@ -160,9 +161,10 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
 }
 
 function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem,
-      collapsed, onToggleCollapse, onContextMenu, stashes, lockedPatterns, onAddBranch }: BranchTreeProps) {
+      collapsed, onToggleCollapse, onContextMenu, stashes, lockedPatterns, onAddBranch, originUrl }: BranchTreeProps) {
   const lockPatterns = lockedPatterns || [];
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [branchFilter, setBranchFilter] = useState('');
 
@@ -194,6 +196,25 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
+  }, [contextMenu]);
+
+  // Keep the menu fully on screen when opened near the window edges
+  useLayoutEffect(() => {
+    if (!contextMenu) {
+      setMenuPosition(null);
+      return;
+    }
+
+    const menu = menuRef.current;
+    if (!menu)
+      return;
+
+    const margin = 4;
+    const { width, height } = menu.getBoundingClientRect();
+    setMenuPosition({
+      x: Math.max(margin, Math.min(contextMenu.x, window.innerWidth - width - margin)),
+      y: Math.max(margin, Math.min(contextMenu.y, window.innerHeight - height - margin))
+    });
   }, [contextMenu]);
 
   const handleContextMenu = (e: React.MouseEvent, branchName: string) => {
@@ -274,11 +295,11 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
           {contextMenu && (
             <div
               ref={menuRef}
-              className="context-menu"
+              className="context-menu branch-context-menu"
               style={{
                 position: 'fixed',
-                left: `${contextMenu.x}px`,
-                top: `${contextMenu.y}px`,
+                left: `${(menuPosition || contextMenu).x}px`,
+                top: `${(menuPosition || contextMenu).y}px`,
                 zIndex: 1000
               }}
             >
@@ -326,6 +347,20 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               <div className="context-menu-item" onClick={() => handleMenuAction('copy-branch-name')}>
                 Copy Branch Name
               </div>
+              {originUrl && (
+                <>
+                  <div className="context-menu-separator"></div>
+                  <div className="context-menu-item" onClick={() => handleMenuAction('open-remote-url')}>
+                    🌐 Open Remote URL
+                  </div>
+                  <div className="context-menu-item" onClick={() => handleMenuAction('open-pr')}>
+                    🌐 Open PR
+                  </div>
+                  <div className="context-menu-item" onClick={() => handleMenuAction('open-branch-compare')}>
+                    🌐 Open Branch Compare
+                  </div>
+                </>
+              )}
             </div>
           )}
           {Object.keys(tree.children).sort().map(key => (

@@ -25,8 +25,9 @@ import AmendCommitDialog from './AmendCommitDialog';
 import PullRequestDialog from './PullRequestDialog';
 import ConfirmDialog from './ConfirmDialog';
 import CreateWorktreeDialog, { CreateWorktreeParams } from './CreateWorktreeDialog';
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, shell } from 'electron';
 import path from 'path';
+import { convertGitSshToHttps } from '../utils/utils';
 import { useGitAdapter, useRepositoryData } from '../hooks/useGit';
 import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
@@ -1104,8 +1105,23 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       case 'copy-branch-name':
         navigator.clipboard.writeText(branchName);
         break;
+      case 'open-remote-url':
+        if (originUrl) {
+          shell.openExternal(`${convertGitSshToHttps(originUrl)}/commits/${branchName}`);
+        }
+        break;
+      case 'open-pr':
+        if (originUrl) {
+          shell.openExternal(`${convertGitSshToHttps(originUrl)}/compare/${branchName}?expand=1`);
+        }
+        break;
+      case 'open-branch-compare':
+        if (originUrl) {
+          shell.openExternal(`${convertGitSshToHttps(originUrl)}/compare/${branchName}`);
+        }
+        break;
     }
-  }, [gitAdapter, currentBranch, handleBranchSwitch, handleFetchClick, showPullDialog,
+  }, [gitAdapter, currentBranch, originUrl, handleBranchSwitch, handleFetchClick, showPullDialog,
       showPushDialog, showMergeBranchDialog, showRebaseBranchDialog, showCreateBranchDialog,
       showCreateTagFromCommitDialog, showRenameBranchDialog, showDeleteBranchDialog, showCreateWorktreeDialog]);
 
@@ -1899,6 +1915,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                   onAddBranch={() => showCreateBranchDialog()}
                   onStashAll={() => showStashDialog()}
                   canStash={hasLocalChanges}
+                  originUrl={originUrl}
                 />
               </div>
             </div>
