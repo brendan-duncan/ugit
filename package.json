@@ -1,6 +1,6 @@
 {
   "name": "ugit",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "A Git VCS client",
   "main": "dist/main.js",
   "engines": {
