@@ -1885,7 +1885,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onStashChanges={hasLocalChanges ? () => showStashDialog() : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
                 onRefresh={() => loadRepoData(true)}
-                onError={setError}
+                onError={setErrorWithDialog}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel
@@ -1937,7 +1937,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onCommitDoubleClick={handleCommitDoubleClick}
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}
-                onError={setError}
+                onError={setErrorWithDialog}
                 onBusyChange={setIsBusy}
                 onBusyMessageChange={setBusyMessage}
                 onCommitCreated={() => clearBranchCache(currentBranch)}
