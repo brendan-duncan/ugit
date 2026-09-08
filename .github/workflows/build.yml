@@ -95,9 +95,22 @@ jobs:
           
           ## Downloads
           
-          - **Windows**: [ugit-Setup-$VERSION.exe](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-Setup-$VERSION_NUM.exe)
-          - **macOS**: [ugit-$VERSION.dmg](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION_NUM.dmg)
-          - **Linux**: [ugit-$VERSION.AppImage](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION_NUM.AppImage)
+          - **Windows**: [ugit-Setup-$VERSION_NUM.exe](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-Setup-$VERSION_NUM.exe)
+          - **macOS**: [ugit-$VERSION_NUM.dmg](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION_NUM.dmg)
+          - **Linux (AppImage)**: [ugit-$VERSION_NUM.AppImage](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION_NUM.AppImage)
+          - **Ubuntu/Debian (.deb)**: [ugit-$VERSION_NUM.deb](https://github.com/${{ github.repository }}/releases/download/$VERSION/ugit-$VERSION_NUM.deb)
+
+          ### Linux notes
+
+          Install the .deb with \`sudo apt install ./ugit-$VERSION_NUM.deb\`, which adds a menu
+          entry and a \`ugit\` command on PATH. Uninstall with \`sudo apt remove ugit\`.
+
+          The AppImage needs no install — \`chmod +x\` it and run it — but it does require FUSE 2,
+          which Ubuntu 24.04+ no longer ships: \`sudo apt install libfuse2t64\`. To avoid that,
+          run it as \`./ugit-$VERSION_NUM.AppImage --appimage-extract-and-run\` instead.
+
+          Both builds update themselves from these releases. The .deb shows a password prompt
+          when it installs an update, since it hands the package to dpkg.
           EOF
           
           gh release edit $VERSION --notes-file /tmp/release-notes.md --draft=false --latest

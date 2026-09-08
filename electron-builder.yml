@@ -46,9 +46,36 @@ mac:
 linux:
   target:
     - AppImage
+    - deb
   icon: assets/icon
   artifactName: ${productName}-${version}.${ext}
-  category: Development
+  category: Development;RevisionControl
+  # package.json's author has no email, which fpm requires for the deb Maintainer field.
+  maintainer: Brendan Duncan <brendanduncan@gmail.com>
+  synopsis: A Git VCS client
+  desktop:
+    entry:
+      # Electron sets WM_CLASS to the executable name; without this the desktop
+      # environment won't associate running windows with ugit.desktop.
+      StartupWMClass: ugit
+
+deb:
+  # Only x64 is built, so the arch suffix fpm normally adds is omitted to keep the
+  # download URL in the release notes predictable.
+  artifactName: ${productName}-${version}.${ext}
+  priority: optional
+  packageCategory: devel
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - git
 
 nsis:
   oneClick: false
