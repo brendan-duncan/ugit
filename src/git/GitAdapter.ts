@@ -133,6 +133,19 @@ export interface Commit {
   tags: string[];
 }
 
+/**
+ * Thrown when git could only read part of a branch's history, for example when an
+ * object referenced by the history is missing from the object database. `commits`
+ * holds the commits that were read before git gave up, so the caller can still show
+ * what history is available.
+ */
+export class IncompleteHistoryError extends Error {
+  constructor(message: string, public readonly commits: Commit[]) {
+    super(message);
+    this.name = 'IncompleteHistoryError';
+  }
+}
+
 export interface SearchQuery {
   message?: string;
   author?: string;
@@ -495,6 +508,8 @@ export abstract class GitAdapter {
    * @param branchName - Name of the branch
    * @param maxCount - Maximum number of commits to retrieve
    * @param offset - Number of commits to skip from the start (for paging)
+   * @throws IncompleteHistoryError when git failed part way through the log but had
+   * already produced usable commits
    */
   abstract log(branchName: string, maxCount: number, offset?: number): Promise<Commit[]>;
 

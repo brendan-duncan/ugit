@@ -12,7 +12,9 @@ import GitAdapter, {
   SearchLogResult,
   WorktreeInfo,
   TagComparison,
-  CloneProgress } from './GitAdapter';
+  CloneProgress,
+  IncompleteHistoryError } from './GitAdapter';
+import { GitCommandError, gitErrorHandler } from './gitErrors';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
@@ -20,6 +22,13 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+
+// Separators for the `git log` format used by log(). Both are control characters that
+// can't appear in a commit message, so a body containing newlines - or a `git log` that
+// stops mid-commit - can't be mistaken for the end of a record.
+const LOG_FIELD_SEP = '\x1f';
+const LOG_RECORD_SEP = '\x1e';
+const LOG_FORMAT = ['%H', '%ai', '%s', '%b', '%an', '%ae'].join('%x1f') + '%x1e';
 
 /**
  * Git adapter implementation using simple-git library
@@ -32,7 +41,7 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   async open(): Promise<void> {
-    this.git = simpleGit({ baseDir: this.repoPath });
+    this.git = simpleGit({ baseDir: this.repoPath, errors: gitErrorHandler });
     this.isOpen = true;
   }
 
@@ -40,7 +49,7 @@ export class SimpleGitAdapter extends GitAdapter {
     const startTime = performance.now();
     const id = this._startCommand('git init', startTime);
     try {
-      const git = simpleGit({ baseDir: this.repoPath });
+      const git = simpleGit({ baseDir: this.repoPath, errors: gitErrorHandler });
       await git.init();
       if (branchName) {
         // Point the unborn HEAD at the requested branch. This works regardless of
@@ -60,14 +69,14 @@ export class SimpleGitAdapter extends GitAdapter {
     try {
       if (path) {
         if (noLock) {
-          const git2 = simpleGit({ baseDir: this.repoPath }).env({'GIT_OPTIONAL_LOCKS': '0'});
+          const git2 = simpleGit({ baseDir: this.repoPath, errors: gitErrorHandler }).env({'GIT_OPTIONAL_LOCKS': '0'});
           result = await git2.raw(['status', '--', path]);
         } else {
           result = await this.git!.raw(['status', '--', path]);
         }
       } else {
         if (noLock) {
-          const git2 = simpleGit({ baseDir: this.repoPath }).env({'GIT_OPTIONAL_LOCKS': '0'});
+          const git2 = simpleGit({ baseDir: this.repoPath, errors: gitErrorHandler }).env({'GIT_OPTIONAL_LOCKS': '0'});
           result = await git2.status();
         } else {
           result = await this.git.status();
@@ -857,38 +866,69 @@ export class SimpleGitAdapter extends GitAdapter {
     const skipStr = offset > 0 ? ` --skip=${offset}` : '';
     const id = this._startCommand(`git log ${branchName} --max-count=${maxCount}${skipStr}`, startTime);
 
-    const options: any = {
-      [branchName]: null,
-      maxCount: maxCount,
-      format: {
-        hash: '%H',
-        date: '%ai',
-        message: '%s',
-        body: '%b',
-        author_name: '%an',
-        author_email: '%ae'
-      }
-    };
+    const args = ['log', `--max-count=${maxCount}`];
     if (offset > 0) {
-      options['--skip'] = `${offset}`;
+      args.push(`--skip=${offset}`);
+    }
+    args.push(`--format=${LOG_FORMAT}`, branchName, '--');
+
+    // git can fail part way through a log - a commit object missing from the object
+    // database, say - after printing the commits it was able to read. Keep those
+    // instead of losing the whole branch to the failure.
+    let failure: GitCommandError | null = null;
+    let output: string;
+    try {
+      output = await this.git.raw(args);
+    } catch (error) {
+      if (!(error instanceof GitCommandError) || !error.stdOut) {
+        this._endCommand(id, startTime);
+        throw error;
+      }
+      failure = error;
+      output = error.stdOut;
     }
 
-    const result = await this.git.log(options);
-
-    const commits = result.all.map((commit: any) => ({
-      hash: commit.hash,
-      author_name: commit.author_name,
-      author_email: commit.author_email,
-      date: commit.date,
-      message: commit.message,
-      body: commit.body,
-      onOrigin: branchName.startsWith('origin/'),
-      tags: [] as string[]
-    }));
+    const commits = this._parseLogOutput(output, branchName);
 
     await this._enrichCommits(commits, branchName);
 
     this._endCommand(id, startTime);
+
+    if (failure) {
+      if (commits.length === 0) {
+        throw failure;
+      }
+      throw new IncompleteHistoryError(failure.message, commits);
+    }
+
+    return commits;
+  }
+
+  /** Parse the output of a `git log --format=LOG_FORMAT` run into commits. */
+  private _parseLogOutput(output: string, branchName: string): Commit[] {
+    const onOrigin = branchName.startsWith('origin/');
+    const commits: Commit[] = [];
+
+    for (const record of output.split(LOG_RECORD_SEP)) {
+      // git writes a newline after each record separator.
+      const fields = record.replace(/^\r?\n/, '').split(LOG_FIELD_SEP);
+      // A record without every field is the tail of a log that was cut short.
+      if (fields.length < 6) {
+        continue;
+      }
+
+      const [hash, date, message, body, authorName, authorEmail] = fields;
+      commits.push({
+        hash,
+        author_name: authorName,
+        author_email: authorEmail,
+        date,
+        message,
+        body: body.trimEnd(),
+        onOrigin,
+        tags: []
+      });
+    }
 
     return commits;
   }
@@ -1145,6 +1185,7 @@ export class SimpleGitAdapter extends GitAdapter {
       progress: onProgress
         ? ({ method, stage, progress }) => onProgress({ method, stage, progress })
         : undefined,
+      errors: gitErrorHandler,
     });
     try {
       await git.clone(repoUrl, localFolder, cloneOptions);

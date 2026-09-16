@@ -33,7 +33,7 @@ import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit, RebaseStatus, SearchQuery, WorktreeInfo } from "../git/GitAdapter"
+import { GitAdapter, Commit, IncompleteHistoryError, RebaseStatus, SearchQuery, WorktreeInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
 
@@ -728,11 +728,15 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     } catch (error) {
       console.error('Error loading branch commits:', error);
       if (thisLoadId === currentBranchLoadId.current) {
-        setErrorWithDialog(`Failed to load commits: ${(error as Error).message}`);
+        // A partial log still lets the user work with the history git could read.
+        const partialCommits = error instanceof IncompleteHistoryError ? error.commits : [];
+        setErrorWithDialog(partialCommits.length > 0
+          ? `Only the first ${partialCommits.length} commits could be read: ${(error as Error).message}`
+          : `Failed to load commits: ${(error as Error).message}`);
         setSelectedItem({
           type: 'branch',
           branchName,
-          commits: [],
+          commits: partialCommits,
           loading: false,
           page: targetPage,
           totalCount: undefined
@@ -1303,13 +1307,17 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     } catch (error) {
       console.error('Error loading remote branch commits:', error);
       if (thisLoadId === currentBranchLoadId.current) {
-        setErrorWithDialog(`Failed to load commits: ${(error as Error).message}`);
+        // A partial log still lets the user work with the history git could read.
+        const partialCommits = error instanceof IncompleteHistoryError ? error.commits : [];
+        setErrorWithDialog(partialCommits.length > 0
+          ? `Only the first ${partialCommits.length} commits could be read: ${(error as Error).message}`
+          : `Failed to load commits: ${(error as Error).message}`);
         setSelectedItem({
           type: 'remote-branch',
           remoteName,
           branchName,
           fullName,
-          commits: [],
+          commits: partialCommits,
           loading: false,
           page: targetPage,
           totalCount: undefined
