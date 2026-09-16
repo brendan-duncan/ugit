@@ -1,3 +1,21 @@
+## v1.8.0
+
+### New Features
+
+* Added "Clean Up Abandoned Pack Files..." to the repository "..." menu. Fetches that die mid-transfer leave pack temporaries behind that git never reclaims — on a large repository with an unreliable remote these accumulate at hundreds of megabytes per attempt. The action reports how many files there are and how much space they take before deleting anything.
+
+### Improvements
+
+* Git commands that write to a repository are now serialized against each other per object database, so a background fetch can no longer interleave with a repack. The two together could discard objects that were still reachable. Worktrees of the same repository share one queue.
+* "Git GC" is now "Repack Repository", and repacks the object database and refreshes the commit-graph without pruning.
+* The ahead/behind indicator no longer fetches on a timer. It asks the remote for the current branch's SHA — one round trip, no object transfer — and fetches only that branch, only when the SHA has actually changed.
+* Background remote polling now skips tabs you aren't looking at, skips ticks while another git command is running, scales its interval to how long fetching this repository actually takes, and backs off exponentially (up to an hour) after failures.
+* A background remote check that fails is now reported inline in the repository panel, with the git error on hover, instead of being retried silently every five minutes.
+
+### Bug Fixes
+
+* A failed fetch when tagging a commit on a remote branch now reports the error instead of leaving the dialog to never open.
+
 ## v1.7.3
 
 ### Bug Fixes
