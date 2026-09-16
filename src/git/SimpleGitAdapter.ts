@@ -298,6 +298,16 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
+  async gc(): Promise<void> {
+    const startTime = performance.now();
+    const id = this._startCommand('git gc', startTime);
+    try {
+      await this.git.raw(['gc']);
+    } finally {
+      this._endCommand(id, startTime);
+    }
+  }
+
   async pull(remote: string, branch: string, rebase?: boolean): Promise<void> {
     const startTime = performance.now();
     const options = rebase ? ['--rebase'] : [];

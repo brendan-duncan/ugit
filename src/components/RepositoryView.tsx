@@ -479,6 +479,26 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, updateCachedCommitsOriginStatus, setErrorWithDialog]);
 
+  const handleGitGC = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      // gc can run for several minutes on a large repository, so keep the busy
+      // overlay up for the whole run rather than letting it work unannounced.
+      setBusyMessage('git gc (this can take a while on a large repository)');
+      await gitAdapter.gc();
+      showAlert('Garbage collection complete.', 'Git GC');
+    } catch (error) {
+      console.error('Error during git gc:', error);
+      setErrorWithDialog(`Git GC failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, showAlert, setErrorWithDialog]);
+
   const handlePull = useCallback(async (branch: string, stashAndReapply: boolean, rebase: boolean) => {
     hidePullDialog();
     if (!gitAdapter)
@@ -1888,7 +1908,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 usingCache={usingCache}
                 onResetToOrigin={() => showResetDialog()}
                 onCleanWorkingDirectory={() => showCleanWorkingDirectoryDialog()}
-                onGitGC={async () => { if (gitAdapter) await gitAdapter.raw(['gc']); }}
+                onGitGC={handleGitGC}
                 onOriginChanged={async () => { if (gitAdapter) setOriginUrl(await gitAdapter.getOriginUrl()); }}
                 onStashChanges={hasLocalChanges ? () => showStashDialog() : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}

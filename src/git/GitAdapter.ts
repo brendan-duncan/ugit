@@ -347,6 +347,12 @@ export abstract class GitAdapter {
   abstract fetch(remote: string, options?: string[]): Promise<void>;
 
   /**
+   * Run housekeeping on the repository: repack loose objects and prune what is no
+   * longer reachable. Can take minutes on a large repository, and throws if git fails.
+   */
+  abstract gc(): Promise<void>;
+
+  /**
    * Pull from remote branch
    * @param remote - Remote name (e.g., 'origin')
    * @param branch - Branch name
