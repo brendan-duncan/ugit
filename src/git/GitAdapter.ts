@@ -340,17 +340,44 @@ export abstract class GitAdapter {
   abstract stashList(): Promise<StashListResponse>;
 
   /**
-   * Fetch from remote
+   * Fetch from remote. Throws if git fails, so callers must handle failure rather
+   * than assume the remote-tracking refs moved.
    * @param remote - Remote name (e.g., 'origin')
    * @param options - Additional fetch options (e.g., ['--prune'])
    */
   abstract fetch(remote: string, options?: string[]): Promise<void>;
 
   /**
-   * Run housekeeping on the repository: repack loose objects and prune what is no
-   * longer reachable. Can take minutes on a large repository, and throws if git fails.
+   * Fetch unless another git command is already running against this repository,
+   * in which case do nothing and return false. Use this for polling: a dropped
+   * tick is cheaper than a queue of fetches behind a long-running command.
+   */
+  abstract fetchIfIdle(remote: string, options?: string[]): Promise<boolean>;
+
+  /**
+   * SHA a remote currently has for a branch, or null if it doesn't have it.
+   * One round trip with no object transfer - use this, not a fetch, when the
+   * answer only feeds an ahead/behind indicator.
+   */
+  abstract getRemoteHeadSha(remote: string, branch: string): Promise<string | null>;
+
+  /** Whether this process has a git command queued or running for this repository. */
+  abstract isRepoBusy(): Promise<boolean>;
+
+  /**
+   * Repack the object database and refresh the commit-graph. Can take minutes on a
+   * large repository, and throws if git fails. Deliberately does not prune.
    */
   abstract gc(): Promise<void>;
+
+  /**
+   * Abandoned pack temporaries left behind by fetches that died mid-transfer, older
+   * than `minAgeMs`. Git never reclaims these itself.
+   */
+  abstract findStalePackTemps(minAgeMs?: number): Promise<{ files: string[]; bytes: number }>;
+
+  /** Delete the files reported by findStalePackTemps. */
+  abstract removeStalePackTemps(minAgeMs?: number): Promise<{ removed: number; bytes: number }>;
 
   /**
    * Pull from remote branch

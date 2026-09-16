@@ -15,6 +15,7 @@ import GitAdapter, {
   CloneProgress,
   IncompleteHistoryError } from './GitAdapter';
 import { GitCommandError, gitErrorHandler } from './gitErrors';
+import { withGitLock, isGitBusy } from './gitQueue';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
@@ -35,9 +36,48 @@ const LOG_FORMAT = ['%H', '%ai', '%s', '%b', '%an', '%ae'].join('%x1f') + '%x1e'
  */
 export class SimpleGitAdapter extends GitAdapter {
   private git: SimpleGit | null = null;
+  /** Cached `git rev-parse --git-common-dir`: the object database of this repo. */
+  private commonDir: string | null = null;
 
   constructor(repoPath: string, commandStateCallback: CommandStateCallback | null = null) {
     super(repoPath, commandStateCallback);
+  }
+
+  /**
+   * Path to this repository's object database (shared by all its worktrees).
+   *
+   * Falls back to the worktree path if the probe fails (not a repo yet, or a git
+   * older than --path-format); that still serializes this tab's own commands.
+   */
+  private async getCommonDir(): Promise<string> {
+    if (this.commonDir)
+      return this.commonDir;
+
+    let dir = this.repoPath;
+    try {
+      const out = await this.git.raw(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+      if (out.trim())
+        dir = out.trim();
+    } catch {
+      // Keep the worktree-path fallback.
+    }
+    this.commonDir = dir;
+    return this.commonDir;
+  }
+
+  /**
+   * Queue key for this repository: the object database, not the worktree. Worktrees
+   * share one database, so two tabs open on two worktrees must share a queue -
+   * keying on the worktree path would let each think it had the repository alone.
+   */
+  private async getObjectStoreKey(): Promise<string> {
+    const dir = await this.getCommonDir();
+    return process.platform === 'win32' ? dir.toLowerCase() : dir;
+  }
+
+  /** Whether this process is already running a queued git command against this repo. */
+  async isRepoBusy(): Promise<boolean> {
+    return isGitBusy(await this.getObjectStoreKey());
   }
 
   async open(): Promise<void> {
@@ -291,21 +331,119 @@ export class SimpleGitAdapter extends GitAdapter {
     const optionsStr = options ? ` ${options.join(' ')}` : '';
     const id = this._startCommand(`git fetch ${remote}${optionsStr}`, startTime);
     try {
-      await this.git.fetch(remote, options);
+      // gc.auto=0: a fetch otherwise kicks off `gc --auto` on completion, which can
+      // start a repack that outlives this command and overlaps the next fetch.
+      // Maintenance is the user's call - see gc() - not a side effect of polling.
+      await withGitLock(await this.getObjectStoreKey(), () =>
+        this.git.raw(['-c', 'gc.auto=0', 'fetch', remote, ...(options || [])]));
     } catch (error) {
       console.error(`Error fetching from ${remote}:`, error);
+      // Rethrow: swallowing this reported failed fetches as clean ones, so callers
+      // showed stale ahead/behind counts and polling retried forever in silence.
+      throw error;
+    } finally {
+      this._endCommand(id, startTime);
     }
-    this._endCommand(id, startTime);
+  }
+
+  /**
+   * Fetch unless a queued git command is already running, in which case report the
+   * tick as skipped. Polling should drop a tick rather than stack up behind a
+   * repack or a long fetch - that queue is how five-minute polls turn into a
+   * permanent backlog on a large repository.
+   */
+  async fetchIfIdle(remote: string, options?: string[]): Promise<boolean> {
+    if (await this.isRepoBusy())
+      return false;
+    await this.fetch(remote, options);
+    return true;
+  }
+
+  /**
+   * SHA a remote currently has for `branch`, or null if the remote doesn't have it.
+   *
+   * This is the cheap way to answer "has the remote moved?": one round trip, no
+   * object transfer, no pack writes, and it cannot trigger maintenance. Prefer it
+   * over a fetch whenever the answer is only needed to update an indicator.
+   */
+  async getRemoteHeadSha(remote: string, branch: string): Promise<string | null> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git ls-remote --heads ${remote} ${branch}`, startTime);
+    try {
+      const out = await this.git.raw(['ls-remote', '--heads', remote, `refs/heads/${branch}`]);
+      const sha = out.trim().split(/\s+/)[0];
+      return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+    } catch (error) {
+      console.error(`Error reading ${remote}/${branch} from remote:`, error);
+      throw error;
+    } finally {
+      this._endCommand(id, startTime);
+    }
   }
 
   async gc(): Promise<void> {
     const startTime = performance.now();
-    const id = this._startCommand('git gc', startTime);
+    const id = this._startCommand('git maintenance run --task=incremental-repack', startTime);
     try {
-      await this.git.raw(['gc']);
+      await withGitLock(await this.getObjectStoreKey(), async () => {
+        // incremental-repack consolidates packs geometrically rather than rewriting
+        // the whole object database, and it never prunes - so an interrupted run
+        // costs time instead of objects. Plain `gc` does prune, and `repack -a -d`
+        // discards anything that looked unreachable when it sampled reachability.
+        await this.git.raw(['-c', 'gc.auto=0', 'maintenance', 'run', '--task=incremental-repack']);
+        // Any repack can leave the commit-graph naming commits that no longer exist.
+        // A stale graph is worse than no graph: fetch believes it, claims to have
+        // those commits, downloads nothing, and moves refs onto missing objects.
+        await this.git.raw(['-c', 'gc.auto=0', 'commit-graph', 'write', '--reachable']);
+      });
     } finally {
       this._endCommand(id, startTime);
     }
+  }
+
+  /**
+   * Abandoned pack temporaries left by fetches that died mid-transfer. Git never
+   * reclaims these, and a failing poll loop can pile up gigabytes of them.
+   * Only files untouched for `minAgeMs` are reported, so a live fetch is left alone.
+   */
+  async findStalePackTemps(minAgeMs: number = 60 * 60 * 1000): Promise<{ files: string[]; bytes: number }> {
+    const result = { files: [] as string[], bytes: 0 };
+    try {
+      const packDir = path.join(await this.getCommonDir(), 'objects', 'pack');
+      const cutoff = Date.now() - minAgeMs;
+      for (const name of await fs.readdir(packDir)) {
+        if (!/^tmp_(pack|idx|rev)_/.test(name))
+          continue;
+        const full = path.join(packDir, name);
+        const info = await fs.stat(full);
+        if (info.mtimeMs > cutoff)
+          continue;
+        result.files.push(full);
+        result.bytes += info.size;
+      }
+    } catch (error) {
+      console.warn('Could not scan for stale pack temporaries:', error);
+    }
+    return result;
+  }
+
+  /** Delete the files reported by findStalePackTemps; returns how many went away. */
+  async removeStalePackTemps(minAgeMs: number = 60 * 60 * 1000): Promise<{ removed: number; bytes: number }> {
+    const { files, bytes } = await this.findStalePackTemps(minAgeMs);
+    // Through the queue: never unlink from the pack directory while we have a
+    // fetch or repack of our own in flight.
+    return withGitLock(await this.getObjectStoreKey(), async () => {
+      let removed = 0;
+      for (const file of files) {
+        try {
+          await fs.unlink(file);
+          removed++;
+        } catch (error) {
+          console.warn(`Could not remove ${file}:`, error);
+        }
+      }
+      return { removed, bytes };
+    });
   }
 
   async pull(remote: string, branch: string, rebase?: boolean): Promise<void> {
@@ -313,11 +451,19 @@ export class SimpleGitAdapter extends GitAdapter {
     const options = rebase ? ['--rebase'] : [];
     const id = this._startCommand(`git pull ${remote} ${branch}${rebase ? ' --rebase' : ''}`, startTime);
     try {
-      await this.git.pull(remote, branch, options);
+      // A pull is a fetch plus a merge, and both ends trigger `gc --auto`; see fetch().
+      await withGitLock(await this.getObjectStoreKey(), () =>
+        this.git.raw(['-c', 'gc.auto=0', 'pull', remote, branch, ...options]));
     } catch (error) {
       console.error(`Error pulling from ${remote}/${branch}:`, error);
+      // Rethrow: callers already handle this - LocalChangesPanel's stash-then-pull
+      // flow has a recovery path that pops the stash back - but swallowing the error
+      // here meant a failed pull looked successful and that path never ran, so the
+      // stash got applied and committed on top of history that never moved.
+      throw error;
+    } finally {
+      this._endCommand(id, startTime);
     }
-    this._endCommand(id, startTime);
   }
 
   async merge(branchName: string): Promise<void> {
@@ -391,10 +537,13 @@ export class SimpleGitAdapter extends GitAdapter {
         return arg;
       }).join(' ')}`;
 
-      const { stdout, stderr } = await execAsync(command, {
-        cwd: this.repoPath,
-        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
-      });
+      // Serialized with our other commands: a push enumerates objects, so it should
+      // not race a repack of the same object database.
+      const { stdout, stderr } = await withGitLock(await this.getObjectStoreKey(), () =>
+        execAsync(command, {
+          cwd: this.repoPath,
+          maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+        }));
 
       // Combine stdout and stderr as PR URLs typically appear in stderr
       result = stdout + '\n' + stderr;

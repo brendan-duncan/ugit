@@ -66,6 +66,14 @@
   color: var(--repo-info-branch-color);
 }
 
+/* Background remote polling failed; the full git error is in the title attribute. */
+.repo-remote-warning {
+  color: var(--text-warning, #d08a4a);
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+  cursor: help;
+}
+
 .local-changes-section {
   user-select: text;
 }

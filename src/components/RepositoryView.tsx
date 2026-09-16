@@ -47,7 +47,18 @@ interface RepositoryViewProps {
   onOpenRepository?: (repoPath: string) => void;
 }
 
-const TAB_REMOTE_FETCH_INTERVAL_MS = 5 * 60 * 1000;
+// How often to ask the remote whether it has moved. This is an `ls-remote` probe,
+// not a fetch: one round trip, no object transfer, and it cannot trigger git's
+// automatic maintenance. A real fetch only follows when the SHA actually changed.
+const REMOTE_POLL_INTERVAL_MS = 5 * 60 * 1000;
+// Floor on the interval expressed as a multiple of how long the last fetch took, so
+// a repository whose fetches take minutes automatically polls less often. Without
+// this, a fetch slower than the interval leaves ticks queueing behind each other.
+const REMOTE_POLL_FETCH_COST_FACTOR = 4;
+// Ceiling for the failure backoff. A remote that is unreachable - or a repository
+// that cannot complete a fetch at all - must not be retried every interval forever;
+// each failed attempt on a large repo can abandon hundreds of megabytes of pack.
+const REMOTE_POLL_MAX_BACKOFF_MS = 60 * 60 * 1000;
 
 function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0, onOpenRepository }: RepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
@@ -71,6 +82,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   const remoteFetchInFlight = useRef(false);
   const branchStatusRef = useRef<{ [branchName: string]: { ahead: number; behind: number } }>({});
   const currentBranchCacheRef = useRef<string>('');
+  // Last background remote-status failure, shown inline rather than as a dialog:
+  // polling runs unattended, so a modal on every failed tick would be unusable.
+  const [remoteStatusError, setRemoteStatusError] = useState<string | null>(null);
 
   const handleGitError = useCallback((err: Error) => {
     setError(err.message);
@@ -379,60 +393,118 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     isBusyRef.current = isBusy;
   }, [isBusy]);
 
+  // Keep the ahead/behind indicator current without fetching on a fixed timer.
+  //
+  // This polled `git fetch origin --prune` every five minutes regardless of whether
+  // anything had changed. On a large repository that is actively harmful: a fetch
+  // can take longer than the interval, every fetch makes git consider running
+  // automatic maintenance, and a fetch that dies mid-transfer leaves an abandoned
+  // pack temporary behind that git never reclaims. Instead, ask the remote for the
+  // branch SHA (cheap, read-only) and fetch only when it differs from ours.
+  //
+  // Self-scheduling timeout rather than setInterval so the delay can adapt to how
+  // expensive fetching this repository actually is.
   useEffect(() => {
     if (loading || !gitAdapter || !currentBranch)
       return;
 
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let consecutiveFailures = 0;
+    let lastFetchDurationMs = 0;
+
+    const nextDelay = () => {
+      if (consecutiveFailures > 0) {
+        return Math.min(REMOTE_POLL_INTERVAL_MS * 2 ** consecutiveFailures, REMOTE_POLL_MAX_BACKOFF_MS);
+      }
+      return Math.max(REMOTE_POLL_INTERVAL_MS, lastFetchDurationMs * REMOTE_POLL_FETCH_COST_FACTOR);
+    };
+
+    const updateLocalStatus = async () => {
+      let status: { ahead: number; behind: number } | null = null;
+      try {
+        // Compares local refs only - no network.
+        const { ahead, behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
+        if (ahead > 0 || behind > 0) {
+          status = { ahead, behind };
+        }
+      } catch {
+        status = null;
+      }
+      if (cancelled)
+        return;
+
+      setBranchStatus(prev => {
+        const next = { ...prev };
+        if (status) {
+          next[currentBranch] = status;
+        } else {
+          delete next[currentBranch];
+        }
+        return next;
+      });
+      // No direct onTabStatusChange call — the branchStatus useEffect above
+      // mirrors current-branch status to the tab indicator on every change.
+    };
 
     const checkRemoteStatus = async () => {
-      if (isBusyRef.current || remoteFetchInFlight.current)
+      if (cancelled)
         return;
+
+      // Skip a tab the user isn't looking at, and never queue behind another git
+      // command - ours or one the user started. A dropped tick costs nothing.
+      if (document.hidden || isBusyRef.current || remoteFetchInFlight.current) {
+        timer = setTimeout(checkRemoteStatus, nextDelay());
+        return;
+      }
+
       remoteFetchInFlight.current = true;
-
       try {
-        try {
-          await gitAdapter.fetch('origin', ['--prune']);
-        } catch {
+        if (await gitAdapter.isRepoBusy())
           return;
-        }
+
+        const remoteSha = await gitAdapter.getRemoteHeadSha('origin', currentBranch);
         if (cancelled)
           return;
 
-        let status: { ahead: number; behind: number } | null = null;
-        try {
-          const { ahead, behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
-          if (ahead > 0 || behind > 0) {
-            status = { ahead, behind };
+        if (remoteSha) {
+          const localSha = (await gitAdapter.raw(
+            ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${currentBranch}`])).trim();
+          if (remoteSha !== localSha) {
+            // Only this branch, not every ref: the indicator needs one branch, and
+            // a full fetch on a repository with thousands of refs is not free.
+            const startedAt = Date.now();
+            if (await gitAdapter.fetchIfIdle('origin', [currentBranch]))
+              lastFetchDurationMs = Date.now() - startedAt;
+            if (cancelled)
+              return;
           }
-        } catch {
-          status = null;
         }
-        if (cancelled)
-          return;
 
-        setBranchStatus(prev => {
-          const next = { ...prev };
-          if (status) {
-            next[currentBranch] = status;
-          } else {
-            delete next[currentBranch];
-          }
-          return next;
-        });
-        // No direct onTabStatusChange call — the branchStatus useEffect above
-        // mirrors current-branch status to the tab indicator on every change.
+        consecutiveFailures = 0;
+        setRemoteStatusError(null);
+        await updateLocalStatus();
+      } catch (error) {
+        consecutiveFailures++;
+        // Surface it instead of retrying silently: the previous code swallowed these,
+        // so a repository that could not fetch at all kept trying every five minutes
+        // with nothing shown to the user.
+        console.error('Remote status check failed:', error);
+        if (!cancelled)
+          setRemoteStatusError((error as Error).message || 'Could not reach origin');
       } finally {
         remoteFetchInFlight.current = false;
+        if (!cancelled)
+          timer = setTimeout(checkRemoteStatus, nextDelay());
       }
     };
 
     checkRemoteStatus();
-    const intervalId = setInterval(checkRemoteStatus, TAB_REMOTE_FETCH_INTERVAL_MS);
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      if (timer)
+        clearTimeout(timer);
     };
   }, [loading, gitAdapter, currentBranch, setBranchStatus]);
 
@@ -448,11 +520,15 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     try {
       if (gitAdapter) {
         setIsBusy(true);
-        setBusyMessage('git fetch --tags --prune');
-        await gitAdapter.raw(['fetch', '--tags', '--prune']);
+        setBusyMessage('git fetch origin --tags --prune');
+        // Through the adapter, not raw(): this is the one place that still fetches
+        // every ref, and it must be serialized against background polling and any
+        // repack. raw() deliberately runs unqueued and swallows failures.
+        await gitAdapter.fetch('origin', ['--tags', '--prune']);
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
+      setRemoteStatusError((error as Error).message || 'Fetch failed');
     } finally {
       setIsBusy(false);
       setBusyMessage('');
@@ -485,19 +561,54 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
 
     try {
       setIsBusy(true);
-      // gc can run for several minutes on a large repository, so keep the busy
-      // overlay up for the whole run rather than letting it work unannounced.
-      setBusyMessage('git gc (this can take a while on a large repository)');
+      // Repacking can run for several minutes on a large repository, so keep the
+      // busy overlay up for the whole run rather than letting it work unannounced.
+      setBusyMessage('git maintenance run --task=incremental-repack (this can take a while on a large repository)');
       await gitAdapter.gc();
-      showAlert('Garbage collection complete.', 'Git GC');
+      showAlert('Repack complete.', 'Repack Repository');
     } catch (error) {
-      console.error('Error during git gc:', error);
-      setErrorWithDialog(`Git GC failed: ${(error as Error).message}`);
+      console.error('Error during repack:', error);
+      setErrorWithDialog(`Repack failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
   }, [gitAdapter, showAlert, setErrorWithDialog]);
+
+  // Abandoned pack temporaries are the fallout of fetches that died mid-transfer.
+  // Git never cleans them up, and on a large repository with a failing remote they
+  // accumulate at hundreds of megabytes per attempt.
+  const handleCleanPackTemps = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage('Scanning for abandoned pack files...');
+      const { files, bytes } = await gitAdapter.findStalePackTemps();
+      if (files.length === 0) {
+        showAlert('No abandoned pack files found.', 'Clean Up Pack Files');
+        return;
+      }
+
+      const megabytes = (bytes / (1024 * 1024)).toFixed(1);
+      const confirmed = await showConfirm(
+        `Found ${files.length} abandoned pack file(s) totalling ${megabytes} MB, left behind by interrupted fetches. Delete them?`,
+        'Clean Up Pack Files');
+      if (!confirmed)
+        return;
+
+      setBusyMessage('Removing abandoned pack files...');
+      const { removed } = await gitAdapter.removeStalePackTemps();
+      showAlert(`Removed ${removed} file(s), freeing ${megabytes} MB.`, 'Clean Up Pack Files');
+    } catch (error) {
+      console.error('Error cleaning up pack files:', error);
+      setErrorWithDialog(`Clean up failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, showAlert, showConfirm, setErrorWithDialog]);
 
   const handlePull = useCallback(async (branch: string, stashAndReapply: boolean, rebase: boolean) => {
     hidePullDialog();
@@ -1459,7 +1570,15 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         break;
       case 'new-tag':
         if (gitAdapter) {
-          await gitAdapter.fetch(remoteName, ['--prune']);
+          try {
+            // fetch() throws now; without this the failure would surface as an
+            // unhandled rejection and the dialog would simply never open.
+            await gitAdapter.fetch(remoteName, ['--prune']);
+          } catch (error) {
+            console.error(`Error fetching ${remoteName} before tagging:`, error);
+            setErrorWithDialog(`Fetch failed: ${(error as Error).message}`);
+            break;
+          }
           const result = await gitAdapter.raw(['rev-parse', `${remoteName}/${branchName}`]);
           const logResult = await gitAdapter.raw(['log', '-1', '--format=%H|%an|%ae|%ad|%s', '--date=short', result.trim()]);
           const [h, author, email, date, message] = logResult.trim().split('|');
@@ -1473,7 +1592,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         navigator.clipboard.writeText(fullName);
         break;
     }
-  }, [gitAdapter, handleCheckoutRemoteBranch, showMergeBranchDialog, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, handleDeleteRemoteBranch]);
+  }, [gitAdapter, handleCheckoutRemoteBranch, showMergeBranchDialog, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, handleDeleteRemoteBranch, setErrorWithDialog]);
 
   const handleCreateBranchFromCommit = useCallback(async (branchName: string, checkoutAfterCreate: boolean) => {
     const commit = pendingState.commitForDialog;
@@ -1909,6 +2028,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onResetToOrigin={() => showResetDialog()}
                 onCleanWorkingDirectory={() => showCleanWorkingDirectoryDialog()}
                 onGitGC={handleGitGC}
+                onCleanPackTemps={handleCleanPackTemps}
+                remoteStatusError={remoteStatusError}
                 onOriginChanged={async () => { if (gitAdapter) setOriginUrl(await gitAdapter.getOriginUrl()); }}
                 onStashChanges={hasLocalChanges ? () => showStashDialog() : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}

@@ -26,6 +26,9 @@ interface RepoInfoProps {
   onResetToOrigin: () => void;
   onCleanWorkingDirectory: () => void;
   onGitGC: () => Promise<void>;
+  onCleanPackTemps?: () => Promise<void>;
+  /** Last background remote-status failure, if any; shown inline, not as a dialog. */
+  remoteStatusError?: string | null;
   onOriginChanged?: () => Promise<void>;
   onStashChanges?: () => void;
   onDiscardChanges?: () => void;
@@ -33,7 +36,7 @@ interface RepoInfoProps {
   onError?: (error: string) => void;
 }
 
-const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onCleanPackTemps, remoteStatusError, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
   const { showAlert, showConfirm } = useAlert();
   const { getSetting } = useSettings();
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
@@ -403,8 +406,13 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           </DropdownItem>
           <DropdownSeparator />
           <DropdownItem onClick={onGitGC}>
-            🗑 Git GC
+            🗑 Repack Repository
           </DropdownItem>
+          {onCleanPackTemps && (
+            <DropdownItem onClick={onCleanPackTemps}>
+              🧽 Clean Up Abandoned Pack Files...
+            </DropdownItem>
+          )}
           <DropdownItem onClick={onCleanWorkingDirectory}>
             🧹Clean Working Directory...
           </DropdownItem>
@@ -428,6 +436,11 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
       {currentBranch && (
           <div className="repo-branch">
             Branch: <strong>{currentBranch}</strong>
+          </div>
+        )}
+      {remoteStatusError && (
+          <div className="repo-remote-warning" title={remoteStatusError}>
+            ⚠ Remote status unavailable — ahead/behind counts may be stale
           </div>
         )}
       <div className="local-changes-section">

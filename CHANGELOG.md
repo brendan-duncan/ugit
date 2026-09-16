@@ -1,4 +1,70 @@
-## [v1.4.0](https://github.com/brendan-duncan/ugit/releases/tag/v1.4.0) (June 22, 2026)
+## v1.7.3
+
+### Bug Fixes
+
+* A branch whose history can't be read all the way through — a commit object missing from the object database, for example — now shows the commits git was able to read, along with a one-line explanation, instead of an error dialog containing the entire partial log.
+* Git GC now runs behind the busy overlay and reports when it's finished, rather than running unannounced. A failed GC is now reported instead of being treated as a success.
+
+## v1.7.2
+
+### Improvements
+
+* Linux releases now include a `.deb` installer alongside the AppImage, with a desktop entry so the window is associated with ugit.
+
+## v1.7.1
+
+### Bug Fixes
+
+* Errors raised from the repository menu and the commit panel now open the error dialog instead of being recorded but never shown.
+
+## v1.7.0
+
+### New Features
+
+* Added "Open Remote URL", "Open PR" and "Open Branch Compare" to the branch context menu. Previously these were only available from the repository "..." menu.
+
+### Improvements
+
+* Context menus opened near the edge of the window now stay fully on screen.
+
+## v1.6.1
+
+### Improvements
+
+* Pushing tags now compares the local tags against the remote first. Tags the remote already has at a different commit are skipped and reported rather than failing the whole push, and the rest are pushed in a single command.
+* Push results that completed with skipped tags now show as "Push Completed with Warnings" instead of being titled "Error".
+
+## v1.6.0
+
+### New Features
+
+* Right-click a stash and choose "Save as Patch..." to write it out as a patch file, with a separate "Save as Patch (include untracked)" when the stash captured untracked files.
+
+## v1.5.1
+
+### Bug Fixes
+
+* Restored the Branch and Stash toolbar buttons that were removed in v1.5.0.
+
+## v1.5.0
+
+### New Features
+
+* Lore repository support. Lore repositories open in their own tab alongside Git repositories, with a hierarchical Files tree, a Changes view, per-file history, revision details and a revision graph.
+* Lore: create and clone repositories, including background cloning in its own tab, sparse clones by include-path, and shared-store support.
+* Lore: file locks, links and layers management, branch merge with an interactive conflict resolver, and client-side stash emulation with apply and delete.
+* Lore: image and audio previews with the same diff modes as the Git diff viewer.
+* Lore: repository, branch, revision and file metadata viewing and editing, repository verify and info, and Find Revision by number or metadata.
+* Lore: install and version detection from Settings, configurable `lore` and `loreserver` binary paths, and a local Lore server you can start, stop and health-check from File → Local Lore Server.
+* Tabs now show a repository type icon — orange for Git, theme-tinted for Lore.
+* Added `docs/lore.md` documenting the Lore workflow, including stash and `.loreignore`.
+
+### Improvements
+
+* The Clone and Init dialogs are now shared between Git and Lore repositories.
+* Visual cleanup of the Settings dialog, stash list, worktree list and toolbar.
+
+## v1.4.0
 
 ### New Features
 
@@ -12,7 +78,7 @@
 * The Git LFS "Add Track Pattern" action now uses a proper dialog with pattern suggestions instead of a plain text prompt.
 * When Git LFS isn't installed on the system, LFS actions now show an actionable message with the install link instead of failing silently.
 
-## [v1.3.0](https://github.com/brendan-duncan/ugit/releases/tag/v1.3.0) (June )
+## v1.3.0
 
 ### New Features
 
@@ -23,31 +89,31 @@
 
 * A failed clone no longer reports success silently.
 
-## [v1.0.1](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 2, 2026)
+## v1.0.1
 
 * Improve Init New Repository. Assign a branch name and a remote repository during initialization.
 
-## [v0.2.0](https://github.com/brendan-duncan/ugit/releases/tag/v0.2.0) (June 1, 2026)
+## v0.2.0
 
 ### New Features
 
 * Stash selected files, with an option to keep the changes in the working directory or remove them.
 
-## [v0.1.15](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.15) (May 19, 2026))
+## v0.1.15
 
 ### Bug Fixes
 
 * Remote branch sometimes had stale info when checking for pulls before commit.
 * Rename "Blocked Branches" to "Locked Branches", fixed checking for them before allowing a commit, add indicator to Branch List label.
 
-## [v0.1.14](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.14) (May 13, 2026))
+## v0.1.14
 
 ### Bug Fixes
 
 * Enter and Escape aren't working with confirm dialogs.
 * Pressing Enter from commit text field will apply commit.
 
-## [v0.1.13](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.13) (XXX)
+## v0.1.13
 
 ### Bug Fixes
 
@@ -64,7 +130,7 @@
 * Add Filter field to Remotes to filter the remote branches displayed.
 * Add Filter field to Branches to filter the local branches displayed.
 
-## [v0.1.12](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.12) (March 5, 2026)
+## v0.1.12
 
 ### Bug Fixes
 
@@ -74,7 +140,7 @@
 
 * Move the Cancel button for dialogs to always be on the right side.
 
-## [v0.1.11](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.11) (March 3, 2026)
+## v0.1.11
 
 ### New Features
 
@@ -92,7 +158,7 @@
 * Creating a stash wasn't updating the Stashes list.
 * Fix "Save as patch".
 
-## [v0.1.10](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.10) (February 27, 2026)
+## v0.1.10
 
 ### New Features
 
@@ -108,7 +174,7 @@ When you switch back to that branch, those changes will be automatically re-appl
 * Refactor the react code to improve performance.
 * CTRL+A in the Staged or Unstaged file list will select all files.
 
-## [v0.1.9](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.9) (February 23, 2026)
+## v0.1.9
 
 ### New Features
 
@@ -119,7 +185,7 @@ When you switch back to that branch, those changes will be automatically re-appl
 
 * Fix remote branch "Open in Browser" and "Copy URL"
 
-## [v0.1.8](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.8) (February 21, 2026)
+## v0.1.8
 
 ### New Features
 
@@ -133,7 +199,7 @@ When you switch back to that branch, those changes will be automatically re-appl
 
 * Move Diff View options from the View menu to the DiffViewer.
 
-## [v0.1.7](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.7) (February 20, 2026)
+## v0.1.7
 
 ### New features
 
@@ -152,13 +218,13 @@ When you switch back to that branch, those changes will be automatically re-appl
 
 * Updated the layout of the Preferences dialog.
 
-## [v0.1.6](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.6) (February 19, 2026)
+## v0.1.6
 
 ### New Features
 
 * Add `Git GC` to RepoInfo menu, to perform a git garbage collection pass on the repo.
 
-## [v0.1.5](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.5) (February 19, 2026)
+## v0.1.5
 
 ### New Features
 
@@ -173,7 +239,7 @@ When you switch back to that branch, those changes will be automatically re-appl
 * Implement `New Tag` from Remote Branch context menu, to create a new tag on the Remote Branch.
 * Implement `New Branch` from Remote Branch context menu, to create a new branch off of the Remote Branch.
 
-## [v0.1.4](https://github.com/brendan-duncan/ugit/releases/tag/v0.1.4) (February 18, 2026)
+## v0.1.4
 
 ### New Features
 
