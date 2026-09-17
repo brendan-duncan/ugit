@@ -10,7 +10,28 @@ permissions:
   contents: write # Required for creating releases
 
 jobs:
+  # electron-builder used to create the release itself as a side effect of
+  # --publish always. Creating it up front instead means the release is named after
+  # the git tag rather than package.json's version, and it stays a draft until
+  # update-release-notes flips it live, so a half-uploaded release is never visible.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      # One job owns creation so the three parallel build jobs don't race to make it.
+      - name: Create draft release for this tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME already exists, reusing it"
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --draft --title "$GITHUB_REF_NAME" --notes "Build in progress."
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
+    needs: create-release
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
@@ -60,22 +81,61 @@ jobs:
     - name: Build main process
       run: npm run build:main
 
-    - name: Build and Publish (Windows / Linux)
+    # --publish never, because electron-builder's uploader sets a 60s socket timeout
+    # and fires every artifact at GitHub concurrently. When the release endpoint is
+    # slow, a stalled 120MB upload burns ~40 minutes in retries and then fails the
+    # build with "Request timed out" even though signing and notarization succeeded.
+    # It still writes latest*.yml for electron-updater, which is the only part of
+    # publishing the build itself needs to do.
+    - name: Build (Windows / Linux)
       if: matrix.os != 'macos-latest'
-      run: npm run dist:${{ matrix.target }} -- --publish always
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: npm run dist:${{ matrix.target }} -- --publish never
 
-    - name: Build and Publish (macOS)
+    - name: Build (macOS)
       if: matrix.os == 'macos-latest'
-      run: npm run dist:${{ matrix.target }} -- --publish always
+      run: npm run dist:${{ matrix.target }} -- --publish never
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CSC_LINK: ${{ secrets.MAC_CERTS }}
         CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
         APPLE_ID: ${{ secrets.APPLE_ID }}
         APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+    # gh imposes no socket timeout, so a slow transfer finishes instead of dying, and
+    # --clobber makes the upload idempotent, which is what makes it safe to retry.
+    - name: Upload artifacts to release
+      if: startsWith(github.ref, 'refs/tags/v')
+      shell: bash
+      working-directory: release
+      run: |
+        shopt -s nullglob
+        files=()
+        for f in *; do
+          # Skip the unpacked app directories, builder's own logs, and the NSIS
+          # uninstaller stub, none of which belong on the release.
+          [ -f "$f" ] || continue
+          case "$f" in
+            builder-debug.yml|builder-effective-config.yaml|*.__uninstaller*) continue ;;
+          esac
+          files+=("$f")
+        done
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "::error::no artifacts found in release/ to upload"
+          exit 1
+        fi
+        printf 'uploading %s\n' "${files[@]}"
+        for attempt in 1 2 3; do
+          if gh release upload "$GITHUB_REF_NAME" "${files[@]}" \
+               --repo "$GITHUB_REPOSITORY" --clobber; then
+            exit 0
+          fi
+          echo "upload attempt $attempt failed, retrying"
+          sleep $((attempt * 30))
+        done
+        echo "::error::gh release upload failed after 3 attempts"
+        exit 1
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-release-notes:
     needs: build
