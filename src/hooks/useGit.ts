@@ -246,12 +246,20 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       let remotesList: RemoteInfo[] = [];
       try {
         const remotesOutput = await gitAdapter.raw(['remote', '-v']);
+        // Lines look like "origin\t<url> (fetch)". Partial clones append a filter
+        // spec, e.g. "origin\t<url> (fetch) [blob:none]", so don't anchor the end.
+        const seenRemotes = new Set<string>();
         remotesList = remotesOutput
           .split('\n')
-          .filter(line => line.trim())
+          .map(line => line.trim())
+          .filter(Boolean)
           .map(line => {
-            const match = line.match(/^([^\s]+)\s+([^\s]+)(?:\s+\(fetch\))?$/);
-            return match ? { name: match[1], url: match[2] } : null;
+            const match = line.match(/^(\S+)\s+(\S+)\s+\((fetch|push)\)/);
+            if (!match || seenRemotes.has(match[1])) {
+              return null;
+            }
+            seenRemotes.add(match[1]);
+            return { name: match[1], url: match[2] };
           })
           .filter(Boolean) as RemoteInfo[];
         setRemotes(remotesList);
