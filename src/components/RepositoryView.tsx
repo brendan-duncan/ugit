@@ -74,6 +74,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState<string | undefined>(undefined);
   const [rebaseStatus, setRebaseStatus] = useState<RebaseStatus | null>(null);
+  // Bumped by any command that brings new commits into the repository. The selected
+  // branch's commit list was rendered from the cache as it stood before the command
+  // ran, so it has to be reloaded; see the effect next to the branch loaders.
+  const [commitViewReloadKey, setCommitViewReloadKey] = useState(0);
 
   const activeSplitter = useRef<number | string | null>(null);
   const currentBranchLoadId = useRef(0);
@@ -534,6 +538,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage('');
     }
     await loadRepoData(true);
+    setCommitViewReloadKey(key => key + 1);
   }, [gitAdapter, clearBranchCache, loadRepoData]);
 
   const handleFetchClick = useCallback(async () => {
@@ -546,6 +551,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       await gitAdapter.fetch('origin', ['--prune']);
       setBusyMessage('Updating branch status...');
       await updateCachedCommitsOriginStatus();
+      setCommitViewReloadKey(key => key + 1);
     } catch (error) {
       console.error('Error during fetch:', error);
       setErrorWithDialog(`Fetch failed: ${(error as Error).message}`);
@@ -627,6 +633,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       await gitAdapter.pull('origin', branch, rebase);
       clearBranchCache(branch);
       await loadRepoData(true);
+      setCommitViewReloadKey(key => key + 1);
     } catch (error) {
       console.error('Error during pull:', error);
       setErrorWithDialog(`Pull failed: ${(error as Error).message}`);
@@ -1464,6 +1471,25 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setSelectedItem(info);
     }
   }, [loadRemoteBranchCommits]);
+
+  // Reload the selected branch's commits after a fetch, pull or refresh. Those
+  // commands move refs, which makes both the rendered list and the cache entry it
+  // came from stale, so the cache is dropped for that branch before reloading.
+  // Keyed only on commitViewReloadKey: selectedItem is read for its current value,
+  // and reloading every time the selection changes would defeat the cache.
+  useEffect(() => {
+    if (commitViewReloadKey === 0 || !selectedItem)
+      return;
+
+    if (selectedItem.type === 'branch') {
+      clearBranchCache(selectedItem.branchName);
+      handleBranchSelect(selectedItem.branchName, selectedItem.page ?? 0);
+    } else if (selectedItem.type === 'remote-branch') {
+      clearBranchCache(selectedItem.fullName);
+      loadRemoteBranchCommits(
+        selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName, selectedItem.page ?? 0);
+    }
+  }, [commitViewReloadKey]);
 
   const handleLoadCommitPage = useCallback((page: number) => {
     if (!selectedItem)
