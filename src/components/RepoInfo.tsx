@@ -28,6 +28,7 @@ interface RepoInfoProps {
   onGitGC: () => Promise<void>;
   onCleanPackTemps?: () => Promise<void>;
   onPushTags: () => Promise<void>;
+  onSyncTags: () => Promise<void>;
   /** Last background remote-status failure, if any; shown inline, not as a dialog. */
   remoteStatusError?: string | null;
   onOriginChanged?: () => Promise<void>;
@@ -37,7 +38,7 @@ interface RepoInfoProps {
   onError?: (error: string) => void;
 }
 
-const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onCleanPackTemps, onPushTags, remoteStatusError, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onCleanPackTemps, onPushTags, onSyncTags, remoteStatusError, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
   const { showAlert, showConfirm } = useAlert();
   const { getSetting } = useSettings();
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
@@ -371,6 +372,9 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
           <DropdownSeparator />
           <DropdownItem onClick={onPushTags}>
             🏷 Push Tags...
+          </DropdownItem>
+          <DropdownItem onClick={onSyncTags}>
+            🔄 Sync Tags from Origin...
           </DropdownItem>
           <DropdownSeparator />
           {!isLfsInitialized ? (

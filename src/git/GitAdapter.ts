@@ -423,6 +423,27 @@ export abstract class GitAdapter {
   }
 
   /**
+   * Reset the named local tags to the commits the remote has them on. Tags are the
+   * one ref type git refuses to update on a plain fetch, so a tag that was moved or
+   * recreated on the remote stays stale locally forever without --force.
+   *
+   * Only the named refs are fetched, never every tag: a wildcard force fetch with
+   * pruning would also delete local-only tags that have never been pushed.
+   * Sent in batches for the same command line length reason as pushTags().
+   *
+   * @param remote - Remote name (e.g., 'origin')
+   * @param tags - Short tag names (e.g., ['v1.5.1', 'v1.6.0'])
+   */
+  async syncTags(remote: string, tags: string[]): Promise<void> {
+    const batchSize = 100;
+    for (let i = 0; i < tags.length; i += batchSize) {
+      const batch = tags.slice(i, i + batchSize)
+        .map(tag => `refs/tags/${tag}:refs/tags/${tag}`);
+      await this.fetch(remote, ['--force', ...batch]);
+    }
+  }
+
+  /**
    * Create a stash
    * @param message - Stash message
    * @param filePaths - Optional array of file paths to stash (if not provided, stashes all changes)
