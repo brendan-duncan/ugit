@@ -711,6 +711,67 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, hidePushDialog, loadRepoData, showPullRequestDialog, setErrorWithDialog]);
 
+  // Tags on their own. The Push dialog can only send tags along with a branch, but
+  // tags are often created and pushed without any branch having moved.
+  const handlePushTags = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage('git ls-remote --tags origin');
+      const tags = await gitAdapter.compareTags('origin');
+
+      if (tags.toPush.length === 0) {
+        showAlert(tags.conflicting.length > 0
+          ? `No new tags to push. ${tags.conflicting.length} local tag${tags.conflicting.length === 1 ? '' : 's'} ` +
+            `differ${tags.conflicting.length === 1 ? 's' : ''} from origin and can only be pushed by ` +
+            `overwriting the remote tag${tags.conflicting.length === 1 ? '' : 's'}.`
+          : 'All local tags are already on origin.',
+          'Push Tags');
+        return;
+      }
+
+      // Confirm before publishing: this is one click from a menu, where the Push
+      // dialog at least tells you what it's about to send.
+      const shownToPush = tags.toPush.slice(0, 10).join(', ');
+      const restToPush = tags.toPush.length - 10;
+      const confirmed = await showConfirm(
+        `Push ${tags.toPush.length} tag${tags.toPush.length === 1 ? '' : 's'} to origin?\n\n` +
+        `${shownToPush}${restToPush > 0 ? `, and ${restToPush} more` : ''}`,
+        'Push Tags');
+      if (!confirmed)
+        return;
+
+      setBusyMessage(`git push origin ${tags.toPush.length} tag${tags.toPush.length === 1 ? '' : 's'}`);
+      await gitAdapter.pushTags('origin', tags.toPush);
+
+      // Tags origin already has under a different commit can only be pushed by
+      // overwriting the remote tag, so skip them and say which ones were skipped.
+      if (tags.conflicting.length > 0) {
+        const shown = tags.conflicting.slice(0, 10).join(', ');
+        const rest = tags.conflicting.length - 10;
+        setErrorWithDialog(
+          `Pushed ${tags.toPush.length} tag${tags.toPush.length === 1 ? '' : 's'} to origin.\n\n` +
+          `${tags.conflicting.length} tag${tags.conflicting.length === 1 ? '' : 's'} ` +
+          `not pushed because origin already has ${tags.conflicting.length === 1 ? 'it' : 'them'} ` +
+          `at a different commit:\n${shown}${rest > 0 ? `, and ${rest} more` : ''}\n\n` +
+          `Your local tags are probably out of date. Run 'git fetch --tags --force' to ` +
+          `reset them to origin, or 'git push origin --tags --force' to overwrite the ` +
+          `tags on origin instead.`,
+          'Push Completed with Warnings');
+      } else {
+        showAlert(`Pushed ${tags.toPush.length} tag${tags.toPush.length === 1 ? '' : 's'} to origin.`, 'Push Tags');
+      }
+    } catch (error) {
+      console.error('Error pushing tags:', error);
+      setErrorWithDialog(`Push tags failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, showAlert, showConfirm, setErrorWithDialog]);
+
   const performBranchSwitch = useCallback(async (branchName: string, skipBusyManagement = false) => {
     if (!gitAdapter)
       return;
@@ -2063,6 +2124,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onResetToOrigin={() => showResetDialog()}
                 onCleanWorkingDirectory={() => showCleanWorkingDirectoryDialog()}
                 onGitGC={handleGitGC}
+                onPushTags={handlePushTags}
                 onCleanPackTemps={handleCleanPackTemps}
                 remoteStatusError={remoteStatusError}
                 onOriginChanged={async () => { if (gitAdapter) setOriginUrl(await gitAdapter.getOriginUrl()); }}
