@@ -1,239 +1,236 @@
-## v1.8.0
+## v1.9.0
 
 ### New Features
 
-* Added "Clean Up Abandoned Pack Files..." to the repository "..." menu. Fetches that die mid-transfer leave pack temporaries behind that git never reclaims — on a large repository with an unreliable remote these accumulate at hundreds of megabytes per attempt. The action reports how many files there are and how much space they take before deleting anything.
+* Added "Clean Up Abandoned Pack Files..." to the repository menu, to reclaim space left behind by interrupted fetches.
 
 ### Improvements
 
-* The selected branch's commit list is now reloaded after a fetch, pull or refresh, instead of continuing to show the history as it stood before the command ran.
-* Refresh no longer fetches. It re-reads the repository from disk — commits, branches, stashes and file status created outside ugit, none of which a fetch would show — so it's instant and works offline. Fetching all tags moved to the Fetch button, which is where the rest of the network work already lives.
-* Git commands that write to a repository are now serialized against each other per object database, so a background fetch can no longer interleave with a repack. The two together could discard objects that were still reachable. Worktrees of the same repository share one queue.
-* "Git GC" is now "Repack Repository", and repacks the object database and refreshes the commit-graph without pruning.
-* The ahead/behind indicator no longer fetches on a timer. It asks the remote for the current branch's SHA — one round trip, no object transfer — and fetches only that branch, only when the SHA has actually changed.
-* Background remote polling now skips tabs you aren't looking at, skips ticks while another git command is running, scales its interval to how long fetching this repository actually takes, and backs off exponentially (up to an hour) after failures.
-* A background remote check that fails is now reported inline in the repository panel, with the git error on hover, instead of being retried silently every five minutes.
+* The commit list now reloads after a fetch, pull or refresh.
+* Refresh now reloads the repository from disk without fetching, so it also picks up changes made outside ugit. Fetch handles tags.
+* Background fetches no longer run at the same time as a repack, which could discard history.
+* "Git GC" is now "Repack Repository", and no longer prunes.
+* The ahead/behind indicator now checks the remote instead of fetching on a timer, and only fetches when something has changed.
+* Background remote checks are skipped for inactive tabs and back off after failures.
+* A failed remote check is now reported in the repository panel instead of retried silently.
 
 ### Bug Fixes
 
-* A failed fetch when tagging a commit on a remote branch now reports the error instead of leaving the dialog to never open.
-* The Refresh button now shows its spinner and is disabled while a refresh is running.
+* A failed fetch when tagging a commit on a remote branch is now reported.
+* The Refresh button now spins and is disabled while a refresh is running.
 
 ## v1.7.3
 
 ### Bug Fixes
 
-* A branch whose history can't be read all the way through — a commit object missing from the object database, for example — now shows the commits git was able to read, along with a one-line explanation, instead of an error dialog containing the entire partial log.
-* Git GC now runs behind the busy overlay and reports when it's finished, rather than running unannounced. A failed GC is now reported instead of being treated as a success.
+* A branch whose history can't be fully read now shows the commits that could be read, instead of an error.
+* Git GC now shows progress and reports when it finishes, or if it fails.
 
 ## v1.7.2
 
 ### Improvements
 
-* Linux releases now include a `.deb` installer alongside the AppImage, with a desktop entry so the window is associated with ugit.
+* Linux releases now include a `.deb` installer.
 
 ## v1.7.1
 
 ### Bug Fixes
 
-* Errors raised from the repository menu and the commit panel now open the error dialog instead of being recorded but never shown.
+* Errors from the repository menu and the commit panel now show a dialog.
 
 ## v1.7.0
 
 ### New Features
 
-* Added "Open Remote URL", "Open PR" and "Open Branch Compare" to the branch context menu. Previously these were only available from the repository "..." menu.
+* Added "Open Remote URL", "Open PR" and "Open Branch Compare" to the branch context menu.
 
 ### Improvements
 
-* Context menus opened near the edge of the window now stay fully on screen.
+* Context menus opened near the window edge now stay on screen.
 
 ## v1.6.1
 
 ### Improvements
 
-* Pushing tags now compares the local tags against the remote first. Tags the remote already has at a different commit are skipped and reported rather than failing the whole push, and the rest are pushed in a single command.
-* Push results that completed with skipped tags now show as "Push Completed with Warnings" instead of being titled "Error".
+* Pushing tags now skips tags that conflict with the remote instead of failing the push.
+* A push with skipped tags now reports a warning instead of an error.
 
 ## v1.6.0
 
 ### New Features
 
-* Right-click a stash and choose "Save as Patch..." to write it out as a patch file, with a separate "Save as Patch (include untracked)" when the stash captured untracked files.
+* Save a stash as a patch file from the stash context menu, optionally including untracked files.
 
 ## v1.5.1
 
 ### Bug Fixes
 
-* Restored the Branch and Stash toolbar buttons that were removed in v1.5.0.
+* Restored the Branch and Stash toolbar buttons.
 
 ## v1.5.0
 
 ### New Features
 
-* Lore repository support. Lore repositories open in their own tab alongside Git repositories, with a hierarchical Files tree, a Changes view, per-file history, revision details and a revision graph.
-* Lore: create and clone repositories, including background cloning in its own tab, sparse clones by include-path, and shared-store support.
-* Lore: file locks, links and layers management, branch merge with an interactive conflict resolver, and client-side stash emulation with apply and delete.
-* Lore: image and audio previews with the same diff modes as the Git diff viewer.
-* Lore: repository, branch, revision and file metadata viewing and editing, repository verify and info, and Find Revision by number or metadata.
-* Lore: install and version detection from Settings, configurable `lore` and `loreserver` binary paths, and a local Lore server you can start, stop and health-check from File → Local Lore Server.
-* Tabs now show a repository type icon — orange for Git, theme-tinted for Lore.
-* Added `docs/lore.md` documenting the Lore workflow, including stash and `.loreignore`.
+* Lore repository support. Lore repositories open in their own tab, with a Files tree, a Changes view, per-file history and a revision graph.
+* Create and clone Lore repositories, including background clones, sparse clones and shared stores.
+* Lore file locks, links and layers, branch merge with a conflict resolver, and stash support.
+* Image and audio previews for Lore assets.
+* View and edit Lore repository, branch, revision and file metadata, and find revisions by number or metadata.
+* Install Lore and run a local Lore server from within ugit.
+* Tabs now show a repository type icon for Git and Lore.
+* Added Lore documentation.
 
 ### Improvements
 
-* The Clone and Init dialogs are now shared between Git and Lore repositories.
+* The Clone and Init dialogs are now shared between Git and Lore.
 * Visual cleanup of the Settings dialog, stash list, worktree list and toolbar.
 
 ## v1.4.0
 
 ### New Features
 
-* Large files are now flagged before they're committed. Staging a file at or above a configurable size (default 100 MB) that isn't already tracked by Git LFS will prompt you when you commit, with a one-click "Track & Commit" that runs `git lfs track`, re-stages the files and `.gitattributes`, and continues the commit.
-* Right-click a file in the Staged or Unstaged list to track it with Git LFS — either all files of that extension (e.g. `*.psd`) or just that one file. Git LFS is installed automatically if it isn't set up yet.
-* Files tracked by Git LFS now show an "LFS" badge in the file lists.
-* Added "Warn about large files not tracked by Git LFS" and a "Large File Warning Size" threshold to Preferences.
+* Staging a large file that isn't tracked by Git LFS now prompts at commit time, with a one-click "Track & Commit".
+* Right-click a file to track it with Git LFS, by extension or on its own. Git LFS is installed if needed.
+* Files tracked by Git LFS now show an "LFS" badge.
+* Added large file warning settings to Preferences.
 
 ### Improvements
 
-* The Git LFS "Add Track Pattern" action now uses a proper dialog with pattern suggestions instead of a plain text prompt.
-* When Git LFS isn't installed on the system, LFS actions now show an actionable message with the install link instead of failing silently.
+* The Git LFS "Add Track Pattern" action now uses a dialog with pattern suggestions.
+* LFS actions now report when Git LFS isn't installed, with an install link.
 
 ## v1.3.0
 
 ### New Features
 
-* Cloning a repository now runs in the background in its own tab. Other repository tabs stay usable while a large clone runs, switching tabs no longer interrupts it, and the clone tab shows live progress (with a Retry action if it fails).
-* Added a "Shallow clone" option with a configurable depth to the Clone dialog, applied per clone.
+* Cloning now runs in the background in its own tab, with live progress and a Retry action.
+* Added a "Shallow clone" option with a configurable depth to the Clone dialog.
 
 ### Bug Fixes
 
-* A failed clone no longer reports success silently.
+* A failed clone no longer reports success.
 
 ## v1.0.1
 
-* Improve Init New Repository. Assign a branch name and a remote repository during initialization.
+* Init New Repository can now assign a branch name and a remote.
 
 ## v0.2.0
 
 ### New Features
 
-* Stash selected files, with an option to keep the changes in the working directory or remove them.
+* Stash selected files, keeping or discarding the changes in the working directory.
 
 ## v0.1.15
 
 ### Bug Fixes
 
-* Remote branch sometimes had stale info when checking for pulls before commit.
-* Rename "Blocked Branches" to "Locked Branches", fixed checking for them before allowing a commit, add indicator to Branch List label.
+* Remote branch info was sometimes stale when checking for pulls before a commit.
+* Renamed "Blocked Branches" to "Locked Branches", fixed the pre-commit check, and added an indicator to the Branch List.
 
 ## v0.1.14
 
 ### Bug Fixes
 
-* Enter and Escape aren't working with confirm dialogs.
-* Pressing Enter from commit text field will apply commit.
+* Enter and Escape now work in confirm dialogs.
+* Enter in the commit message field now applies the commit.
 
 ## v0.1.13
 
 ### Bug Fixes
 
-* Fix for window going blank When git has an error.
-* Fix copying text on macOS.
+* Fixed the window going blank on a git error.
+* Fixed copying text on macOS.
 
 ### Improvements
 
-* Double-click remote branch to do a checkout.
-* Add Edit menu.
+* Double-click a remote branch to check it out.
+* Added an Edit menu.
 
 ### New Features
 
-* Add Filter field to Remotes to filter the remote branches displayed.
-* Add Filter field to Branches to filter the local branches displayed.
+* Added filter fields to Branches and Remotes.
 
 ## v0.1.12
 
 ### Bug Fixes
 
-* Fix Branch checkout not working
+* Fixed branch checkout.
 
 ### Improvements
 
-* Move the Cancel button for dialogs to always be on the right side.
+* Dialog Cancel buttons are now always on the right.
 
 ## v0.1.11
 
 ### New Features
 
-* Add "Rebase instead of Merge" to Pull Dialog.
+* Added "Rebase instead of Merge" to the Pull dialog.
 
 ### Improvements
 
-* Escape will now close dialogs.
-* Make the Cancel button for all dialogs consistently on the left.
-* Double-click on a commit to check it out.
-* Double-click on a stash to apply the stash.
+* Escape now closes dialogs.
+* Dialog Cancel buttons are now consistent across dialogs.
+* Double-click a commit to check it out.
+* Double-click a stash to apply it.
 
 ### Bug Fixes
 
-* Creating a stash wasn't updating the Stashes list.
-* Fix "Save as patch".
+* Creating a stash now updates the Stashes list.
+* Fixed "Save as patch".
 
 ## v0.1.10
 
 ### New Features
 
-* Branch Stash. If you have local changes when switching branches, you can chose Branch Stash to stash the local changes.
-When you switch back to that branch, those changes will be automatically re-applied.
+* Branch Stash: stash local changes when switching branches, and re-apply them automatically on return.
 
 ### Bug Fixes
 
-* CTRL+A will no longer select all of the text in the window.
+* CTRL+A no longer selects all text in the window.
 
 ### Improvements
 
-* Refactor the react code to improve performance.
-* CTRL+A in the Staged or Unstaged file list will select all files.
+* Performance improvements.
+* CTRL+A in the Staged or Unstaged file list selects all files.
 
 ## v0.1.9
 
 ### New Features
 
-* Add Light color scheme, selectable from the View / Color Mode menu.
-* Add "..." menu to DiffView. If a file is unstaged, this will have "Stage" and "Discard". If the file is staged, it will have "Unstage" and "Unstage and Discard".
+* Added a Light color scheme, selectable from View → Color Mode.
+* Added a "..." menu to the diff view with Stage, Unstage and Discard actions.
 
 ### Bug Fixes
 
-* Fix remote branch "Open in Browser" and "Copy URL"
+* Fixed remote branch "Open in Browser" and "Copy URL".
 
 ## v0.1.8
 
 ### New Features
 
-* Added DiffViewer modes or modified images: Side-By-Side, Swipe, and Difference.
-* Add Conflict Merge tool to DiffViewer for resolving conflicted files.
-* Add documentation links to the Help menu.
-* Implement "New Branch from Branch" for local branches.
-* Implement 'Merge' for remote branches.
+* Added Side-By-Side, Swipe and Difference modes for image diffs.
+* Added a conflict merge tool to the diff viewer.
+* Added documentation links to the Help menu.
+* Added "New Branch from Branch" for local branches.
+* Added "Merge" for remote branches.
 
 ### Improvements
 
-* Move Diff View options from the View menu to the DiffViewer.
+* Moved the diff view options from the View menu into the diff viewer.
 
 ## v0.1.7
 
-### New features
+### New Features
 
-* Add Pull to the branch context menu. For non-current branches, this will do a fetch of that branch.
-* Add Push to the branch context menu. This will also work for non-current branches.
-* Add "Add Tag" to the branch context menu. This will add the tag the last commit.
-* Change "Open with Visual Studio Code" to "Open With Editor", and added a Preference setting to change the editor used.
-* Commit Block List, defined in Preferences, will check the current branch before letting you do a Commit. If the current branch is in the block list, it will notify you that you probably forgot to create a branch and prevent the Commit until you do that.
+* Added Pull and Push to the branch context menu, including for non-current branches.
+* Added "Add Tag" to the branch context menu.
+* "Open With Editor" replaces "Open with Visual Studio Code", with a configurable editor in Preferences.
+* Commit Block List: warns and blocks a commit on a branch listed in Preferences.
 
 ### Bug Fixes
 
-* Fix: Creating a Commit doesn't update the count on the Push toolbar button.
-* Fix: Discard of a chunk in a file change diff.
+* Creating a commit now updates the count on the Push button.
+* Fixed discarding a chunk in a file diff.
 
 ### Improvements
 
@@ -243,26 +240,19 @@ When you switch back to that branch, those changes will be automatically re-appl
 
 ### New Features
 
-* Add `Git GC` to RepoInfo menu, to perform a git garbage collection pass on the repo.
+* Added "Git GC" to the repository menu.
 
 ## v0.1.5
 
 ### New Features
 
-* Add `Open Remote URL` to the RepoInfo menu, to open the remote branch in a browser.
-* Add `Open PR` to the RepoInfo menu, to open the PR creation URL in a browser.
-* Add `Open Branch Compare` to the RepoInfo menu, to open the branch comparison URL in a browser.
-* Add `Copy Remote URL` to the RepoInfo menu, to copy the remote url to the clipboard.
-* Implement `Rebase 'branch' onto 'current-branch'` from Local Branch context menu, to perform a rebase.
-* Implement `Checkout` from Remote Branch context menu, to create a Local Branch from a Remote branch.
-* Implement `Delete` from Remote Branch context menu, to delete a Remote Branch.
-* Implement `Pull` from Remote Branch context menu, to pull the remote branch into the currnet Local Branch.
-* Implement `New Tag` from Remote Branch context menu, to create a new tag on the Remote Branch.
-* Implement `New Branch` from Remote Branch context menu, to create a new branch off of the Remote Branch.
+* Added "Open Remote URL", "Open PR", "Open Branch Compare" and "Copy Remote URL" to the repository menu.
+* Added "Rebase onto current branch" to the local branch context menu.
+* Added Checkout, Delete, Pull, New Tag and New Branch to the remote branch context menu.
 
 ## v0.1.4
 
 ### New Features
 
-* Add menu to Unstaged Files with: `Discard All` and `Stage All`.
-* Add menu to Staged Files with: `Unstage All`.
+* Added "Discard All" and "Stage All" to the Unstaged Files menu.
+* Added "Unstage All" to the Staged Files menu.
