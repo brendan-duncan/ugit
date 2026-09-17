@@ -6,6 +6,8 @@
 
 ### Improvements
 
+* The selected branch's commit list is now reloaded after a fetch, pull or refresh, instead of continuing to show the history as it stood before the command ran.
+* Refresh no longer fetches. It re-reads the repository from disk — commits, branches, stashes and file status created outside ugit, none of which a fetch would show — so it's instant and works offline. Fetching all tags moved to the Fetch button, which is where the rest of the network work already lives.
 * Git commands that write to a repository are now serialized against each other per object database, so a background fetch can no longer interleave with a repack. The two together could discard objects that were still reachable. Worktrees of the same repository share one queue.
 * "Git GC" is now "Repack Repository", and repacks the object database and refreshes the commit-graph without pruning.
 * The ahead/behind indicator no longer fetches on a timer. It asks the remote for the current branch's SHA — one round trip, no object transfer — and fetches only that branch, only when the SHA has actually changed.
@@ -15,6 +17,7 @@
 ### Bug Fixes
 
 * A failed fetch when tagging a commit on a remote branch now reports the error instead of leaving the dialog to never open.
+* The Refresh button now shows its spinner and is disabled while a refresh is running.
 
 ## v1.7.3
 

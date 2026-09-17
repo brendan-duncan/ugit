@@ -83,6 +83,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   const currentBranchLoadId = useRef(0);
   const isBusyRef = useRef(false);
   const refreshInFlight = useRef(false);
+  // Guards the Refresh button specifically. Separate from refreshInFlight, which
+  // drops ticks of the background file-status poll, and read synchronously so a
+  // double-click can't start a second reload before `refreshing` re-renders.
+  const manualRefreshInFlight = useRef(false);
   const remoteFetchInFlight = useRef(false);
   const branchStatusRef = useRef<{ [branchName: string]: { ahead: number; behind: number } }>({});
   const currentBranchCacheRef = useRef<string>('');
@@ -519,27 +523,29 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [loading, selectedItem]);
 
+  // Re-read the repository from disk, without touching the network. This is what
+  // picks up work done outside ugit - a commit from a terminal, a branch someone's
+  // script created, a stash from another tool - none of which a fetch would show.
+  // Anything that needs the remote belongs to Fetch and Pull.
   const handleRefreshClick = useCallback(async () => {
-    clearBranchCache();
+    if (!gitAdapter || manualRefreshInFlight.current)
+      return;
+
+    manualRefreshInFlight.current = true;
+    setRefreshing(true);
     try {
-      if (gitAdapter) {
-        setIsBusy(true);
-        setBusyMessage('git fetch origin --tags --prune');
-        // Through the adapter, not raw(): this is the one place that still fetches
-        // every ref, and it must be serialized against background polling and any
-        // repack. raw() deliberately runs unqueued and swallows failures.
-        await gitAdapter.fetch('origin', ['--tags', '--prune']);
-      }
+      clearBranchCache();
+      await loadRepoData(true);
+      await refreshRebaseStatus();
+      setCommitViewReloadKey(key => key + 1);
     } catch (error) {
-      console.error('Error fetching tags:', error);
-      setRemoteStatusError((error as Error).message || 'Fetch failed');
+      console.error('Error refreshing repository:', error);
+      setErrorWithDialog(`Refresh failed: ${(error as Error).message}`);
     } finally {
-      setIsBusy(false);
-      setBusyMessage('');
+      manualRefreshInFlight.current = false;
+      setRefreshing(false);
     }
-    await loadRepoData(true);
-    setCommitViewReloadKey(key => key + 1);
-  }, [gitAdapter, clearBranchCache, loadRepoData]);
+  }, [gitAdapter, clearBranchCache, loadRepoData, refreshRebaseStatus, setErrorWithDialog]);
 
   const handleFetchClick = useCallback(async () => {
     if (!gitAdapter)
@@ -547,8 +553,11 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
 
     try {
       setIsBusy(true);
-      setBusyMessage('git fetch origin --prune');
-      await gitAdapter.fetch('origin', ['--prune']);
+      setBusyMessage('git fetch origin --tags --prune');
+      // --tags belongs here rather than on Refresh, which no longer touches the
+      // network. git already fetches tags reachable from the refs it downloads, so
+      // this only adds the ones that aren't.
+      await gitAdapter.fetch('origin', ['--tags', '--prune']);
       setBusyMessage('Updating branch status...');
       await updateCachedCommitsOriginStatus();
       setCommitViewReloadKey(key => key + 1);
