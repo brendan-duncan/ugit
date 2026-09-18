@@ -8,6 +8,7 @@ import RenameBranchDialog from './RenameBranchDialog';
 import MergeBranchDialog from './MergeBranchDialog';
 import RebaseBranchDialog from './RebaseBranchDialog';
 import RebaseBanner from './RebaseBanner';
+import InteractiveRebaseDialog from './InteractiveRebaseDialog';
 import ApplyStashDialog from './ApplyStashDialog';
 import DeleteStashDialog from './DeleteStashDialog';
 import ContentViewer from './ContentViewer';
@@ -33,7 +34,7 @@ import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit, IncompleteHistoryError, RebaseStatus, SearchQuery, WorktreeInfo } from "../git/GitAdapter"
+import { GitAdapter, Commit, IncompleteHistoryError, RebaseStatus, RebaseTodoEntry, SearchQuery, WorktreeInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
 
@@ -74,6 +75,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   const [error, setError] = useState<string | null>(null);
   const [errorTitle, setErrorTitle] = useState<string | undefined>(undefined);
   const [rebaseStatus, setRebaseStatus] = useState<RebaseStatus | null>(null);
+  // Commits gathered for the interactive rebase editor, and what they replay onto.
+  const [interactiveRebase, setInteractiveRebase] =
+    useState<{ base: string | null; commits: Commit[]; ontoLabel: string } | null>(null);
   // Bumped by any command that brings new commits into the repository. The selected
   // branch's commit list was rendered from the cache as it stood before the command
   // ran, so it has to be reloaded; see the effect next to the branch loaders.
@@ -2008,6 +2012,99 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, onOpenRepository, refreshWorktrees, showConfirm, setErrorWithDialog]);
 
+  /**
+   * Gather the commits an interactive rebase would replay and open the editor for
+   * them. A rebase rewrites the checked-out branch, so this only makes sense for a
+   * commit on it, with nothing uncommitted in the way.
+   */
+  const startInteractiveRebase = useCallback(async (commit: Commit) => {
+    if (!gitAdapter)
+      return;
+
+    const viewedBranch = selectedItem?.type === 'branch' ? selectedItem.branchName : null;
+    if (!viewedBranch || viewedBranch !== currentBranch) {
+      showAlert(
+        `An interactive rebase rewrites the branch you have checked out. Check out ${viewedBranch || 'this branch'} first, then rebase from a commit on it.`,
+        'Interactive Rebase'
+      );
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      setBusyMessage('git log');
+
+      const status = await gitAdapter.status();
+      if (status.files.length > 0) {
+        showAlert(
+          'git rebase needs a clean working directory. Commit or stash your changes first.',
+          'Interactive Rebase'
+        );
+        return;
+      }
+
+      // The clicked commit is replayed too, so the rebase starts from its parent.
+      // `rev-list --parents` prints the commit followed by its parents, so a root
+      // commit - which has none - leaves base null, the `--root` case.
+      const parents = await gitAdapter.raw(['rev-list', '--parents', '-n', '1', commit.hash]);
+      const fields = parents.trim().split(/\s+/);
+      const base: string | null = fields.length >= 2 ? fields[1] : null;
+
+      const range = await gitAdapter.getCommitRange(base, 'HEAD');
+      if (range.length === 0) {
+        showAlert('There are no commits to rebase from here.', 'Interactive Rebase');
+        return;
+      }
+
+      // getCommitRange is newest first; a rebase todo list runs oldest first.
+      setInteractiveRebase({
+        base,
+        commits: [...range].reverse(),
+        ontoLabel: base === null ? 'the root commit' : base.slice(0, 8)
+      });
+    } catch (error) {
+      setErrorWithDialog(`Failed to prepare the rebase: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, selectedItem, currentBranch, showAlert, setErrorWithDialog]);
+
+  const runInteractiveRebase = useCallback(async (entries: RebaseTodoEntry[]) => {
+    if (!gitAdapter || !interactiveRebase)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage('git rebase -i');
+      await gitAdapter.rebaseInteractive(interactiveRebase.base, entries);
+      clearBranchCache();
+      await loadRepoData(true);
+
+      // The rebase rewrote the commits the branch view is showing, so reload it.
+      if (selectedItem?.type === 'branch' && selectedItem.branchName)
+        await handleBranchSelect(selectedItem.branchName);
+
+      // A rebase that stopped for a conflict or an edit step is reported by the
+      // banner, which loadRepoData refreshes; say so plainly as well.
+      const stopped = await gitAdapter.getRebaseStatus();
+      if (stopped) {
+        showAlert(
+          stopped.conflictedFiles.length > 0
+            ? `The rebase stopped on ${stopped.currentCommitSubject || 'a commit'} with conflicts in ${stopped.conflictedFiles.join(', ')}. Resolve them, then continue the rebase.`
+            : `The rebase stopped on ${stopped.currentCommitSubject || 'a commit'} so it can be edited. Make your changes, then continue the rebase.`,
+          'Interactive Rebase'
+        );
+      }
+    } catch (error) {
+      setErrorWithDialog(`Rebase failed: ${(error as Error).message}`);
+      throw error;
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, interactiveRebase, clearBranchCache, loadRepoData, selectedItem, handleBranchSelect, showAlert, setErrorWithDialog]);
+
   const handleCommitContextMenu = useCallback(async (action: string, commit: Commit, _currentBranch: string, tagName?: string) => {
     if (!gitAdapter) 
       return;
@@ -2052,6 +2149,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           await gitAdapter.checkoutBranch(commit.hash);
           await loadRepoData(true);
         }
+        break;
+      case 'rebase-interactive':
+        await startInteractiveRebase(commit);
         break;
       case 'cherry-pick':
         if (await showConfirm(`Cherry-pick ${commit.hash.substring(0, 7)}?`)) {
@@ -2357,6 +2457,15 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           gitAdapter={gitAdapter}
         />
       )}
+      {interactiveRebase && (
+        <InteractiveRebaseDialog
+          commits={interactiveRebase.commits}
+          ontoLabel={interactiveRebase.ontoLabel}
+          onClose={() => setInteractiveRebase(null)}
+          onRebase={runInteractiveRebase}
+        />
+      )}
+
       {dialogStates.showRebaseBranchDialog && (
         <RebaseBranchDialog
           onClose={hideRebaseBranchDialog}

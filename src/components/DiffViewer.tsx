@@ -3,6 +3,7 @@ import { FileDiff } from './types';
 import { GitAdapter } from '../git/GitAdapter';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
+import MergeConflictResolver from './MergeConflictResolver';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -243,6 +244,7 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
   const [selectedConflictVersion, setSelectedConflictVersion] = useState<'ours' | 'theirs' | null>(null);
   const [mergeToolDropdownOpen, setMergeToolDropdownOpen] = useState<boolean>(false);
   const [conflictResolving, setConflictResolving] = useState<boolean>(false);
+  const [showConflictResolver, setShowConflictResolver] = useState<boolean>(false);
   const [settingsDropdownOpen, setSettingsDropdownOpen] = useState<boolean>(false);
   const [fileMenuOpen, setFileMenuOpen] = useState<boolean>(false);
   const mergeToolDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -822,6 +824,14 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
               >
                 Merge
               </button>
+              <button
+                className="diff-conflict-merge-btn"
+                onClick={() => setShowConflictResolver(true)}
+                disabled={conflictResolving}
+                title="Resolve each conflict in this file, block by block"
+              >
+                Resolve Conflicts...
+              </button>
               <div className="diff-conflict-mergetool-dropdown" ref={mergeToolDropdownRef}>
                 <div
                   className="diff-conflict-mergetool-trigger"
@@ -1026,6 +1036,17 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
             Difference
           </button>
         </div>
+      )}
+      {showConflictResolver && (
+        <MergeConflictResolver
+          gitAdapter={gitAdapter}
+          filePath={file.path}
+          onClose={() => setShowConflictResolver(false)}
+          onResolved={async () => {
+            if (onRefresh) await onRefresh();
+            await loadContent();
+          }}
+        />
       )}
     </div>
   );

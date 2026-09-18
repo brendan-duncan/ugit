@@ -159,6 +159,64 @@ export interface SearchLogResult {
   truncated: boolean;
 }
 
+/** What an interactive rebase should do with one commit. */
+export type RebaseAction = 'pick' | 'reword' | 'edit' | 'squash' | 'fixup' | 'drop';
+
+/** One line of an interactive rebase's todo list, in the order it should run. */
+export interface RebaseTodoEntry {
+  action: RebaseAction;
+  hash: string;
+  // The commit's subject, for the todo line's comment.
+  subject: string;
+  // For 'reword', the message to use instead. For 'squash', the message for the
+  // commit the changes are folded into. Ignored for the other actions.
+  message?: string;
+}
+
+/**
+ * One line of `git blame` output, with the commit that last touched it.
+ */
+export interface BlameLine {
+  // 1-based line number in the revision that was blamed.
+  line: number;
+  // Full hash of the commit that last touched this line. A hash of all zeroes
+  // means the line is a local modification that isn't committed yet.
+  hash: string;
+  author: string;
+  authorMail: string;
+  // Author time as 'YYYY-MM-DD HH:mm:ss'.
+  date: string;
+  // Subject line of the commit.
+  summary: string;
+  // Line number this line had in `origPath` at `hash`.
+  origLine: number;
+  // Path the file had at `hash`, which differs from the blamed path when the
+  // file has since been renamed.
+  origPath: string;
+  // The text of the line, without its newline.
+  content: string;
+  // True for the first line of each run of consecutive lines from the same
+  // commit, so the view can draw one heading per run.
+  isGroupStart: boolean;
+  // The commit and path this line came from before `hash` touched it, when git
+  // knows them. Lets "blame previous revision" follow renames exactly instead
+  // of guessing at `hash^`.
+  previousHash?: string;
+  previousPath?: string;
+}
+
+/** A commit from a path-scoped log, plus how the path itself changed in it. */
+export interface FileHistoryEntry {
+  commit: Commit;
+  // Status of the path in this commit ('M', 'A', 'D', 'R'...), or '' if unknown.
+  status: string;
+  // The path as it was named in this commit. Differs from the requested path for
+  // commits from before a rename, when the log is following renames.
+  path: string;
+  // Where the path was renamed from, when this commit renamed it.
+  renamedFrom?: string;
+}
+
 export interface WorktreeInfo {
   // Absolute path to the worktree's working directory.
   path: string;
@@ -572,6 +630,71 @@ export abstract class GitAdapter {
    * @param branchName - Name of the branch
    */
   abstract getCommitCount(branchName: string): Promise<number>;
+
+  /**
+   * Read a file from the working directory as text.
+   * @param filePath - Path relative to the repository root
+   */
+  abstract readWorkingFile(filePath: string): Promise<string>;
+
+  /**
+   * Write a file in the working directory, replacing what's there.
+   * @param filePath - Path relative to the repository root
+   * @param content - The new contents
+   */
+  abstract writeWorkingFile(filePath: string, content: string): Promise<void>;
+
+  /**
+   * List the commits in a range, newest first.
+   * @param fromRef - Exclusive start of the range, or null for the root commit
+   * (every commit reachable from `toRef`)
+   * @param toRef - Inclusive end of the range. Defaults to HEAD.
+   */
+  abstract getCommitRange(fromRef: string | null, toRef?: string): Promise<Commit[]>;
+
+  /**
+   * Replay a range of commits with per-commit actions - an interactive rebase,
+   * driven by `entries` instead of by an editor.
+   *
+   * Returns once git is done with the todo list it was given. A rebase that stops
+   * for a conflict or an 'edit' step also returns normally, leaving the rebase in
+   * progress for the caller to report; `getRebaseStatus` says whether that
+   * happened.
+   *
+   * @param baseRef - The commit to replay onto, or null to rebase from the root
+   * @param entries - Todo lines in the order they should run
+   * @throws when the todo list can't be run at all, e.g. a leading squash
+   */
+  abstract rebaseInteractive(baseRef: string | null, entries: RebaseTodoEntry[]): Promise<void>;
+
+  /**
+   * List the commits that touched a single path, newest first.
+   * @param filePath - Path relative to the repository root (file or directory)
+   * @param maxCount - Maximum number of commits to retrieve
+   * @param offset - Number of commits to skip from the start (for paging)
+   * @param follow - Follow the path through renames. Only valid for a single
+   * file; git rejects it for directories, so callers pass false for those.
+   * @param startRef - Commit or branch to start the history from. Defaults to HEAD.
+   */
+  abstract fileLog(filePath: string, maxCount?: number, offset?: number,
+                   follow?: boolean, startRef?: string): Promise<FileHistoryEntry[]>;
+
+  /**
+   * Count the commits that touched a single path.
+   * @param filePath - Path relative to the repository root
+   * @param follow - Follow the path through renames (single files only)
+   * @param startRef - Commit or branch to count from. Defaults to HEAD.
+   */
+  abstract getFileCommitCount(filePath: string, follow?: boolean, startRef?: string): Promise<number>;
+
+  /**
+   * Blame a file: which commit last touched each line.
+   * @param filePath - Path relative to the repository root
+   * @param revision - Revision to blame. Defaults to the working tree, which
+   * marks uncommitted lines with an all-zero hash.
+   * @throws when the path doesn't exist at that revision, or is binary
+   */
+  abstract blame(filePath: string, revision?: string): Promise<BlameLine[]>;
 
   /**
    * Search the commit log of a branch using server-side git filters.

@@ -649,6 +649,19 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
           <div className="context-menu-item" onClick={() => handleMenuAction('open-in-editor')}>
             Open in Editor
           </div>
+          {contextMenu.items.length === 1 && (
+            <>
+              <div className="context-menu-separator"></div>
+              <div className="context-menu-item" onClick={() => handleMenuAction('file-history')}>
+                File History
+              </div>
+              {contextMenu.items[0].type === 'file' && (
+                <div className="context-menu-item" onClick={() => handleMenuAction('blame')}>
+                  Blame
+                </div>
+              )}
+            </>
+          )}
           <div className="context-menu-separator"></div>
           {listType === 'unstaged' && (
             <div className="context-menu-item" onClick={() => handleMenuAction('stage')}>

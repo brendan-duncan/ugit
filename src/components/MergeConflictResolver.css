@@ -1,0 +1,213 @@
+.merge-resolver-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 88vw;
+  max-width: 1200px;
+  height: 85vh;
+  max-height: none;
+}
+
+.merge-resolver-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+}
+
+.merge-resolver-header h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.merge-resolver-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.merge-resolver-count {
+  color: var(--warning-color);
+  font-size: 12px;
+}
+
+.merge-resolver-mini {
+  padding: 4px 10px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.merge-resolver-mini:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.merge-resolver-mini:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.merge-resolver-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 16px;
+  gap: 10px;
+}
+
+.merge-resolver-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.merge-resolver-error {
+  color: var(--danger-color);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.merge-resolver-blocks {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--bg-primary);
+  padding: 6px;
+}
+
+.merge-resolver-stable {
+  margin: 0;
+  padding: 2px 6px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.merge-resolver-block {
+  margin: 8px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.merge-resolver-block-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.merge-resolver-block-label {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.merge-resolver-choice {
+  padding: 2px 8px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.merge-resolver-choice:hover {
+  background-color: var(--border-color);
+}
+
+.merge-resolver-choice.active {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--text-selected);
+}
+
+/* The side a block is resolved to is highlighted; the others stay dim. */
+.merge-resolver-side {
+  border-top: 1px solid var(--border-color);
+  opacity: 0.55;
+}
+
+.merge-resolver-side:first-of-type {
+  border-top: none;
+}
+
+.merge-resolver-side.chosen {
+  opacity: 1;
+}
+
+.merge-resolver-side-head {
+  padding: 2px 8px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.merge-resolver-side.ours .merge-resolver-side-head {
+  color: var(--repo-info-local-color, var(--text-secondary));
+}
+
+.merge-resolver-side.theirs .merge-resolver-side-head {
+  color: var(--repo-info-origin-color, var(--text-secondary));
+}
+
+.merge-resolver-code {
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--text-primary);
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.merge-resolver-preview {
+  flex-shrink: 0;
+  max-height: 30%;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--bg-primary);
+}
+
+.merge-resolver-preview-head {
+  position: sticky;
+  top: 0;
+  padding: 3px 8px;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.merge-resolver-edit {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.merge-resolver-footer {
+  align-items: center;
+}
+
+.merge-resolver-error-inline {
+  margin-right: auto;
+  color: var(--danger-color);
+  font-size: 12px;
+}

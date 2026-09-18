@@ -1,3 +1,22 @@
+## Unreleased
+
+### New Features
+
+* Added "File History" to the file and folder context menus: the commits that
+  touched a path, the diff each one made, rename tracking and paging.
+* Added a "Blame" tab to the File History dialog, with a per-line gutter, "Blame
+  Previous" to walk back through earlier revisions - following renames - and
+  actions to show the commit or copy its SHA.
+* Added "Rebase Interactively from Here..." to the commit context menu. Commits
+  can be reordered, and picked, reworded, edited, squashed, fixed up or dropped.
+  A rebase that stops for a conflict or an edit step is reported by the existing
+  rebase banner.
+* Added "Resolve Conflicts..." to the diff viewer's conflict bar: a 3-way
+  resolver that takes each conflict block on its own - ours, theirs, both or
+  base - with all-ours and all-theirs, a text-edit fallback and a result
+  preview. Saving stages the resolved file, and a result that still has conflict
+  markers is refused.
+
 ## v1.9.1
 
 ### New Features

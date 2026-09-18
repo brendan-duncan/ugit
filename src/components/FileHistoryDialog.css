@@ -1,0 +1,348 @@
+.file-history-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 90vw;
+  height: 85vh;
+  min-width: 700px;
+  max-width: none;
+}
+
+.file-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+}
+
+.file-history-header h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.file-history-tabs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.file-history-tab {
+  padding: 5px 14px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.file-history-tab:hover {
+  background-color: var(--border-color);
+}
+
+.file-history-tab.active {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--text-selected);
+}
+
+/* Body: the history tab splits into a commit list and a diff; blame stacks. */
+.file-history-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.file-history-body-blame {
+  flex-direction: column;
+}
+
+.file-history-commits {
+  width: 38%;
+  min-width: 260px;
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+}
+
+.file-history-diff {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.file-history-status {
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.file-history-error {
+  color: var(--danger-color);
+  white-space: pre-wrap;
+}
+
+.file-history-commit {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.file-history-commit:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.file-history-commit.selected {
+  background-color: var(--accent-color);
+}
+
+.file-history-commit.selected .file-history-commit-message,
+.file-history-commit.selected .file-history-commit-meta,
+.file-history-commit.selected .file-history-commit-rename {
+  color: var(--text-selected);
+}
+
+.file-history-commit-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.file-history-commit-message {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-history-commit-status {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.file-history-commit-status.status-A {
+  color: var(--success-color);
+}
+
+.file-history-commit-status.status-D {
+  color: var(--danger-color);
+}
+
+.file-history-commit-status.status-R,
+.file-history-commit-status.status-C {
+  color: var(--warning-color);
+}
+
+.file-history-commit-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.file-history-commit-hash {
+  font-family: monospace;
+}
+
+.file-history-commit-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-history-commit-date {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.file-history-commit-rename {
+  margin-top: 2px;
+  color: var(--warning-color);
+  font-size: 11px;
+  font-family: monospace;
+}
+
+/* Blame */
+.file-history-blame-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+}
+
+.file-history-blame-revision {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.file-history-blame-count {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.file-history-blame-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+.file-history-blame-row {
+  display: flex;
+  align-items: center;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre;
+  cursor: default;
+}
+
+.file-history-blame-row:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.file-history-blame-row.selected {
+  background-color: var(--accent-color);
+}
+
+.file-history-blame-row.selected .blame-content,
+.file-history-blame-row.selected .blame-line-number {
+  color: var(--text-selected);
+}
+
+.blame-gutter {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 320px;
+  padding: 0 8px;
+  border-right: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+
+.blame-gutter.group-start {
+  color: var(--text-primary);
+}
+
+.blame-gutter.uncommitted .blame-hash {
+  color: var(--warning-color);
+}
+
+.blame-hash {
+  flex-shrink: 0;
+  width: 84px;
+  color: var(--repo-info-branch-color, var(--text-secondary));
+}
+
+.blame-author {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blame-date {
+  flex-shrink: 0;
+}
+
+.blame-line-number {
+  flex-shrink: 0;
+  width: 56px;
+  padding-right: 10px;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+.blame-content {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.file-history-blame-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  min-height: 34px;
+}
+
+.file-history-blame-summary {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-history-blame-summary strong {
+  font-family: monospace;
+}
+
+.file-history-blame-byline {
+  margin-left: 10px;
+  color: var(--text-secondary);
+}
+
+.file-history-blame-hint {
+  color: var(--text-secondary);
+}
+
+.file-history-blame-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Footer */
+.file-history-footer {
+  justify-content: space-between;
+  padding: 10px 16px;
+}
+
+.file-history-pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-history-page-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.file-history-small-button {
+  padding: 4px 10px;
+  border-radius: 3px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.file-history-small-button:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.file-history-small-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

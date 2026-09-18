@@ -13,12 +13,16 @@ import GitAdapter, {
   WorktreeInfo,
   TagComparison,
   CloneProgress,
+  BlameLine,
+  FileHistoryEntry,
+  RebaseTodoEntry,
   IncompleteHistoryError } from './GitAdapter';
 import { GitCommandError, gitErrorHandler } from './gitErrors';
 import { withGitLock, isGitBusy } from './gitQueue';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -30,6 +34,38 @@ const execAsync = promisify(exec);
 const LOG_FIELD_SEP = '\x1f';
 const LOG_RECORD_SEP = '\x1e';
 const LOG_FORMAT = ['%H', '%ai', '%s', '%b', '%an', '%ae'].join('%x1f') + '%x1e';
+// Same fields, but with the record separator leading instead of trailing, so the
+// --name-status lines that follow a record stay attached to the commit they
+// belong to when the output is split on the separator.
+// Interactive rebase todo lists and message files live in temp directories with
+// this prefix, so stale ones can be recognized and swept up later.
+const REBASE_TEMP_PREFIX = 'ugit-rebase-';
+const FILE_LOG_FORMAT = '%x1e' + ['%H', '%ai', '%s', '%b', '%an', '%ae'].join('%x1f');
+
+/** A commit's details as `git blame --porcelain` spells them out once. */
+interface BlameCommitInfo {
+  author: string;
+  authorMail: string;
+  date: string;
+  summary: string;
+  filename: string;
+  previousHash?: string;
+  previousPath?: string;
+}
+
+/** The header block being accumulated for the blame line that follows it. */
+interface BlameHeader {
+  hash: string;
+  origLine: number;
+  line: number;
+  hasTime: boolean;
+  author?: string;
+  authorMail?: string;
+  summary?: string;
+  filename?: string;
+  previousHash?: string;
+  previousPath?: string;
+}
 
 /**
  * Git adapter implementation using simple-git library
@@ -1238,6 +1274,405 @@ export class SimpleGitAdapter extends GitAdapter {
       this._endCommand(id, startTime);
       return [];
     }
+  }
+
+  async readWorkingFile(filePath: string): Promise<string> {
+    return fs.readFile(path.join(this.repoPath, filePath), 'utf8');
+  }
+
+  async writeWorkingFile(filePath: string, content: string): Promise<void> {
+    await fs.writeFile(path.join(this.repoPath, filePath), content, 'utf8');
+  }
+
+  async getCommitRange(fromRef: string | null, toRef: string = 'HEAD'): Promise<Commit[]> {
+    const range = fromRef ? `${fromRef}..${toRef}` : toRef;
+    const args = ['log', `--format=${LOG_FORMAT}`, range, '--'];
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git log --format=... ${range}`, startTime);
+    try {
+      const output = await this.git.raw(args);
+      this._endCommand(id, startTime);
+      // The range is on one branch, so onOrigin/tags aren't known here; callers that
+      // need them enrich from their own branch view.
+      return this._parseLogOutput(output, toRef);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      throw error;
+    }
+  }
+
+  /**
+   * git reads the todo list and any message files through its own shell, which
+   * takes forward slashes on Windows too.
+   */
+  private _shellPath(p: string): string {
+    return p.replace(/\\/g, '/');
+  }
+
+  /**
+   * Remove the temp directories of earlier interactive rebases. A rebase that
+   * stopped part way through still needs its files, so they can't be cleaned up
+   * when the command returns; sweeping the old ones here keeps them from piling up.
+   */
+  private async _sweepRebaseTempDirs(keepDir: string): Promise<void> {
+    const maxAgeMs = 24 * 60 * 60 * 1000;
+    try {
+      const parent = os.tmpdir();
+      const names = await fs.readdir(parent);
+      for (const name of names) {
+        if (!name.startsWith(REBASE_TEMP_PREFIX))
+          continue;
+
+        const dir = path.join(parent, name);
+        if (dir === keepDir)
+          continue;
+
+        try {
+          const info = await fs.stat(dir);
+          if (Date.now() - info.mtimeMs > maxAgeMs)
+            await fs.rm(dir, { recursive: true, force: true });
+        } catch (error) {
+          // Another ugit window may be using it, or it's already gone.
+        }
+      }
+    } catch (error) {
+      // Not being able to tidy up is never worth failing a rebase over.
+    }
+  }
+
+  async rebaseInteractive(baseRef: string | null, entries: RebaseTodoEntry[]): Promise<void> {
+    const kept = entries.filter(entry => entry.action !== 'drop');
+    if (kept.length === 0)
+      throw new Error('Every commit is set to drop, which would leave nothing to rebase.');
+    if (kept[0].action === 'squash' || kept[0].action === 'fixup')
+      throw new Error(`The first commit can't be ${kept[0].action === 'squash' ? 'squashed' : 'fixed up'} - there is no commit before it to fold it into.`);
+
+    // Keep the todo and message files in a directory of our own, so a second rebase
+    // can't overwrite them and the whole lot can be removed together.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), REBASE_TEMP_PREFIX));
+    let messageCount = 0;
+    const writeMessage = async (message: string): Promise<string> => {
+      const file = path.join(dir, `message-${messageCount++}.txt`);
+      await fs.writeFile(file, message.endsWith('\n') ? message : `${message}\n`, 'utf8');
+      return this._shellPath(file);
+    };
+
+    const lines: string[] = [];
+    for (const entry of entries) {
+      // A subject only annotates the line, but a newline in it would split the line.
+      const subject = entry.subject.replace(/\r?\n/g, ' ');
+      switch (entry.action) {
+        case 'pick':
+        case 'edit':
+        case 'fixup':
+        case 'drop':
+          lines.push(`${entry.action} ${entry.hash} ${subject}`);
+          break;
+
+        case 'reword':
+          // git's own `reword` opens an editor. Amending from a file instead keeps
+          // the rebase non-interactive, so it can't stall waiting for an editor
+          // that never appears.
+          lines.push(`pick ${entry.hash} ${subject}`);
+          lines.push(`exec git commit --amend -F "${await writeMessage(entry.message || subject)}"`);
+          break;
+
+        case 'squash':
+          // `squash` would open an editor for the combined message for the same
+          // reason, so fold the commit in with `fixup` - which keeps the earlier
+          // message - and set the combined message afterwards.
+          lines.push(`fixup ${entry.hash} ${subject}`);
+          if (entry.message)
+            lines.push(`exec git commit --amend -F "${await writeMessage(entry.message)}"`);
+          break;
+      }
+    }
+
+    const todoPath = path.join(dir, 'todo.txt');
+    // git's shell reads this file, so end the lines with LF whatever the platform.
+    await fs.writeFile(todoPath, `${lines.join('\n')}\n`, 'utf8');
+
+    const target = baseRef === null ? '--root' : baseRef;
+    const command = `git rebase -i ${target}`;
+    const startTime = performance.now();
+    const id = this._startCommand(command, startTime);
+
+    try {
+      await withGitLock(await this.getObjectStoreKey(), () => execAsync(command, {
+        cwd: this.repoPath,
+        env: {
+          ...process.env,
+          // git appends the path of the todo list it wrote, so `cp <ours>` becomes
+          // `cp <ours> <the todo>`: our list replaces git's without an editor.
+          GIT_SEQUENCE_EDITOR: `cp "${this._shellPath(todoPath)}"`,
+          // Nothing in the todo list should need an editor, but a hook or a step we
+          // didn't account for would otherwise hang the rebase waiting for one.
+          GIT_EDITOR: 'true'
+        },
+        maxBuffer: 1024 * 1024 * 10
+      }));
+    } catch (error: any) {
+      // A rebase that stops for a conflict or an `edit` step exits non-zero. That's
+      // not a failure: the caller reports the stopped rebase and the user carries on
+      // with continue/abort. Anything else is a real error.
+      const stopped = await this.getRebaseStatus().catch(() => null);
+      if (!stopped) {
+        this._endCommand(id, startTime);
+        await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+        throw new Error(error?.stderr || error?.message || String(error));
+      }
+    }
+
+    this._endCommand(id, startTime);
+
+    // Only clean up once git is finished with the files; a stopped rebase still has
+    // todo lines left to run, and they name the message files.
+    const inProgress = await this.getRebaseStatus().catch(() => null);
+    if (!inProgress)
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+
+    await this._sweepRebaseTempDirs(inProgress ? dir : '');
+  }
+
+  /**
+   * Reduce a commit's `--name-status` block to the status of the path the log was
+   * filtered on.
+   */
+  private _parseNameStatus(lines: string[], requestedPath: string):
+      { status: string; path: string; renamedFrom?: string } {
+    const entries = lines
+      .map(line => line.split('\t'))
+      .filter(parts => parts.length >= 2 && parts[0].length > 0);
+
+    // A merge commit is printed without a diff, so it has no entry. More than one
+    // entry means the filter matched a directory, where no single status describes
+    // what the commit did to it.
+    if (entries.length !== 1)
+      return { status: '', path: requestedPath };
+
+    const parts = entries[0];
+    const code = parts[0];
+    // Rename and copy entries are `R<score>\told\tnew`.
+    if ((code.startsWith('R') || code.startsWith('C')) && parts.length >= 3)
+      return { status: code.charAt(0), path: parts[2], renamedFrom: parts[1] };
+
+    return { status: code.charAt(0), path: parts[1] };
+  }
+
+  async fileLog(filePath: string, maxCount: number = 100, offset: number = 0,
+                follow: boolean = true, startRef: string = 'HEAD'): Promise<FileHistoryEntry[]> {
+    const args = ['log', `--max-count=${maxCount}`];
+    if (offset > 0)
+      args.push(`--skip=${offset}`);
+    // --follow only takes a single file; git rejects it for a directory.
+    if (follow)
+      args.push('--follow');
+    args.push('--name-status', `--format=${FILE_LOG_FORMAT}`, startRef, '--', filePath);
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    let output: string;
+    try {
+      output = await this.git.raw(args);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+
+    const entries: FileHistoryEntry[] = [];
+    for (const record of output.split(LOG_RECORD_SEP)) {
+      if (!record.trim())
+        continue;
+
+      const fields = record.split(LOG_FIELD_SEP);
+      // A record without every field is the tail of a log that was cut short.
+      if (fields.length < 6)
+        continue;
+
+      const [hash, date, message, body, authorName] = fields;
+      // The last field ends at its newline; the commit's --name-status block
+      // follows it.
+      const tail = fields[5].split('\n');
+      const { status, path: pathInCommit, renamedFrom } =
+        this._parseNameStatus(tail.slice(1), filePath);
+
+      entries.push({
+        commit: {
+          hash,
+          date,
+          message,
+          body: body.trimEnd(),
+          author_name: authorName,
+          author_email: tail[0],
+          onOrigin: false,
+          tags: []
+        },
+        status,
+        path: pathInCommit,
+        ...(renamedFrom ? { renamedFrom } : {})
+      });
+    }
+
+    return entries;
+  }
+
+  async getFileCommitCount(filePath: string, follow: boolean = true,
+                           startRef: string = 'HEAD'): Promise<number> {
+    // rev-list has no --follow, so a followed count has to come from log itself.
+    const args = follow
+      ? ['log', '--follow', '--format=%H', startRef, '--', filePath]
+      : ['rev-list', '--count', startRef, '--', filePath];
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      const result = await this.git.raw(args);
+      this._endCommand(id, startTime);
+      if (follow)
+        return result.split('\n').filter(line => line.trim().length > 0).length;
+      const n = parseInt(result.trim(), 10);
+      return isNaN(n) ? 0 : n;
+    } catch (error) {
+      this._endCommand(id, startTime);
+      return 0;
+    }
+  }
+
+  /**
+   * Turn a git author time into 'YYYY-MM-DD HH:mm:ss' in the author's own zone, so
+   * the date shown is the one the author saw.
+   * @param timeSec - Seconds since the epoch, UTC
+   * @param tz - Zone offset as git reports it, e.g. '+0200'
+   */
+  private _formatBlameDate(timeSec: number, tz: string): string {
+    const sign = tz.startsWith('-') ? -1 : 1;
+    const hours = parseInt(tz.slice(1, 3), 10) || 0;
+    const minutes = parseInt(tz.slice(3, 5), 10) || 0;
+    const shifted = new Date((timeSec + sign * (hours * 3600 + minutes * 60)) * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())} ` +
+           `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(shifted.getUTCSeconds())}`;
+  }
+
+  async blame(filePath: string, revision?: string): Promise<BlameLine[]> {
+    const args = ['blame', '--porcelain'];
+    if (revision)
+      args.push(revision);
+    args.push('--', filePath);
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    let output: string;
+    try {
+      output = await this.git.raw(args);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+
+    // Porcelain output spells a commit's details out the first time it appears and
+    // only repeats the hash afterwards, so hold on to what each commit said.
+    const commits = new Map<string, BlameCommitInfo>();
+    const result: BlameLine[] = [];
+    let header: BlameHeader | null = null;
+    let lastHash: string | null = null;
+    let authorTime = 0;
+    let authorTz = '+0000';
+
+    for (const raw of output.split('\n')) {
+      // A line starting with a tab is file content, and closes the header block
+      // that preceded it.
+      if (raw.startsWith('\t')) {
+        if (!header)
+          continue;
+
+        const info = commits.get(header.hash) || {
+          author: '', authorMail: '', date: '', summary: '', filename: filePath
+        };
+        if (header.author !== undefined) info.author = header.author;
+        if (header.authorMail !== undefined) info.authorMail = header.authorMail;
+        if (header.summary !== undefined) info.summary = header.summary;
+        if (header.filename !== undefined) info.filename = header.filename;
+        if (header.previousHash !== undefined) info.previousHash = header.previousHash;
+        if (header.previousPath !== undefined) info.previousPath = header.previousPath;
+        if (header.hasTime) info.date = this._formatBlameDate(authorTime, authorTz);
+        commits.set(header.hash, info);
+
+        result.push({
+          line: header.line,
+          hash: header.hash,
+          author: info.author,
+          authorMail: info.authorMail,
+          date: info.date,
+          summary: info.summary,
+          origLine: header.origLine,
+          origPath: info.filename,
+          content: raw.slice(1).replace(/\r$/, ''),
+          isGroupStart: header.hash !== lastHash,
+          ...(info.previousHash ? { previousHash: info.previousHash } : {}),
+          ...(info.previousPath ? { previousPath: info.previousPath } : {})
+        });
+
+        lastHash = header.hash;
+        header = null;
+        continue;
+      }
+
+      // '<hash> <line in the original> <line in the result> [lines in this run]'
+      // opens a new block.
+      const start = /^([0-9a-f]{40}) (\d+) (\d+)(?: (\d+))?$/.exec(raw);
+      if (start) {
+        header = {
+          hash: start[1],
+          origLine: parseInt(start[2], 10),
+          line: parseInt(start[3], 10),
+          hasTime: false
+        };
+        continue;
+      }
+
+      if (!header)
+        continue;
+
+      const space = raw.indexOf(' ');
+      const key = space === -1 ? raw : raw.slice(0, space);
+      const value = space === -1 ? '' : raw.slice(space + 1);
+      switch (key) {
+        case 'author':
+          header.author = value;
+          break;
+        case 'author-mail':
+          header.authorMail = value.replace(/^<|>$/g, '');
+          break;
+        case 'author-time':
+          authorTime = parseInt(value, 10) || 0;
+          header.hasTime = true;
+          break;
+        case 'author-tz':
+          authorTz = value || '+0000';
+          break;
+        case 'summary':
+          header.summary = value;
+          break;
+        case 'filename':
+          header.filename = value;
+          break;
+        case 'previous': {
+          // '<hash> <path>', and the path can contain spaces.
+          const cut = value.indexOf(' ');
+          if (cut !== -1) {
+            header.previousHash = value.slice(0, cut);
+            header.previousPath = value.slice(cut + 1);
+          }
+          break;
+        }
+      }
+    }
+
+    return result;
   }
 
   async createPatch(filePaths: string[], outputPath: string, isStaged: boolean = false): Promise<void> {

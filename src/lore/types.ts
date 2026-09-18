@@ -291,13 +291,9 @@ export interface LoreSharedStoreInfo {
   stores: LoreSharedStore[];
 }
 
-/** Per-conflict resolution choice in the interactive resolver. */
-export type ConflictChoice = 'ours' | 'theirs' | 'both-ot' | 'both-to' | 'base';
-
-/** A segment of a conflicted file: either unchanged text or a 3-way conflict block. */
-export type ConflictSegment =
-  | { type: 'stable'; lines: string[] }
-  | { type: 'conflict'; ours: string[]; base: string[]; theirs: string[] };
+// The conflict marker format isn't Lore-specific, so the parser and its types are
+// shared with the Git side.
+export type { ConflictChoice, ConflictSegment } from '../utils/conflictMarkers';
 
 /** Options shared by most Lore CLI invocations. */
 export interface LoreRunOptions {

@@ -454,6 +454,9 @@ function CommitList({
           <div className="context-menu-item" onClick={() => handleMenuAction('checkout-commit')}>
             Checkout Commit...
           </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('rebase-interactive')}>
+            Rebase Interactively from Here...
+          </div>
           <div className="context-menu-item" onClick={() => handleMenuAction('cherry-pick')}>
             Cherry-pick Commit...
           </div>

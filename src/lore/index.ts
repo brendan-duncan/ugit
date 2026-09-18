@@ -4,7 +4,7 @@
 export * from './types';
 export * from './loreProcess';
 export * from './loreParsers';
-export * from './conflictParser';
+export * from '../utils/conflictMarkers';
 export * from './graphLayout';
 export * from './loreStash';
 export {

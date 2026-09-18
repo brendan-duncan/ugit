@@ -1,0 +1,171 @@
+.interactive-rebase-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 80vw;
+  max-width: 1100px;
+  max-height: 85vh;
+}
+
+.interactive-rebase-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 16px;
+}
+
+.interactive-rebase-note {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.interactive-rebase-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--bg-primary);
+}
+
+.interactive-rebase-row {
+  border-bottom: 1px solid var(--border-color);
+  padding: 4px 6px;
+}
+
+.interactive-rebase-row:last-child {
+  border-bottom: none;
+}
+
+.interactive-rebase-row.dragging {
+  opacity: 0.4;
+}
+
+/* A dropped commit stays visible but reads as removed. */
+.interactive-rebase-row.action-drop .interactive-rebase-subject {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.interactive-rebase-row.action-squash,
+.interactive-rebase-row.action-fixup {
+  background-color: var(--bg-tertiary);
+}
+
+.interactive-rebase-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interactive-rebase-grip {
+  color: var(--text-secondary);
+  cursor: grab;
+  font-size: 12px;
+  letter-spacing: -2px;
+  user-select: none;
+}
+
+.interactive-rebase-action {
+  flex-shrink: 0;
+  width: 104px;
+  padding: 3px 6px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.interactive-rebase-hash {
+  flex-shrink: 0;
+  color: var(--repo-info-branch-color, var(--text-secondary));
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.interactive-rebase-subject {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interactive-rebase-author {
+  flex-shrink: 0;
+  max-width: 140px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.interactive-rebase-arrows {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.interactive-rebase-arrow {
+  width: 22px;
+  padding: 2px 0;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.interactive-rebase-arrow:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.interactive-rebase-arrow:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.interactive-rebase-row-message {
+  padding: 4px 0 4px 28px;
+}
+
+.interactive-rebase-row-message label {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.interactive-rebase-row-hint {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.interactive-rebase-message {
+  width: 100%;
+  resize: vertical;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.interactive-rebase-problem {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--danger-color);
+  border-radius: 3px;
+  color: var(--danger-color);
+  font-size: 12px;
+}
+
+.interactive-rebase-footer {
+  align-items: center;
+}
+
+.interactive-rebase-summary {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}

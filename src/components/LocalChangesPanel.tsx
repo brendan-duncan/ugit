@@ -5,6 +5,7 @@ import StashDialog from './StashDialog';
 import PullCommitDialog from './PullCommitDialog';
 import StashConflictDialog from './StashConflictDialog';
 import LfsWarningDialog, { LargeFile } from './LfsWarningDialog';
+import FileHistoryDialog from './FileHistoryDialog';
 import { GitAdapter } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import { useAlert } from '../contexts/AlertContext';
@@ -47,6 +48,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const [showLfsWarningDialog, setShowLfsWarningDialog] = useState<boolean>(false);
   const [lfsWarningFiles, setLfsWarningFiles] = useState<Array<LargeFile>>([]);
   const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
+  const [fileHistoryTarget, setFileHistoryTarget] =
+    useState<{ path: string; isDirectory: boolean; tab: 'history' | 'blame' } | null>(null);
   const [lfsPatterns, setLfsPatterns] = useState<Array<string>>([]);
   const activeSplitter = useRef<string | null>(null);
 
@@ -560,6 +563,15 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
           }
           break;
 
+        case 'file-history':
+        case 'blame':
+          setFileHistoryTarget({
+            path: clickedItem,
+            isDirectory: items.length === 1 && items[0].type === 'folder',
+            tab: action === 'blame' ? 'blame' : 'history'
+          });
+          break;
+
         case 'copy-path':
           // Copy repo-relative path to clipboard
           navigator.clipboard.writeText(clickedItem);
@@ -858,6 +870,17 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       {showStashConflictDialog && (
         <StashConflictDialog
           onClose={() => setShowStashConflictDialog(false)}
+        />
+      )}
+
+      {/* File History / Blame Dialog */}
+      {fileHistoryTarget && (
+        <FileHistoryDialog
+          gitAdapter={gitAdapter}
+          filePath={fileHistoryTarget.path}
+          isDirectory={fileHistoryTarget.isDirectory}
+          initialTab={fileHistoryTarget.tab}
+          onClose={() => setFileHistoryTarget(null)}
         />
       )}
 

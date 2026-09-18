@@ -1,5 +1,5 @@
-// Pure parsing of Lore's diff3 conflict markers into segments, and composing a resolution.
-// Lore writes conflicted files as:
+// Pure parsing of diff3 conflict markers into segments, and composing a resolution.
+// Git and Lore both write conflicted files the same way:
 //   <<<<<<< ours
 //   ...ours lines...
 //   ||||||| original
@@ -7,9 +7,17 @@
 //   =======
 //   ...theirs lines...
 //   >>>>>>> theirs
-// (the "original" / base section may be absent for add/add conflicts).
+// (the "original" / base section is absent unless the writer was asked for it -
+// for git that means merge.conflictStyle=diff3, and Lore omits it for add/add
+// conflicts.)
 
-import { ConflictSegment, ConflictChoice } from './types';
+/** Per-conflict resolution choice in the interactive resolver. */
+export type ConflictChoice = 'ours' | 'theirs' | 'both-ot' | 'both-to' | 'base';
+
+/** A segment of a conflicted file: either unchanged text or a 3-way conflict block. */
+export type ConflictSegment =
+  | { type: 'stable'; lines: string[] }
+  | { type: 'conflict'; ours: string[]; base: string[]; theirs: string[] };
 
 const START = '<<<<<<<';
 const BASE = '|||||||';
