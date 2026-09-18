@@ -1,0 +1,31 @@
+.signing-dialog {
+  min-width: 460px;
+  max-width: 560px;
+}
+
+.signing-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.signing-hint {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.signing-warning {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--warning-color);
+  border-radius: 3px;
+  color: var(--warning-color);
+  font-size: 12px;
+}
+
+.signing-error {
+  margin-top: 10px;
+  color: var(--danger-color);
+  font-size: 12px;
+  white-space: pre-wrap;
+}

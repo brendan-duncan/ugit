@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Commit, SearchQuery } from '../git/GitAdapter';
+import { Commit, SearchQuery, StashCommit } from '../git/GitAdapter';
 import './CommitList.css';
 
 interface CommitSearchState {
@@ -11,6 +11,11 @@ interface CommitSearchState {
 
 interface CommitListProps {
   commits: Array<Commit>;
+  // Stashes, so each can be shown against the commit it was made on. Omitted for
+  // views where they make no sense, like a remote branch.
+  stashCommits?: Array<StashCommit>;
+  // Context-menu actions on a stash row, handled like the stash panel's.
+  onStashContextMenu?: (action: string, stash: StashCommit) => void;
   selectedCommit: Commit | null;
   onSelectCommit: (commit: Commit | null) => void;
   onContextMenu: (action: string, commit: Commit, currentBranch: string, tagName?: string) => void;
@@ -43,6 +48,30 @@ const EMPTY_FILTERS: CommitFilters = {
   dateTo: ''
 };
 
+/** How a signature status should be coloured. */
+function signatureClass(status: string): string {
+  if (status === 'G')
+    return 'signature-good';
+  if (status === 'U')
+    return 'signature-unknown';
+  return 'signature-bad';
+}
+
+/** What `git log %G?` reported about a signature, in words. */
+function signatureTitle(status: string, signer?: string): string {
+  const by = signer ? ` by ${signer}` : '';
+  switch (status) {
+    case 'G': return `Good signature${by}`;
+    case 'U': return `Good signature${by}, but the key isn't trusted`;
+    case 'B': return `Bad signature${by}`;
+    case 'X': return `Good signature${by} from an expired key`;
+    case 'Y': return `Good signature${by} from a key that has since expired`;
+    case 'R': return `Good signature${by} from a revoked key`;
+    case 'E': return 'Signature could not be checked';
+    default: return `Signature status: ${status}`;
+  }
+}
+
 function filtersToQuery(f: CommitFilters): SearchQuery {
   const q: SearchQuery = {};
   if (f.message) q.message = f.message;
@@ -54,8 +83,8 @@ function filtersToQuery(f: CommitFilters): SearchQuery {
 }
 
 function CommitList({
-  commits, selectedCommit, onSelectCommit, onContextMenu, onDoubleClick, currentBranch,
-  page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch
+  commits, stashCommits, onStashContextMenu, selectedCommit, onSelectCommit, onContextMenu,
+  onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch
 }: CommitListProps) {
   const [contextMenu, setContextMenu] = useState(null);
   const [tagSubmenuOpen, setTagSubmenuOpen] = useState(false);
@@ -170,6 +199,30 @@ function CommitList({
       return true;
     });
   }, [commits, filters, search, panelMode]);
+
+  // A stash is a commit made on top of another one, so it can be shown against
+  // that commit instead of only in the side panel.
+  const stashesByParent = useMemo(() => {
+    const grouped = new Map<string, StashCommit[]>();
+    for (const stash of stashCommits || []) {
+      const existing = grouped.get(stash.parentHash) || [];
+      existing.push(stash);
+      grouped.set(stash.parentHash, existing);
+    }
+    return grouped;
+  }, [stashCommits]);
+
+  const handleStashContextMenu = (e: React.MouseEvent, stash: StashCommit) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, stash });
+  };
+
+  const handleStashMenuAction = (action: string) => {
+    if (onStashContextMenu && contextMenu && contextMenu.stash)
+      onStashContextMenu(action, contextMenu.stash);
+    setContextMenu(null);
+  };
 
   const hasActiveFilters = filters.author || filters.message || filters.sha || filters.dateFrom || filters.dateTo;
 
@@ -329,9 +382,10 @@ function CommitList({
         ) : (
           filteredCommits.map((commit) => {
             const isSelected = selectedCommit && selectedCommit.hash === commit.hash;
+            const stashes = stashesByParent.get(commit.hash) || [];
             return (
+              <React.Fragment key={commit.hash}>
               <div
-                key={commit.hash}
                 className={`commit-item ${isSelected ? 'selected' : ''} ${!commit.onOrigin ? 'not-on-origin' : ''}`}
                 onClick={() => onSelectCommit(commit)}
                 onDoubleClick={() => onDoubleClick?.(commit)}
@@ -346,10 +400,33 @@ function CommitList({
                   </span>
                 )}
                 <span className={`commit-message ${!commit.onOrigin ? 'italic' : ''}`}>{commit.message}</span>
+                {commit.signature && commit.signature !== 'N' && (
+                  <span
+                    className={`commit-signature ${signatureClass(commit.signature)}`}
+                    title={signatureTitle(commit.signature, commit.signer)}
+                  >
+                    {commit.signature === 'G' ? '🔒' : '⚠'}
+                  </span>
+                )}
                 <span className="commit-author">{commit.author_name}</span>
                 <span className="commit-hash">{commit.hash.substring(0, 7)}</span>
                 <span className="commit-date">{commit.date}</span>
               </div>
+              {stashes.map((stash) => (
+                <div
+                  key={stash.hash}
+                  className="commit-item commit-item-stash"
+                  title={`${stash.selector} - stashed on this commit`}
+                  onContextMenu={(e) => handleStashContextMenu(e, stash)}
+                >
+                  <span className="commit-stash-icon">📦</span>
+                  <span className="commit-stash-selector">{stash.selector}</span>
+                  <span className="commit-message">{stash.message}</span>
+                  <span className="commit-hash">{stash.hash.substring(0, 7)}</span>
+                  <span className="commit-date">{stash.date}</span>
+                </div>
+              ))}
+              </React.Fragment>
             );
           })
         )}
@@ -396,6 +473,24 @@ function CommitList({
             zIndex: 1000
           }}
         >
+          {contextMenu.stash ? (
+            <>
+              <div className="context-menu-item" onClick={() => handleStashMenuAction('apply')}>
+                Apply Stash...
+              </div>
+              <div className="context-menu-item" onClick={() => handleStashMenuAction('rename')}>
+                Rename Stash...
+              </div>
+              <div className="context-menu-item" onClick={() => handleStashMenuAction('delete')}>
+                Delete Stash...
+              </div>
+              <div className="context-menu-separator"></div>
+              <div className="context-menu-item" onClick={() => handleStashMenuAction('save-patch')}>
+                Save as Patch...
+              </div>
+            </>
+          ) : (
+          <>
           <div className="context-menu-item" onClick={() => handleMenuAction('new-branch')}>
             New Branch...
           </div>
@@ -457,6 +552,17 @@ function CommitList({
           <div className="context-menu-item" onClick={() => handleMenuAction('rebase-interactive')}>
             Rebase Interactively from Here...
           </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('browse-tree')}>
+            Browse Files at This Commit...
+          </div>
+          <div className="context-menu-separator"></div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('bisect-bad')}>
+            Start Bisect - Mark as Bad...
+          </div>
+          <div className="context-menu-item" onClick={() => handleMenuAction('bisect-good')}>
+            Bisect - Mark as Good
+          </div>
+          <div className="context-menu-separator"></div>
           <div className="context-menu-item" onClick={() => handleMenuAction('cherry-pick')}>
             Cherry-pick Commit...
           </div>
@@ -473,6 +579,8 @@ function CommitList({
           <div className="context-menu-item" onClick={() => handleMenuAction('copy-info')}>
             Copy Commit Info
           </div>
+          </>
+          )}
         </div>
       )}
     </div>

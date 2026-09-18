@@ -3,8 +3,9 @@ import BranchTree from './BranchTree';
 import RemoteList from './RemoteList';
 import StashList from './StashList';
 import WorktreeList from './WorktreeList';
+import SubmoduleList from './SubmoduleList';
 import { SelectedItem, RemoteInfo } from './types';
-import { GitAdapter, StashInfo, WorktreeInfo } from '../git/GitAdapter';
+import { GitAdapter, StashInfo, SubmoduleInfo, WorktreeInfo } from '../git/GitAdapter';
 
 interface BranchStashPanelProps {
   branches: Array<string>;
@@ -27,6 +28,9 @@ interface BranchStashPanelProps {
   onRemoteAdded?: () => void;
   lockedPatterns?: ReadonlyArray<string>;
   worktrees: Array<WorktreeInfo>;
+  submodules: Array<SubmoduleInfo>;
+  onOpenSubmodule: (submodulePath: string) => void;
+  onSubmoduleAction: (action: string, submodule: SubmoduleInfo | null) => void;
   onOpenWorktree: (worktreePath: string) => void;
   onAddWorktree: () => void;
   onWorktreeAction: (action: string, worktree: WorktreeInfo) => void;
@@ -39,12 +43,15 @@ interface BranchStashPanelProps {
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
       onBranchSelect, stashes, onSelectStash, onStashDoubleClick, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
       remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded, lockedPatterns,
-      worktrees, onOpenWorktree, onAddWorktree, onWorktreeAction, onAddBranch, onStashAll, canStash,
+      worktrees, submodules, onOpenSubmodule, onSubmoduleAction,
+      onOpenWorktree, onAddWorktree, onWorktreeAction, onAddBranch, onStashAll, canStash,
       originUrl }: BranchStashPanelProps) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
   const [worktreesCollapsed, setWorktreesCollapsed] = useState(false);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
   const [stashesCollapsed, setStashesCollapsed] = useState(false);
+  // Most repositories have no submodules, so that section starts out of the way.
+  const [submodulesCollapsed, setSubmodulesCollapsed] = useState(true);
 
   return (
     <div className="branch-stash-panel-contents">
@@ -84,6 +91,17 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           onWorktreeAction={onWorktreeAction}
         />
       </div>
+      {submodules && submodules.length > 0 && (
+        <div className={`split-panel submodules-panel ${submodulesCollapsed ? 'collapsed' : ''}`}>
+          <SubmoduleList
+            submodules={submodules}
+            collapsed={submodulesCollapsed}
+            onToggleCollapse={() => setSubmodulesCollapsed(!submodulesCollapsed)}
+            onOpenSubmodule={onOpenSubmodule}
+            onSubmoduleAction={onSubmoduleAction}
+          />
+        </div>
+      )}
       {!worktreesCollapsed && !remotesCollapsed && (
         <div
           className="splitter-handle"

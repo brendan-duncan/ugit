@@ -2,7 +2,7 @@ import React from 'react';
 import LocalChangesPanel from './LocalChangesPanel';
 import StashViewer from './StashViewer';
 import BranchView from './BranchView';
-import { GitAdapter, Commit, SearchQuery } from '../git/GitAdapter';
+import { GitAdapter, Commit, SearchQuery, StashCommit } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import './ContentViewer.css';
 
@@ -26,9 +26,12 @@ interface ContentViewerProps {
   onLoadCommitPage: (page: number) => void;
   onSearchCommits: (query: SearchQuery) => void;
   onClearCommitSearch: () => void;
+  // Stashes to show against the commits they were made on.
+  stashCommits?: Array<StashCommit>;
+  onStashContextMenu?: (action: string, stash: StashCommit) => void;
 }
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, onStashCreated, pageSize, onLoadCommitPage, onSearchCommits, onClearCommitSearch }: ContentViewerProps): React.ReactElement {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, onStashCreated, pageSize, onLoadCommitPage, onSearchCommits, onClearCommitSearch, stashCommits, onStashContextMenu }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -70,6 +73,8 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
       )}
       {item.type === 'branch' && (
         <BranchView
+          stashCommits={stashCommits}
+          onStashContextMenu={onStashContextMenu}
           branchName={selectedItem.branchName}
           commits={item.commits}
           loading={item.loading}

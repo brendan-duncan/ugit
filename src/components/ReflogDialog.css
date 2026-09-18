@@ -1,0 +1,146 @@
+.reflog-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 88vw;
+  max-width: 1150px;
+  height: 80vh;
+  max-height: none;
+}
+
+.reflog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+}
+
+.reflog-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.reflog-ref-select {
+  width: 200px;
+  margin: 0;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.reflog-filter {
+  width: 180px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.reflog-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 16px;
+  gap: 8px;
+}
+
+.reflog-note {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.reflog-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.reflog-error {
+  color: var(--danger-color);
+  white-space: pre-wrap;
+}
+
+.reflog-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--bg-primary);
+}
+
+.reflog-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.reflog-entry:last-child {
+  border-bottom: none;
+}
+
+.reflog-entry:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.reflog-entry.selected {
+  background-color: var(--accent-color);
+}
+
+.reflog-entry.selected span {
+  color: var(--text-selected);
+}
+
+.reflog-selector {
+  flex-shrink: 0;
+  width: 92px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.reflog-action {
+  flex-shrink: 0;
+  width: 116px;
+  color: var(--repo-info-branch-color, var(--text-secondary));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reflog-subject {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reflog-hash {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.reflog-date {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.reflog-footer {
+  align-items: center;
+}
+
+.reflog-selection {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

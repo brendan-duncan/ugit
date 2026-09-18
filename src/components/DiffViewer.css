@@ -756,3 +756,171 @@
 .diff-conflict-mergetool-menu button:hover {
   background-color: #575757;
 }
+
+/* Line selection: pick individual added/removed lines to stage or discard. */
+.diff-viewer-select-lines-btn {
+  padding: 3px 10px;
+  margin-right: 6px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.diff-viewer-select-lines-btn:hover {
+  background-color: var(--border-color);
+}
+
+.diff-viewer-select-lines-btn.active {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--text-selected);
+}
+
+.diff-line-select {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.diff-line-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.diff-line-select-count {
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.diff-line-select-button {
+  padding: 3px 10px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.diff-line-select-button:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.diff-line-select-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.diff-line-select-button.primary {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.diff-line-select-button.primary:hover:not(:disabled) {
+  background-color: var(--accent-color);
+  color: #ffffff;
+}
+
+.diff-line-select-button.danger {
+  border-color: var(--danger-color);
+  color: var(--danger-color);
+}
+
+.diff-line-select-button.danger:hover:not(:disabled) {
+  background-color: var(--danger-color);
+  color: #ffffff;
+}
+
+.diff-line-select-lines {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background-color: var(--bg-primary);
+}
+
+.diff-line {
+  display: flex;
+  align-items: baseline;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 17px;
+  white-space: pre;
+}
+
+.diff-line.selectable {
+  cursor: pointer;
+}
+
+.diff-line-add {
+  background-color: rgba(70, 149, 74, 0.16);
+}
+
+.diff-line-remove {
+  background-color: rgba(229, 83, 75, 0.16);
+}
+
+.diff-line-hunk {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.diff-line-header,
+.diff-line-meta {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.diff-line.selected {
+  background-color: var(--accent-color);
+}
+
+.diff-line.selected .diff-line-text,
+.diff-line.selected .diff-line-marker,
+.diff-line.selected .diff-line-number {
+  color: var(--text-selected);
+}
+
+.diff-line.selectable:hover:not(.selected) {
+  outline: 1px solid var(--border-color);
+  outline-offset: -1px;
+}
+
+.diff-line-check {
+  flex-shrink: 0;
+  width: 18px;
+  padding-left: 4px;
+  color: var(--text-secondary);
+}
+
+.diff-line-number {
+  flex-shrink: 0;
+  width: 44px;
+  padding-right: 6px;
+  text-align: right;
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
+.diff-line-marker {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.diff-line-text {
+  flex: 1;
+  min-width: 0;
+  padding-right: 8px;
+  color: var(--text-primary);
+}

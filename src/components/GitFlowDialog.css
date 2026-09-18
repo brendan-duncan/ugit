@@ -1,0 +1,102 @@
+.git-flow-dialog {
+  min-width: 480px;
+  max-width: 600px;
+}
+
+.git-flow-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.git-flow-hint {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.git-flow-prefixes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.git-flow-prefixes .dialog-field {
+  margin-bottom: 0;
+}
+
+.git-flow-kinds {
+  display: flex;
+  gap: 6px;
+}
+
+.git-flow-kind {
+  padding: 5px 14px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.git-flow-kind:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.git-flow-kind.active {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--text-selected);
+}
+
+.git-flow-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.git-flow-prefix {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.git-flow-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.git-flow-candidate {
+  padding: 2px 8px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.git-flow-candidate:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.git-flow-note {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.git-flow-problem {
+  margin-top: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--danger-color);
+  border-radius: 3px;
+  color: var(--danger-color);
+  font-size: 12px;
+}

@@ -390,3 +390,42 @@
   color: var(--text-secondary);
   font-size: 11px;
 }
+
+/* A stash shown against the commit it was made on. */
+.commit-item-stash {
+  background-color: var(--bg-tertiary);
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.commit-stash-icon {
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.commit-stash-selector {
+  flex-shrink: 0;
+  margin-right: 6px;
+  color: var(--warning-color);
+  font-family: monospace;
+  font-style: normal;
+}
+
+/* Signature status, when a commit has one. */
+.commit-signature {
+  flex-shrink: 0;
+  margin: 0 4px;
+  font-size: 11px;
+}
+
+.commit-signature.signature-good {
+  color: var(--success-color);
+}
+
+.commit-signature.signature-unknown {
+  color: var(--warning-color);
+}
+
+.commit-signature.signature-bad {
+  color: var(--danger-color);
+}

@@ -131,6 +131,13 @@ export interface Commit {
   body: string;
   onOrigin: boolean;
   tags: string[];
+  // Signature status as `git log %G?` reports it: 'G' good, 'B' bad, 'U' good but
+  // of unknown trust, 'X' good but expired, 'Y' made by an expired key, 'R' made
+  // by a revoked key, 'E' couldn't be checked, 'N' unsigned. Absent when the log
+  // that produced this commit didn't ask about signatures.
+  signature?: string;
+  // Who the signature says signed it, when git could tell.
+  signer?: string;
 }
 
 /**
@@ -157,6 +164,114 @@ export interface SearchQuery {
 export interface SearchLogResult {
   commits: Commit[];
   truncated: boolean;
+}
+
+/** One entry of `git reflog`: somewhere a ref used to point. */
+export interface ReflogEntry {
+  // The selector git accepts for this point, e.g. 'HEAD@{2}'.
+  selector: string;
+  hash: string;
+  // The operation that moved the ref, e.g. 'commit', 'rebase (finish)', 'checkout'.
+  action: string;
+  // What git recorded about the move, e.g. 'moving from main to feature'.
+  message: string;
+  date: string;
+  author: string;
+  // Subject of the commit the entry points at.
+  subject: string;
+}
+
+/** One entry of a tree listing at some revision. */
+export interface TreeEntry {
+  // Name within the directory that was listed.
+  name: string;
+  // Path from the repository root.
+  path: string;
+  // 'commit' is a submodule reference.
+  type: 'blob' | 'tree' | 'commit';
+  hash: string;
+  mode: string;
+  // Size in bytes for a blob; null for trees and submodules.
+  size: number | null;
+}
+
+export interface SubmoduleInfo {
+  // Path of the submodule within the superproject.
+  path: string;
+  url: string;
+  // The commit the superproject records for it.
+  hash: string;
+  // Branch from .gitmodules, when one is configured.
+  branch: string | null;
+  // False when it has never been initialized or cloned, which git marks with '-'.
+  initialized: boolean;
+  // True when the checked-out commit isn't the recorded one ('+').
+  modified: boolean;
+  // True when the submodule is in a merge conflict ('U').
+  conflicted: boolean;
+  // The ref git names in parentheses, e.g. 'v1.2.0' or 'heads/main'.
+  describe: string | null;
+}
+
+export interface BisectStatus {
+  // The commit checked out for testing.
+  currentHash: string | null;
+  currentSubject: string | null;
+  // The revision marked bad, when one has been.
+  badRef: string | null;
+  // Revisions marked good.
+  goodRefs: string[];
+  // The branch or commit bisect started from, restored by `git bisect reset`.
+  startRef: string | null;
+  // git's own note on what's left, e.g. '3 revisions left to test after this
+  // (roughly 2 steps)'. Only known right after a start or a mark.
+  progress: string | null;
+  // True once git has named the first bad commit; bisect still needs resetting.
+  finished: boolean;
+  firstBadHash: string | null;
+}
+
+/** How this repository signs commits and tags. */
+export interface SigningConfig {
+  // git config commit.gpgsign
+  signCommits: boolean;
+  // git config tag.gpgsign
+  signTags: boolean;
+  // git config gpg.format: 'openpgp', 'ssh' or 'x509'.
+  format: string;
+  // git config user.signingkey
+  key: string;
+}
+
+/** git-flow branch names and prefixes, as stored in the repository's config. */
+export interface FlowConfig {
+  // True when this repository has been set up for git-flow.
+  initialized: boolean;
+  // The long-lived branches.
+  master: string;
+  develop: string;
+  // Prefixes for the short-lived ones, including the trailing separator.
+  feature: string;
+  release: string;
+  hotfix: string;
+  // Prefix put in front of a release's tag name.
+  versionTag: string;
+}
+
+/** The kinds of git-flow branch ugit can start and finish. */
+export type FlowKind = 'feature' | 'release' | 'hotfix';
+
+/** A stash, as the commit it really is, so it can be placed in history. */
+export interface StashCommit {
+  // Position in the stash list; 0 is the most recent.
+  index: number;
+  // 'stash@{0}'
+  selector: string;
+  hash: string;
+  // The commit the stash was made on top of - where it sits in history.
+  parentHash: string;
+  message: string;
+  date: string;
 }
 
 /** What an interactive rebase should do with one commit. */
@@ -630,6 +745,122 @@ export abstract class GitAdapter {
    * @param branchName - Name of the branch
    */
   abstract getCommitCount(branchName: string): Promise<number>;
+
+  /**
+   * Read the reflog: where a ref has pointed, newest first. Lets commits that
+   * nothing references any more be found again.
+   * @param ref - The ref to read, e.g. 'HEAD' (the default) or a branch name
+   * @param maxCount - Maximum number of entries
+   */
+  abstract getReflog(ref?: string, maxCount?: number): Promise<ReflogEntry[]>;
+
+  /**
+   * List one directory of the tree at a revision, so a whole revision can be
+   * browsed a level at a time.
+   * @param revision - Commit, branch or tag to read the tree from
+   * @param dirPath - Directory to list, or '' for the repository root
+   */
+  abstract getTreeAtRevision(revision: string, dirPath?: string): Promise<TreeEntry[]>;
+
+  /**
+   * Apply a patch with `git apply`, for staging or discarding part of a file.
+   * @param patch - A unified diff
+   * @param options - `cached` applies to the index only, `reverse` undoes the
+   * patch instead of applying it
+   * @throws when the patch doesn't apply
+   */
+  abstract applyPatch(patch: string, options?: { cached?: boolean; reverse?: boolean }): Promise<void>;
+
+  /** List the submodules of this repository. */
+  abstract listSubmodules(): Promise<SubmoduleInfo[]>;
+
+  /**
+   * Register submodules in .git/config so they can be updated.
+   * @param submodulePath - One submodule, or every one when omitted
+   */
+  abstract submoduleInit(submodulePath?: string): Promise<void>;
+
+  /**
+   * Check out the commits the superproject records for its submodules.
+   * @param submodulePath - One submodule, or every one when omitted
+   * @param options - `init` registers submodules first, `recursive` descends into
+   * submodules of submodules
+   */
+  abstract submoduleUpdate(submodulePath?: string,
+                           options?: { init?: boolean; recursive?: boolean }): Promise<void>;
+
+  /**
+   * Copy the URLs from .gitmodules into .git/config, after a remote has moved.
+   * @param submodulePath - One submodule, or every one when omitted
+   */
+  abstract submoduleSync(submodulePath?: string): Promise<void>;
+
+  /** Read how this repository signs commits and tags. */
+  abstract getSigningConfig(): Promise<SigningConfig>;
+
+  /**
+   * Change how this repository signs commits and tags. Only the fields present
+   * are written; the repository's own config is used, not the global one.
+   */
+  abstract setSigningConfig(config: Partial<SigningConfig>): Promise<void>;
+
+  /** The state of a bisect in progress, or null when there isn't one. */
+  abstract getBisectStatus(): Promise<BisectStatus | null>;
+
+  /**
+   * Start bisecting.
+   * @param badRef - A revision where the problem is present
+   * @param goodRef - A revision where it isn't
+   */
+  abstract bisectStart(badRef?: string, goodRef?: string): Promise<BisectStatus | null>;
+
+  /**
+   * Mark the commit being tested, and check out the next one to test.
+   * @param mark - 'good', 'bad', or 'skip' when it can't be tested
+   */
+  abstract bisectMark(mark: 'good' | 'bad' | 'skip'): Promise<BisectStatus | null>;
+
+  /** End the bisect and go back to where it started. */
+  abstract bisectReset(): Promise<void>;
+
+  /** Read this repository's git-flow branch names and prefixes. */
+  abstract getFlowConfig(): Promise<FlowConfig>;
+
+  /**
+   * Set up git-flow: store the branch names and prefixes, and create the
+   * development branch when it doesn't exist yet.
+   */
+  abstract flowInit(config: Partial<FlowConfig>): Promise<void>;
+
+  /**
+   * Start a git-flow branch and check it out.
+   * @param kind - Which kind of branch to start
+   * @param name - The part after the prefix, e.g. 'login-form' or '1.4.0'
+   * @returns The full name of the branch that was created
+   */
+  abstract flowStart(kind: FlowKind, name: string): Promise<string>;
+
+  /**
+   * Finish a git-flow branch: merge it where it belongs, tag a release or hotfix,
+   * and delete the branch.
+   *
+   * Stops at the first merge that conflicts, leaving the repository mid-merge for
+   * the conflict to be resolved by hand.
+   *
+   * @param kind - Which kind of branch is being finished
+   * @param name - The part after the prefix
+   * @param options - `tag` names the tag for a release or hotfix (defaults to the
+   * version tag prefix plus `name`), `keepBranch` leaves the branch in place
+   * @throws when the working directory isn't clean, or a merge conflicts
+   */
+  abstract flowFinish(kind: FlowKind, name: string,
+                      options?: { tag?: string; tagMessage?: string; keepBranch?: boolean }): Promise<void>;
+
+  /**
+   * List the stashes as the commits they are, with the commit each was made on,
+   * so they can be shown in the history they belong to.
+   */
+  abstract getStashCommits(): Promise<StashCommit[]>;
 
   /**
    * Read a file from the working directory as text.

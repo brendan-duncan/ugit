@@ -2,6 +2,27 @@
 
 ### New Features
 
+* Added "Reflog..." to the repository menu, for finding commits nothing points at
+  any more: browse where HEAD or a branch has pointed, then check an entry out,
+  branch from it, or reset the current branch to it.
+* Added a Submodules section to the left panel, with initialize, update, update
+  recursively and sync, and opening a submodule in its own tab. It stays hidden
+  for repositories without submodules.
+* Added "Select Lines" to the diff viewer: pick individual changed lines - click,
+  or shift-click for a run - and stage, unstage or discard only those.
+* Added "Browse Files at This Commit..." to the commit context menu, to walk the
+  whole tree at that revision and read any file as it was then.
+* Added "Commit Signing..." to the repository menu, for this repository's signing
+  settings, and the commit list now shows each commit's signature status.
+* Added a Git Flow submenu to the repository menu: set up the branch names and
+  prefixes, and start or finish a feature, release or hotfix. The branch, merge
+  and tag commands are run directly, so git-flow doesn't have to be installed.
+* Added git bisect: mark a commit bad to start, mark others good or bad, and a
+  banner shows what's checked out, what's left to test, and the first bad commit
+  when git finds it.
+* Stashes now appear in the commit list against the commit they were made on, as
+  well as in the Stashes panel.
+
 * Added "File History" to the file and folder context menus: the commits that
   touched a path, the diff each one made, rename tracking and paging.
 * Added a "Blame" tab to the File History dialog, with a per-line gutter, "Blame

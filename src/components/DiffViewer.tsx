@@ -4,6 +4,7 @@ import { GitAdapter } from '../git/GitAdapter';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import MergeConflictResolver from './MergeConflictResolver';
+import { buildPartialPatch, listDiffLines } from '../utils/partialPatch';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -245,6 +246,12 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
   const [mergeToolDropdownOpen, setMergeToolDropdownOpen] = useState<boolean>(false);
   const [conflictResolving, setConflictResolving] = useState<boolean>(false);
   const [showConflictResolver, setShowConflictResolver] = useState<boolean>(false);
+  // Line selection: which diff lines are picked, and the last one clicked so
+  // shift-click can extend from it.
+  const [lineSelectMode, setLineSelectMode] = useState<boolean>(false);
+  const [selectedLines, setSelectedLines] = useState<Set<number>>(new Set());
+  const [lastClickedLine, setLastClickedLine] = useState<number | null>(null);
+  const [lineActionRunning, setLineActionRunning] = useState<boolean>(false);
   const [settingsDropdownOpen, setSettingsDropdownOpen] = useState<boolean>(false);
   const [fileMenuOpen, setFileMenuOpen] = useState<boolean>(false);
   const mergeToolDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -466,6 +473,97 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
       if (onError) onError(`Failed to resolve conflict: ${error.message}`);
     } finally {
       setConflictResolving(false);
+    }
+  };
+
+  // Lines of the current diff, and which of them can be picked.
+  const diffLines = React.useMemo(() => (diff ? listDiffLines(diff) : []), [diff]);
+  const selectableLines = React.useMemo(
+    () => diffLines.filter(line => line.kind === 'add' || line.kind === 'remove').map(line => line.index),
+    [diffLines]
+  );
+
+  // Leaving selection mode, or loading a different file, shouldn't keep a stale
+  // selection around - the indices mean nothing against another diff.
+  useEffect(() => {
+    setSelectedLines(new Set());
+    setLastClickedLine(null);
+  }, [file?.path, isStaged, diff]);
+
+  const toggleLine = (index: number, extend: boolean) => {
+    setSelectedLines(prev => {
+      const next = new Set(prev);
+
+      // Shift-click covers the run between the two clicks, which is how picking
+      // out a block of lines is worth doing at all.
+      if (extend && lastClickedLine !== null) {
+        const from = selectableLines.indexOf(lastClickedLine);
+        const to = selectableLines.indexOf(index);
+        if (from !== -1 && to !== -1) {
+          const [low, high] = from <= to ? [from, to] : [to, from];
+          const selecting = !prev.has(index);
+          for (let i = low; i <= high; i++) {
+            if (selecting)
+              next.add(selectableLines[i]);
+            else
+              next.delete(selectableLines[i]);
+          }
+          return next;
+        }
+      }
+
+      if (next.has(index))
+        next.delete(index);
+      else
+        next.add(index);
+      return next;
+    });
+    setLastClickedLine(index);
+  };
+
+  /**
+   * Stage, unstage or discard just the selected lines, by handing git a patch
+   * built from them.
+   */
+  const applyLineSelection = async (action: 'stage' | 'unstage' | 'discard') => {
+    if (!file || !gitAdapter || selectedLines.size === 0)
+      return;
+
+    if (action === 'discard') {
+      const confirmed = await showConfirm(
+        `Discard ${selectedLines.size} selected line${selectedLines.size === 1 ? '' : 's'}? This cannot be undone.`
+      );
+      if (!confirmed)
+        return;
+    }
+
+    // Staging applies the patch as-is; unstaging and discarding undo what's
+    // there, so they're applied in reverse and the patch is built to suit.
+    const direction = action === 'stage' ? 'forward' : 'reverse';
+    const patch = buildPartialPatch(diff, selectedLines, direction);
+    if (!patch) {
+      showAlert('That selection has nothing to apply.', 'Selected Lines');
+      return;
+    }
+
+    setLineActionRunning(true);
+    try {
+      await gitAdapter.applyPatch(patch, {
+        cached: action !== 'discard',
+        reverse: action !== 'stage'
+      });
+      setSelectedLines(new Set());
+      if (onRefresh)
+        await onRefresh();
+      await loadContent();
+    } catch (error: any) {
+      const message = error?.message || String(error);
+      if (onError)
+        onError(`Failed to ${action} the selected lines: ${message}`);
+      else
+        showAlert(`Failed to ${action} the selected lines: ${message}`, 'Selected Lines');
+    } finally {
+      setLineActionRunning(false);
     }
   };
 
@@ -727,8 +825,17 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
           )}
         </div>
         <div className="diff-viewer-header-right">
-          <span 
-            className="diff-viewer-status-badge" 
+          {showChunkControls && fileType === 'diff' && !isConflicted && (
+            <button
+              className={`diff-viewer-select-lines-btn ${lineSelectMode ? 'active' : ''}`}
+              onClick={() => setLineSelectMode(!lineSelectMode)}
+              title="Pick individual lines to stage, unstage or discard"
+            >
+              {lineSelectMode ? 'Done Selecting' : 'Select Lines'}
+            </button>
+          )}
+          <span
+            className="diff-viewer-status-badge"
             style={{ backgroundColor: getStatusBadge(file.status).color }}
           >
             {getStatusBadge(file.status).text}
@@ -963,6 +1070,80 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
                 editable={false}
                 readOnly={true}
               />
+            </div>
+          </div>
+        ) : fileType === 'diff' && lineSelectMode ? (
+          <div className="diff-line-select">
+            <div className="diff-line-select-bar">
+              <span className="diff-line-select-count">
+                {selectedLines.size} of {selectableLines.length} changed lines selected
+              </span>
+              <button
+                className="diff-line-select-button"
+                onClick={() => setSelectedLines(new Set(selectableLines))}
+                disabled={lineActionRunning || selectableLines.length === 0}
+              >
+                Select All
+              </button>
+              <button
+                className="diff-line-select-button"
+                onClick={() => setSelectedLines(new Set())}
+                disabled={lineActionRunning || selectedLines.size === 0}
+              >
+                Clear
+              </button>
+              {!isStaged ? (
+                <>
+                  <button
+                    className="diff-line-select-button primary"
+                    onClick={() => applyLineSelection('stage')}
+                    disabled={lineActionRunning || selectedLines.size === 0}
+                    title="Stage only the selected lines"
+                  >
+                    Stage Selected
+                  </button>
+                  <button
+                    className="diff-line-select-button danger"
+                    onClick={() => applyLineSelection('discard')}
+                    disabled={lineActionRunning || selectedLines.size === 0}
+                    title="Throw away only the selected lines"
+                  >
+                    Discard Selected
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="diff-line-select-button primary"
+                  onClick={() => applyLineSelection('unstage')}
+                  disabled={lineActionRunning || selectedLines.size === 0}
+                  title="Unstage only the selected lines"
+                >
+                  Unstage Selected
+                </button>
+              )}
+            </div>
+            <div className="diff-line-select-lines">
+              {diffLines.map(line => {
+                const selectable = line.kind === 'add' || line.kind === 'remove';
+                const isSelected = selectedLines.has(line.index);
+                return (
+                  <div
+                    key={line.index}
+                    className={`diff-line diff-line-${line.kind} ${selectable ? 'selectable' : ''} ${isSelected ? 'selected' : ''}`}
+                    onClick={(e) => selectable && toggleLine(line.index, e.shiftKey)}
+                  >
+                    <span className="diff-line-check">
+                      {selectable ? (isSelected ? '☑' : '☐') : ''}
+                    </span>
+                    <span className="diff-line-number">{line.oldNumber ?? ''}</span>
+                    <span className="diff-line-number">{line.newNumber ?? ''}</span>
+                    <span className="diff-line-marker">
+                      {line.kind === 'add' ? '+' : line.kind === 'remove' ? '-' : line.kind === 'context' ? ' ' : ''}
+                    </span>
+                    <span className="diff-line-text">{line.text || ' '}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : fileType === 'diff' && diffHtml ? (

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import CommitList from './CommitList';
 import CommitInfo from './CommitInfo';
-import { Commit, SearchQuery } from '../git/GitAdapter';
+import { Commit, SearchQuery, StashCommit } from '../git/GitAdapter';
 import GitAdapter from '../git/GitAdapter';
 import './BranchView.css';
 
@@ -15,6 +15,8 @@ interface CommitSearchState {
 interface BranchViewProps {
   branchName: string;
   commits: Array<Commit>;
+  stashCommits?: Array<StashCommit>;
+  onStashContextMenu?: (action: string, stash: StashCommit) => void;
   loading: boolean;
   gitAdapter: GitAdapter;
   onRefresh: () => Promise<void>;
@@ -30,7 +32,7 @@ interface BranchViewProps {
   onClearSearch: () => void;
 }
 
-function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onContextMenu, onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch }: BranchViewProps) {
+function BranchView({ branchName, commits, stashCommits, onStashContextMenu, loading, gitAdapter, onRefresh, onContextMenu, onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch }: BranchViewProps) {
   const [selectedCommit, setSelectedCommit] = useState<Commit | null>(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -98,6 +100,8 @@ function BranchView({ branchName, commits, loading, gitAdapter, onRefresh, onCon
           <div className="branch-view-top-panel" style={{ height: `${topHeight}%` }}>
             <CommitList
               commits={commits}
+              stashCommits={stashCommits}
+              onStashContextMenu={onStashContextMenu}
               selectedCommit={selectedCommit}
               onSelectCommit={handleCommitSelect}
               onContextMenu={onContextMenu}

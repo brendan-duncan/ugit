@@ -8,7 +8,12 @@ import RenameBranchDialog from './RenameBranchDialog';
 import MergeBranchDialog from './MergeBranchDialog';
 import RebaseBranchDialog from './RebaseBranchDialog';
 import RebaseBanner from './RebaseBanner';
+import BisectBanner from './BisectBanner';
 import InteractiveRebaseDialog from './InteractiveRebaseDialog';
+import ReflogDialog from './ReflogDialog';
+import RevisionTreeDialog from './RevisionTreeDialog';
+import SigningDialog from './SigningDialog';
+import GitFlowDialog from './GitFlowDialog';
 import ApplyStashDialog from './ApplyStashDialog';
 import DeleteStashDialog from './DeleteStashDialog';
 import ContentViewer from './ContentViewer';
@@ -34,7 +39,7 @@ import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, Commit, IncompleteHistoryError, RebaseStatus, RebaseTodoEntry, SearchQuery, WorktreeInfo } from "../git/GitAdapter"
+import { GitAdapter, BisectStatus, Commit, FlowConfig, FlowKind, IncompleteHistoryError, RebaseStatus, RebaseTodoEntry, ReflogEntry, SearchQuery, StashCommit, SubmoduleInfo, WorktreeInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
 
@@ -78,6 +83,15 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   // Commits gathered for the interactive rebase editor, and what they replay onto.
   const [interactiveRebase, setInteractiveRebase] =
     useState<{ base: string | null; commits: Commit[]; ontoLabel: string } | null>(null);
+  const [bisectStatus, setBisectStatus] = useState<BisectStatus | null>(null);
+  const [submodules, setSubmodules] = useState<SubmoduleInfo[]>([]);
+  // The stashes, as commits, for showing them in the history they were made on.
+  const [stashCommits, setStashCommits] = useState<StashCommit[]>([]);
+  const [showReflogDialog, setShowReflogDialog] = useState<boolean>(false);
+  const [showSigningDialog, setShowSigningDialog] = useState<boolean>(false);
+  const [flowDialogMode, setFlowDialogMode] = useState<'init' | 'start' | 'finish' | null>(null);
+  // The revision whose tree is being browsed, with a label for the header.
+  const [treeTarget, setTreeTarget] = useState<{ revision: string; label?: string } | null>(null);
   // Bumped by any command that brings new commits into the repository. The selected
   // branch's commit list was rendered from the cache as it stood before the command
   // ran, so it has to be reloaded; see the effect next to the branch loaders.
@@ -349,7 +363,57 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     } catch (error) {
       console.error('Error checking rebase status:', error);
     }
+
+    // A bisect is the other state that leaves the repository mid-operation, and
+    // every caller that re-checks a rebase wants to know about it too.
+    try {
+      const bisect = await gitAdapter.getBisectStatus();
+      // Keep a verdict already on screen: git's files say a bisect is in
+      // progress right up until it's reset, but only its output named the commit.
+      setBisectStatus(previous => (previous && previous.finished && bisect ? previous : bisect));
+    } catch (error) {
+      console.error('Error checking bisect status:', error);
+    }
   }, [gitAdapter]);
+
+  const refreshSubmodules = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setSubmodules(await gitAdapter.listSubmodules());
+    } catch (error) {
+      console.error('Error listing submodules:', error);
+      setSubmodules([]);
+    }
+  }, [gitAdapter]);
+
+  // Submodules and the bisect state only change through commands, so read them
+  // when the repository opens and let the actions refresh them after that.
+  useEffect(() => {
+    if (!gitAdapter)
+      return;
+
+    let cancelled = false;
+    refreshSubmodules();
+    gitAdapter.getBisectStatus()
+      .then(status => { if (!cancelled) setBisectStatus(status); })
+      .catch(() => { if (!cancelled) setBisectStatus(null); });
+    return () => { cancelled = true; };
+  }, [gitAdapter, refreshSubmodules]);
+
+  // The stashes shown in the commit list follow the side panel's list, so they
+  // reload whenever a stash is made, applied or dropped.
+  useEffect(() => {
+    if (!gitAdapter)
+      return;
+
+    let cancelled = false;
+    gitAdapter.getStashCommits()
+      .then(list => { if (!cancelled) setStashCommits(list); })
+      .catch(() => { if (!cancelled) setStashCommits([]); });
+    return () => { cancelled = true; };
+  }, [gitAdapter, stashes]);
 
   useEffect(() => {
     branchStatusRef.current = branchStatus;
@@ -2012,6 +2076,210 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, onOpenRepository, refreshWorktrees, showConfirm, setErrorWithDialog]);
 
+  /** Run one git command with the busy overlay up, then reload the repository. */
+  const runOperation = useCallback(async (label: string, operation: () => Promise<void>,
+                                          options: { reloadBranch?: boolean } = {}) => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(label);
+      await operation();
+      clearBranchCache();
+      await loadRepoData(true);
+      await refreshRebaseStatus();
+      if (options.reloadBranch && selectedItem?.type === 'branch' && selectedItem.branchName)
+        await handleBranchSelect(selectedItem.branchName);
+    } catch (error) {
+      setErrorWithDialog(`${label} failed: ${(error as Error).message}`);
+      throw error;
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, clearBranchCache, loadRepoData, refreshRebaseStatus, selectedItem,
+      handleBranchSelect, setErrorWithDialog]);
+
+  /**
+   * Act on a reflog entry: check it out, branch from it, or move the current
+   * branch to it. Branching is the one that rescues work without risking more.
+   */
+  const handleReflogAction = useCallback(async (action: 'reset-hard' | 'branch-here' | 'checkout',
+                                                entry: ReflogEntry) => {
+    if (!gitAdapter)
+      return;
+
+    const short = entry.hash.slice(0, 8);
+
+    if (action === 'branch-here') {
+      setShowReflogDialog(false);
+      // Reuse the create-branch dialog, starting from this commit.
+      showCreateBranchFromCommitDialog({ hash: entry.hash, message: entry.subject } as Commit);
+      return;
+    }
+
+    if (action === 'checkout') {
+      if (!await showConfirm(`Check out ${short} (${entry.subject || entry.message})? This leaves HEAD detached.`))
+        return;
+      setShowReflogDialog(false);
+      await runOperation(`git checkout ${short}`, () => gitAdapter.checkoutBranch(entry.hash), { reloadBranch: true });
+      return;
+    }
+
+    if (!await showConfirm(
+      `Move ${currentBranch} to ${short} and discard everything after it? Uncommitted changes will be lost.`))
+      return;
+    setShowReflogDialog(false);
+    await runOperation(`git reset --hard ${short}`,
+      async () => { await gitAdapter.raw(['reset', '--hard', entry.hash]); },
+      { reloadBranch: true });
+  }, [gitAdapter, currentBranch, showConfirm, runOperation, showCreateBranchFromCommitDialog]);
+
+  const handleSubmoduleAction = useCallback(async (action: string, submodule: SubmoduleInfo | null) => {
+    if (!gitAdapter)
+      return;
+
+    const target = submodule ? submodule.path : undefined;
+
+    switch (action) {
+      case 'open':
+        if (submodule)
+          onOpenRepository(path.join(gitAdapter.repoPath, submodule.path));
+        break;
+
+      case 'update':
+        // An uninitialized submodule needs registering before it can be updated,
+        // and --init covers the case where it's already done.
+        await runOperation(`git submodule update --init ${target || ''}`.trim(),
+          () => gitAdapter.submoduleUpdate(target, { init: true }));
+        await refreshSubmodules();
+        break;
+
+      case 'update-recursive':
+        await runOperation(`git submodule update --init --recursive ${target || ''}`.trim(),
+          () => gitAdapter.submoduleUpdate(target, { init: true, recursive: true }));
+        await refreshSubmodules();
+        break;
+
+      case 'update-all':
+        await runOperation('git submodule update --init',
+          () => gitAdapter.submoduleUpdate(undefined, { init: true }));
+        await refreshSubmodules();
+        break;
+
+      case 'sync':
+        await runOperation(`git submodule sync ${target || ''}`.trim(),
+          () => gitAdapter.submoduleSync(target));
+        await refreshSubmodules();
+        break;
+
+      case 'reveal':
+        if (submodule)
+          await ipcRenderer.invoke('show-item-in-folder', path.join(gitAdapter.repoPath, submodule.path));
+        break;
+
+      case 'copy-path':
+        if (submodule)
+          navigator.clipboard.writeText(submodule.path);
+        break;
+    }
+  }, [gitAdapter, onOpenRepository, runOperation, refreshSubmodules]);
+
+  const handleBisectMark = useCallback(async (mark: 'good' | 'bad' | 'skip') => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git bisect ${mark}`);
+      const status = await gitAdapter.bisectMark(mark);
+      setBisectStatus(status);
+      clearBranchCache();
+      await loadRepoData(true);
+    } catch (error) {
+      setErrorWithDialog(`Bisect failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, clearBranchCache, loadRepoData, setErrorWithDialog]);
+
+  const handleBisectReset = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage('git bisect reset');
+      await gitAdapter.bisectReset();
+      setBisectStatus(null);
+      clearBranchCache();
+      await loadRepoData(true);
+    } catch (error) {
+      setErrorWithDialog(`Bisect reset failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, clearBranchCache, loadRepoData, setErrorWithDialog]);
+
+  /** Start a bisect with the clicked commit as the bad one. */
+  const handleStartBisect = useCallback(async (commit: Commit) => {
+    if (!gitAdapter)
+      return;
+
+    const status = await gitAdapter.status();
+    if (status.files.length > 0) {
+      showAlert('git bisect checks out commits, so it needs a clean working directory. Commit or stash your changes first.',
+        'Bisect');
+      return;
+    }
+
+    if (!await showConfirm(
+      `Start bisecting with ${commit.hash.slice(0, 8)} marked bad? git will check out commits for you to test.`))
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage('git bisect start');
+      const result = await gitAdapter.bisectStart(commit.hash);
+      setBisectStatus(result);
+      clearBranchCache();
+      await loadRepoData(true);
+      showAlert('Now mark a commit you know was good - use "Good" in the banner once git checks one out, or mark an older commit good from its context menu.',
+        'Bisect');
+    } catch (error) {
+      setErrorWithDialog(`Bisect failed to start: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, showAlert, showConfirm, clearBranchCache, loadRepoData, setErrorWithDialog]);
+
+  const handleFlowInit = useCallback(async (config: Partial<FlowConfig>) => {
+    if (!gitAdapter)
+      return;
+    await runOperation('git flow init', () => gitAdapter.flowInit(config));
+  }, [gitAdapter, runOperation]);
+
+  const handleFlowStart = useCallback(async (kind: FlowKind, name: string) => {
+    if (!gitAdapter)
+      return;
+    await runOperation(`git flow ${kind} start ${name}`,
+      async () => { await gitAdapter.flowStart(kind, name); },
+      { reloadBranch: true });
+  }, [gitAdapter, runOperation]);
+
+  const handleFlowFinish = useCallback(async (kind: FlowKind, name: string,
+                                              options: { tag?: string; keepBranch?: boolean }) => {
+    if (!gitAdapter)
+      return;
+    await runOperation(`git flow ${kind} finish ${name}`,
+      () => gitAdapter.flowFinish(kind, name, options),
+      { reloadBranch: true });
+  }, [gitAdapter, runOperation]);
+
   /**
    * Gather the commits an interactive rebase would replay and open the editor for
    * them. A rebase rewrites the checked-out branch, so this only makes sense for a
@@ -2153,6 +2421,24 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       case 'rebase-interactive':
         await startInteractiveRebase(commit);
         break;
+      case 'browse-tree':
+        setTreeTarget({ revision: commit.hash, label: commit.message });
+        break;
+      case 'bisect-bad':
+        await handleStartBisect(commit);
+        break;
+      case 'bisect-good':
+        // Only meaningful once a bisect is running; marking an older commit good
+        // is how the range gets closed from the other end.
+        if (!bisectStatus) {
+          showAlert('Start a bisect first by marking a commit bad.', 'Bisect');
+          break;
+        }
+        await runOperation(`git bisect good ${commit.hash.slice(0, 8)}`, async () => {
+          await gitAdapter.raw(['bisect', 'good', commit.hash]);
+        });
+        setBisectStatus(await gitAdapter.getBisectStatus());
+        break;
       case 'cherry-pick':
         if (await showConfirm(`Cherry-pick ${commit.hash.substring(0, 7)}?`)) {
           await gitAdapter.raw(['cherry-pick', commit.hash]);
@@ -2255,6 +2541,14 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           onSkip={handleRebaseSkip}
         />
       )}
+      {bisectStatus && (
+        <BisectBanner
+          status={bisectStatus}
+          busy={isBusy}
+          onMark={handleBisectMark}
+          onReset={handleBisectReset}
+        />
+      )}
       <div
         className="repo-content-horizontal"
         onMouseMove={handleMouseMove}
@@ -2301,6 +2595,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
                 onRefresh={() => loadRepoData(true)}
                 onError={setErrorWithDialog}
+                onShowReflog={() => setShowReflogDialog(true)}
+                onShowSigning={() => setShowSigningDialog(true)}
+                onFlowAction={(mode) => setFlowDialogMode(mode)}
               />
               <div className="branch-stash-panel">
                 <BranchStashPanel
@@ -2324,6 +2621,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                   gitAdapter={gitAdapter}
                   lockedPatterns={getSetting('lockedBranchPatterns')}
                   worktrees={worktrees}
+                  submodules={submodules}
+                  onOpenSubmodule={(submodulePath) => handleSubmoduleAction('open', submodules.find(s => s.path === submodulePath) || null)}
+                  onSubmoduleAction={handleSubmoduleAction}
                   onOpenWorktree={handleOpenWorktree}
                   onAddWorktree={handleAddWorktree}
                   onWorktreeAction={handleWorktreeAction}
@@ -2350,6 +2650,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onBranchStatusRefresh={refreshBranchStatus}
                 onContextMenu={handleCommitContextMenu}
                 onCommitDoubleClick={handleCommitDoubleClick}
+                stashCommits={stashCommits}
+                onStashContextMenu={(action, stash) => handleStashContextMenu(action, stashes[stash.index] || stash, stash.index)}
                 currentBranch={currentBranch}
                 branchStatus={branchStatus}
                 onError={setErrorWithDialog}
@@ -2457,6 +2759,52 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           gitAdapter={gitAdapter}
         />
       )}
+      {showReflogDialog && (
+        <ReflogDialog
+          gitAdapter={gitAdapter}
+          branches={branches}
+          currentBranch={currentBranch}
+          onClose={() => setShowReflogDialog(false)}
+          onAction={handleReflogAction}
+        />
+      )}
+
+      {treeTarget && (
+        <RevisionTreeDialog
+          gitAdapter={gitAdapter}
+          revision={treeTarget.revision}
+          label={treeTarget.label}
+          onClose={() => setTreeTarget(null)}
+        />
+      )}
+
+      {showSigningDialog && (
+        <SigningDialog
+          gitAdapter={gitAdapter}
+          onClose={() => setShowSigningDialog(false)}
+          onSaved={async () => {
+            // Signature badges come from the log, so it has to be read again.
+            clearBranchCache();
+            await loadRepoData(true);
+            if (selectedItem?.type === 'branch' && selectedItem.branchName)
+              await handleBranchSelect(selectedItem.branchName);
+          }}
+        />
+      )}
+
+      {flowDialogMode && (
+        <GitFlowDialog
+          gitAdapter={gitAdapter}
+          mode={flowDialogMode}
+          branches={branches}
+          currentBranch={currentBranch}
+          onClose={() => setFlowDialogMode(null)}
+          onInit={handleFlowInit}
+          onStart={handleFlowStart}
+          onFinish={handleFlowFinish}
+        />
+      )}
+
       {interactiveRebase && (
         <InteractiveRebaseDialog
           commits={interactiveRebase.commits}

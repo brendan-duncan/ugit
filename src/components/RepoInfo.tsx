@@ -29,6 +29,12 @@ interface RepoInfoProps {
   onCleanPackTemps?: () => Promise<void>;
   onPushTags: () => Promise<void>;
   onSyncTags: () => Promise<void>;
+  // Open the reflog, where commits nothing points at any more can be found.
+  onShowReflog?: () => void;
+  // Open this repository's commit-signing settings.
+  onShowSigning?: () => void;
+  // Open the git-flow dialog in one of its three modes.
+  onFlowAction?: (mode: 'init' | 'start' | 'finish') => void;
   /** Last background remote-status failure, if any; shown inline, not as a dialog. */
   remoteStatusError?: string | null;
   onOriginChanged?: () => Promise<void>;
@@ -38,7 +44,7 @@ interface RepoInfoProps {
   onError?: (error: string) => void;
 }
 
-const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onCleanPackTemps, onPushTags, onSyncTags, remoteStatusError, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
+const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onCleanPackTemps, onPushTags, onSyncTags, onShowReflog, onShowSigning, onFlowAction, remoteStatusError, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
   const { showAlert, showConfirm } = useAlert();
   const { getSetting } = useSettings();
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
@@ -408,6 +414,31 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
                 Deinitialize Git LFS
               </DropdownItem>
             </DropdownSubmenu>
+          )}
+          <DropdownSeparator />
+          {onShowReflog && (
+            <DropdownItem onClick={onShowReflog}>
+              🕓 Reflog...
+            </DropdownItem>
+          )}
+          {onFlowAction && (
+            <DropdownSubmenu label="Git Flow">
+              <DropdownItem onClick={() => onFlowAction('init')}>
+                Set Up Git Flow...
+              </DropdownItem>
+              <DropdownSeparator />
+              <DropdownItem onClick={() => onFlowAction('start')}>
+                Start Branch...
+              </DropdownItem>
+              <DropdownItem onClick={() => onFlowAction('finish')}>
+                Finish Branch...
+              </DropdownItem>
+            </DropdownSubmenu>
+          )}
+          {onShowSigning && (
+            <DropdownItem onClick={onShowSigning}>
+              🔒 Commit Signing...
+            </DropdownItem>
           )}
           <DropdownSeparator />
           <DropdownItem onClick={handleApplyPatch}>

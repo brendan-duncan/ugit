@@ -16,6 +16,14 @@ import GitAdapter, {
   BlameLine,
   FileHistoryEntry,
   RebaseTodoEntry,
+  ReflogEntry,
+  TreeEntry,
+  SubmoduleInfo,
+  BisectStatus,
+  SigningConfig,
+  FlowConfig,
+  FlowKind,
+  StashCommit,
   IncompleteHistoryError } from './GitAdapter';
 import { GitCommandError, gitErrorHandler } from './gitErrors';
 import { withGitLock, isGitBusy } from './gitQueue';
@@ -33,7 +41,7 @@ const execAsync = promisify(exec);
 // stops mid-commit - can't be mistaken for the end of a record.
 const LOG_FIELD_SEP = '\x1f';
 const LOG_RECORD_SEP = '\x1e';
-const LOG_FORMAT = ['%H', '%ai', '%s', '%b', '%an', '%ae'].join('%x1f') + '%x1e';
+const LOG_FORMAT = ['%H', '%ai', '%s', '%b', '%an', '%ae', '%G?', '%GS'].join('%x1f') + '%x1e';
 // Same fields, but with the record separator leading instead of trailing, so the
 // --name-status lines that follow a record stay attached to the commit they
 // belong to when the output is split on the separator.
@@ -1121,7 +1129,10 @@ export class SimpleGitAdapter extends GitAdapter {
         message,
         body: body.trimEnd(),
         onOrigin,
-        tags: []
+        tags: [],
+        // 'N' for the unsigned commits that make up most histories.
+        signature: fields.length > 6 ? fields[6] : undefined,
+        signer: fields.length > 7 && fields[7] ? fields[7] : undefined
       });
     }
 
@@ -1274,6 +1285,564 @@ export class SimpleGitAdapter extends GitAdapter {
       this._endCommand(id, startTime);
       return [];
     }
+  }
+
+  /** Read one config value, or null when it isn't set. */
+  private async _configGet(key: string): Promise<string | null> {
+    try {
+      const out = await this.git.raw(['config', '--get', key]);
+      return out.trim() || null;
+    } catch (error) {
+      // git exits non-zero for a key that isn't set, which isn't an error here.
+      return null;
+    }
+  }
+
+  /** Write one config value in this repository, or clear it when value is ''. */
+  private async _configSet(key: string, value: string): Promise<void> {
+    if (value === '') {
+      try {
+        await this.git.raw(['config', '--unset', key]);
+      } catch (error) {
+        // Unsetting something that was never set is fine.
+      }
+      return;
+    }
+    await this.git.raw(['config', key, value]);
+  }
+
+  async getReflog(ref: string = 'HEAD', maxCount: number = 200): Promise<ReflogEntry[]> {
+    // `log -g` walks the reflog through the same formatting machinery as any other
+    // log, so the fields arrive delimited instead of having to be picked back out
+    // of `git reflog`'s own layout.
+    const format = ['%gd', '%H', '%gs', '%ai', '%an', '%s'].join('%x1f') + '%x1e';
+    const args = ['log', '-g', `--max-count=${maxCount}`, `--format=${format}`, ref];
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git log -g --max-count=${maxCount} ${ref}`, startTime);
+    let output: string;
+    try {
+      output = await this.git.raw(args);
+    } catch (error) {
+      // A ref with no reflog - a fresh clone, or a branch made with plumbing - is
+      // an empty history rather than a failure.
+      this._endCommand(id, startTime);
+      return [];
+    }
+    this._endCommand(id, startTime);
+
+    const entries: ReflogEntry[] = [];
+    for (const record of output.split(LOG_RECORD_SEP)) {
+      if (!record.trim())
+        continue;
+
+      const fields = record.replace(/^\r?\n/, '').split(LOG_FIELD_SEP);
+      if (fields.length < 6)
+        continue;
+
+      const [selector, hash, subjectOfMove, date, author, subject] = fields;
+      // %gs reads like 'commit: add a thing' or 'checkout: moving from a to b'.
+      const split = subjectOfMove.indexOf(': ');
+      entries.push({
+        selector,
+        hash,
+        action: split === -1 ? subjectOfMove : subjectOfMove.slice(0, split),
+        message: split === -1 ? '' : subjectOfMove.slice(split + 2),
+        date,
+        author,
+        subject
+      });
+    }
+
+    return entries;
+  }
+
+  async getTreeAtRevision(revision: string, dirPath: string = ''): Promise<TreeEntry[]> {
+    const args = ['ls-tree', '-l', revision];
+    // A trailing slash asks git for the directory's contents rather than the
+    // directory entry itself.
+    if (dirPath)
+      args.push(`${dirPath.replace(/\/+$/, '')}/`);
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    let output: string;
+    try {
+      output = await this.git.raw(args);
+    } catch (error) {
+      this._endCommand(id, startTime);
+      throw error;
+    }
+    this._endCommand(id, startTime);
+
+    const entries: TreeEntry[] = [];
+    for (const line of output.split('\n')) {
+      if (!line.trim())
+        continue;
+
+      // '<mode> <type> <hash> <size>\t<path>', with '-' for a tree's size.
+      const match = /^(\d+) (blob|tree|commit) ([0-9a-f]+)\s+(\S+)\t(.*)$/.exec(line);
+      if (!match)
+        continue;
+
+      const [, mode, type, hash, size, entryPath] = match;
+      entries.push({
+        name: entryPath.split('/').filter(Boolean).pop() || entryPath,
+        path: entryPath,
+        type: type as 'blob' | 'tree' | 'commit',
+        hash,
+        mode,
+        size: size === '-' ? null : parseInt(size, 10)
+      });
+    }
+
+    // Directories first, then files, each alphabetically - how a file tree reads.
+    entries.sort((a, b) => {
+      if ((a.type === 'blob') !== (b.type === 'blob'))
+        return a.type === 'blob' ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return entries;
+  }
+
+  async applyPatch(patch: string, options: { cached?: boolean; reverse?: boolean } = {}): Promise<void> {
+    // Hand git a file rather than piping: a partial-selection patch can be large,
+    // and its content must survive verbatim.
+    const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'ugit-patch-')), 'partial.patch');
+    await fs.writeFile(file, patch.endsWith('\n') ? patch : `${patch}\n`, 'utf8');
+
+    const args = ['apply'];
+    if (options.cached)
+      args.push('--cached');
+    if (options.reverse)
+      args.push('--reverse');
+    // Line counts in a patch built from a selection are easy to get wrong by one;
+    // --recount lets git work them out from the lines it's given.
+    args.push('--recount', '--whitespace=nowarn', file);
+
+    const startTime = performance.now();
+    const id = this._startCommand(`git apply${options.cached ? ' --cached' : ''}${options.reverse ? ' --reverse' : ''}`, startTime);
+    try {
+      await withGitLock(await this.getObjectStoreKey(), () => this.git.raw(args));
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(error?.message || String(error));
+    } finally {
+      await fs.rm(path.dirname(file), { recursive: true, force: true }).catch(() => {});
+    }
+    this._endCommand(id, startTime);
+  }
+
+  async listSubmodules(): Promise<SubmoduleInfo[]> {
+    // .gitmodules says what's configured; `submodule status` says what's actually
+    // checked out. Neither on its own is the whole picture.
+    let configured: string;
+    try {
+      configured = await this.git.raw(['config', '--file', '.gitmodules', '--list']);
+    } catch (error) {
+      // No .gitmodules at all: this repository has no submodules.
+      return [];
+    }
+
+    const byName = new Map<string, { path?: string; url?: string; branch?: string }>();
+    for (const line of configured.split('\n')) {
+      const match = /^submodule\.(.+)\.(path|url|branch)=(.*)$/.exec(line.trim());
+      if (!match)
+        continue;
+      const [, name, key, value] = match;
+      const entry = byName.get(name) || {};
+      (entry as any)[key] = value;
+      byName.set(name, entry);
+    }
+
+    const state = new Map<string, { hash: string; flag: string; describe: string | null }>();
+    try {
+      const status = await this.git.raw(['submodule', 'status']);
+      for (const line of status.split('\n')) {
+        if (!line.trim())
+          continue;
+        // '<flag><sha> <path> (<describe>)', where the flag is ' ', '-', '+' or 'U'.
+        const match = /^([-+U ])([0-9a-f]+) (.+?)(?: \((.+)\))?$/.exec(line);
+        if (!match)
+          continue;
+        const [, flag, hash, submodulePath, describe] = match;
+        state.set(submodulePath, { hash, flag, describe: describe || null });
+      }
+    } catch (error) {
+      // Leave the state unknown; the configured list is still worth showing.
+    }
+
+    const submodules: SubmoduleInfo[] = [];
+    for (const entry of byName.values()) {
+      if (!entry.path)
+        continue;
+      const current = state.get(entry.path);
+      submodules.push({
+        path: entry.path,
+        url: entry.url || '',
+        hash: current ? current.hash : '',
+        branch: entry.branch || null,
+        initialized: current ? current.flag !== '-' : false,
+        modified: current ? current.flag === '+' : false,
+        conflicted: current ? current.flag === 'U' : false,
+        describe: current ? current.describe : null
+      });
+    }
+
+    submodules.sort((a, b) => a.path.localeCompare(b.path));
+    return submodules;
+  }
+
+  async submoduleInit(submodulePath?: string): Promise<void> {
+    const args = ['submodule', 'init'];
+    if (submodulePath)
+      args.push('--', submodulePath);
+    await this._runWrite(args);
+  }
+
+  async submoduleUpdate(submodulePath?: string,
+                        options: { init?: boolean; recursive?: boolean } = {}): Promise<void> {
+    const args = ['submodule', 'update'];
+    if (options.init)
+      args.push('--init');
+    if (options.recursive)
+      args.push('--recursive');
+    if (submodulePath)
+      args.push('--', submodulePath);
+    await this._runWrite(args);
+  }
+
+  async submoduleSync(submodulePath?: string): Promise<void> {
+    const args = ['submodule', 'sync'];
+    if (submodulePath)
+      args.push('--', submodulePath);
+    await this._runWrite(args);
+  }
+
+  /** Run a git command that writes to the repository, serialized with the rest. */
+  private async _runWrite(args: string[]): Promise<string> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      const out = await withGitLock(await this.getObjectStoreKey(), () => this.git.raw(args));
+      this._endCommand(id, startTime);
+      return out;
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(error?.message || String(error));
+    }
+  }
+
+  async getSigningConfig(): Promise<SigningConfig> {
+    const [signCommits, signTags, format, key] = await Promise.all([
+      this._configGet('commit.gpgsign'),
+      this._configGet('tag.gpgsign'),
+      this._configGet('gpg.format'),
+      this._configGet('user.signingkey')
+    ]);
+
+    return {
+      signCommits: signCommits === 'true',
+      signTags: signTags === 'true',
+      // git's own default when gpg.format isn't set.
+      format: format || 'openpgp',
+      key: key || ''
+    };
+  }
+
+  async setSigningConfig(config: Partial<SigningConfig>): Promise<void> {
+    if (config.signCommits !== undefined)
+      await this._configSet('commit.gpgsign', config.signCommits ? 'true' : 'false');
+    if (config.signTags !== undefined)
+      await this._configSet('tag.gpgsign', config.signTags ? 'true' : 'false');
+    if (config.format !== undefined)
+      await this._configSet('gpg.format', config.format);
+    if (config.key !== undefined)
+      await this._configSet('user.signingkey', config.key);
+  }
+
+  /**
+   * Pick out of a bisect command's output what git only says there: how much is
+   * left to test, and whether it has reached a verdict.
+   */
+  private _parseBisectOutput(output: string): { progress: string | null; finished: boolean; firstBadHash: string | null } {
+    const progress = /Bisecting:\s*(.+)/.exec(output);
+    const firstBad = /([0-9a-f]{7,40}) is the first bad commit/.exec(output);
+    return {
+      progress: progress ? progress[1].trim() : null,
+      finished: !!firstBad,
+      firstBadHash: firstBad ? firstBad[1] : null
+    };
+  }
+
+  async getBisectStatus(): Promise<BisectStatus | null> {
+    const gitDir = await this._resolveGitDir();
+    const startFile = path.join(gitDir, 'BISECT_START');
+    if (!fsSync.existsSync(startFile))
+      return null;
+
+    let startRef: string | null = null;
+    try {
+      startRef = (await fs.readFile(startFile, 'utf8')).trim() || null;
+    } catch (error) {
+      startRef = null;
+    }
+
+    // The marks live in refs/bisect: one 'bad' ref, and a 'good-<sha>' per good.
+    let badRef: string | null = null;
+    const goodRefs: string[] = [];
+    try {
+      const refs = await this.git.raw(['for-each-ref', '--format=%(refname)%09%(objectname)', 'refs/bisect']);
+      for (const line of refs.split('\n')) {
+        const [name, hash] = line.split('\t');
+        if (!name || !hash)
+          continue;
+        if (name.endsWith('/bad'))
+          badRef = hash;
+        else if (name.includes('/good-'))
+          goodRefs.push(hash);
+      }
+    } catch (error) {
+      // No marks yet.
+    }
+
+    let currentHash: string | null = null;
+    let currentSubject: string | null = null;
+    try {
+      currentHash = (await this.git.raw(['rev-parse', 'HEAD'])).trim() || null;
+      if (currentHash)
+        currentSubject = (await this.git.raw(['log', '-1', '--format=%s', currentHash])).trim();
+    } catch (error) {
+      // An empty repository can't be bisected, but don't fail reading the state.
+    }
+
+    return {
+      currentHash,
+      currentSubject,
+      badRef,
+      goodRefs,
+      startRef,
+      // Only a start or a mark reports this; reading the state says nothing about it.
+      progress: null,
+      finished: false,
+      firstBadHash: null
+    };
+  }
+
+  /** Run a bisect subcommand and fold what it printed into the resulting state. */
+  private async _runBisect(args: string[]): Promise<BisectStatus | null> {
+    const command = `git bisect ${args.join(' ')}`;
+    const startTime = performance.now();
+    const id = this._startCommand(command, startTime);
+
+    let output: string;
+    try {
+      const result = await withGitLock(await this.getObjectStoreKey(), () => execAsync(
+        `git bisect ${args.join(' ')}`,
+        { cwd: this.repoPath, env: { ...process.env, GIT_EDITOR: 'true' }, maxBuffer: 1024 * 1024 * 10 }
+      ));
+      output = `${result.stdout || ''}\n${result.stderr || ''}`;
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      throw new Error(error?.stderr || error?.message || String(error));
+    }
+    this._endCommand(id, startTime);
+
+    const status = await this.getBisectStatus();
+    if (!status)
+      return null;
+
+    const parsed = this._parseBisectOutput(output);
+    return { ...status, ...parsed };
+  }
+
+  async bisectStart(badRef?: string, goodRef?: string): Promise<BisectStatus | null> {
+    const args = ['start'];
+    if (badRef)
+      args.push(badRef);
+    if (goodRef)
+      args.push(goodRef);
+    return this._runBisect(args);
+  }
+
+  async bisectMark(mark: 'good' | 'bad' | 'skip'): Promise<BisectStatus | null> {
+    return this._runBisect([mark]);
+  }
+
+  async bisectReset(): Promise<void> {
+    await this._runBisect(['reset']);
+  }
+
+  async getFlowConfig(): Promise<FlowConfig> {
+    const [master, develop, feature, release, hotfix, versionTag] = await Promise.all([
+      this._configGet('gitflow.branch.master'),
+      this._configGet('gitflow.branch.develop'),
+      this._configGet('gitflow.prefix.feature'),
+      this._configGet('gitflow.prefix.release'),
+      this._configGet('gitflow.prefix.hotfix'),
+      this._configGet('gitflow.prefix.versiontag')
+    ]);
+
+    // Suggest the branch this repository actually uses rather than always 'master'.
+    let defaultMaster = 'master';
+    if (!master) {
+      try {
+        const branches = await this.branchLocal();
+        if (branches.all.includes('main'))
+          defaultMaster = 'main';
+      } catch (error) {
+        // Fall back to the git-flow default.
+      }
+    }
+
+    return {
+      initialized: !!(master && develop),
+      master: master || defaultMaster,
+      develop: develop || 'develop',
+      feature: feature || 'feature/',
+      release: release || 'release/',
+      hotfix: hotfix || 'hotfix/',
+      versionTag: versionTag || ''
+    };
+  }
+
+  async flowInit(config: Partial<FlowConfig>): Promise<void> {
+    const current = await this.getFlowConfig();
+    const merged: FlowConfig = { ...current, ...config, initialized: true };
+
+    await this._configSet('gitflow.branch.master', merged.master);
+    await this._configSet('gitflow.branch.develop', merged.develop);
+    await this._configSet('gitflow.prefix.feature', merged.feature);
+    await this._configSet('gitflow.prefix.release', merged.release);
+    await this._configSet('gitflow.prefix.hotfix', merged.hotfix);
+    // An empty version tag prefix is a real choice, so write it rather than unset.
+    await this.git.raw(['config', 'gitflow.prefix.versiontag', merged.versionTag]);
+
+    const branches = await this.branchLocal();
+    if (!branches.all.includes(merged.master))
+      throw new Error(`Branch '${merged.master}' doesn't exist. Commit something on it first, or pick a different production branch.`);
+
+    // git-flow needs somewhere to collect work; make it if the repository hasn't.
+    if (!branches.all.includes(merged.develop))
+      await this._runWrite(['branch', merged.develop, merged.master]);
+  }
+
+  /** The full branch name git-flow uses for one kind of work. */
+  private _flowBranch(flow: FlowConfig, kind: FlowKind, name: string): string {
+    const prefix = kind === 'feature' ? flow.feature : kind === 'release' ? flow.release : flow.hotfix;
+    return `${prefix}${name}`;
+  }
+
+  async flowStart(kind: FlowKind, name: string): Promise<string> {
+    const flow = await this.getFlowConfig();
+    if (!flow.initialized)
+      throw new Error('git-flow isn\'t set up for this repository yet.');
+    if (!name.trim())
+      throw new Error('Give the branch a name.');
+
+    const branch = this._flowBranch(flow, kind, name.trim());
+    // Features and releases grow out of the development branch; a hotfix has to
+    // start from what's in production.
+    const base = kind === 'hotfix' ? flow.master : flow.develop;
+
+    const branches = await this.branchLocal();
+    if (branches.all.includes(branch))
+      throw new Error(`Branch '${branch}' already exists.`);
+    if (!branches.all.includes(base))
+      throw new Error(`Base branch '${base}' doesn't exist.`);
+
+    await this._runWrite(['checkout', '-b', branch, base]);
+    return branch;
+  }
+
+  async flowFinish(kind: FlowKind, name: string,
+                   options: { tag?: string; tagMessage?: string; keepBranch?: boolean } = {}): Promise<void> {
+    const flow = await this.getFlowConfig();
+    if (!flow.initialized)
+      throw new Error('git-flow isn\'t set up for this repository yet.');
+
+    const branch = this._flowBranch(flow, kind, name.trim());
+    const branches = await this.branchLocal();
+    if (!branches.all.includes(branch))
+      throw new Error(`Branch '${branch}' doesn't exist.`);
+
+    const status = await this.status();
+    if (status.files.length > 0)
+      throw new Error('Finishing needs a clean working directory. Commit or stash your changes first.');
+
+    // A feature goes back to development. A release or a hotfix ships, so it lands
+    // on the production branch first, gets tagged there, and is then taken back
+    // into development so the work isn't lost on the next release.
+    const targets = kind === 'feature' ? [flow.develop] : [flow.master, flow.develop];
+
+    for (const target of targets) {
+      if (!branches.all.includes(target))
+        throw new Error(`Branch '${target}' doesn't exist.`);
+
+      await this._runWrite(['checkout', target]);
+      try {
+        // --no-ff keeps the branch visible in history, which is the point of the
+        // whole convention.
+        await this._runWrite(['merge', '--no-ff', '-m', `Merge branch '${branch}' into ${target}`, branch]);
+      } catch (error: any) {
+        throw new Error(`Merging '${branch}' into '${target}' hit a conflict, so the finish stopped there. Resolve the conflict and commit to complete the merge, then finish the rest by hand.`);
+      }
+
+      if (kind !== 'feature' && target === flow.master) {
+        const tag = options.tag || `${flow.versionTag}${name.trim()}`;
+        if (tag) {
+          const tagArgs = options.tagMessage
+            ? ['tag', '-a', tag, '-m', options.tagMessage]
+            : ['tag', tag];
+          await this._runWrite(tagArgs);
+        }
+      }
+    }
+
+    if (!options.keepBranch)
+      await this._runWrite(['branch', '-d', branch]);
+  }
+
+  async getStashCommits(): Promise<StashCommit[]> {
+    // A stash is a commit whose first parent is the commit it was made on, so the
+    // reflog of refs/stash is enough to place each one in history.
+    const format = ['%H', '%P', '%gd', '%gs', '%ai'].join('%x1f') + '%x1e';
+
+    const startTime = performance.now();
+    const id = this._startCommand('git log -g refs/stash', startTime);
+    let output: string;
+    try {
+      output = await this.git.raw(['log', '-g', `--format=${format}`, 'refs/stash']);
+    } catch (error) {
+      // No refs/stash means nothing has been stashed in this repository.
+      this._endCommand(id, startTime);
+      return [];
+    }
+    this._endCommand(id, startTime);
+
+    const stashes: StashCommit[] = [];
+    for (const record of output.split(LOG_RECORD_SEP)) {
+      if (!record.trim())
+        continue;
+
+      const fields = record.replace(/^\r?\n/, '').split(LOG_FIELD_SEP);
+      if (fields.length < 5)
+        continue;
+
+      const [hash, parents, selector, message, date] = fields;
+      const indexMatch = /\{(\d+)\}/.exec(selector);
+      stashes.push({
+        index: indexMatch ? parseInt(indexMatch[1], 10) : stashes.length,
+        selector,
+        hash,
+        parentHash: parents.trim().split(/\s+/)[0] || '',
+        message,
+        date
+      });
+    }
+
+    return stashes;
   }
 
   async readWorkingFile(filePath: string): Promise<string> {
