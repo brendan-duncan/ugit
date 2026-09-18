@@ -1,3 +1,9 @@
+## v1.10.1
+
+### Bug Fixes
+
+* Fix UI alignment issue with the addition of the recent commit message button.
+
 ## v1.10.0
 
 ### New Features
