@@ -354,3 +354,31 @@
   border-color: var(--accent-color, #4a9eff);
   color: var(--accent-color, #4a9eff);
 }
+
+/* Remote connection test, shared by the add and edit remote dialogs. */
+.remote-test-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.remote-test-button {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.remote-test-result {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-test-result.ok {
+  color: var(--success-color);
+}
+
+.remote-test-result.failed {
+  color: var(--danger-color);
+}

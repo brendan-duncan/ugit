@@ -1,7 +1,73 @@
+/** A command the user added to ugit's context menus. */
+export interface CustomAction {
+  id: string;
+  name: string;
+  /**
+   * The command line to run. Placeholders are substituted before it runs:
+   * $REPO, $FILE, $FILES, $SHA, $BRANCH, $REMOTE_URL.
+   */
+  command: string;
+  /** Which context menu it appears in. */
+  target: 'file' | 'commit' | 'branch' | 'repository';
+  /** Show what the command printed when it finishes. */
+  showOutput: boolean;
+}
+
+/** A named group of repositories in the repository manager. */
+export interface RepositoryGroup {
+  name: string;
+  repositories: RepositoryEntry[];
+}
+
+export interface RepositoryEntry {
+  path: string;
+  /** Display name; defaults to the folder name. */
+  name: string;
+  favorite?: boolean;
+}
+
 export interface AppSettings {
   localFileRefreshTime: number;
   lockedBranchPatterns: string[];
   diffViewMode: 'side-by-side' | 'line-by-line';
+  /** Leave whitespace-only changes out of diffs (git diff -w). */
+  diffIgnoreWhitespace: boolean;
+  /** Draw tabs, trailing spaces and carriage returns in diffs. */
+  diffShowWhitespace: boolean;
+  /**
+   * Column to draw the commit message guide at, for keeping subjects short.
+   * 0 hides it.
+   */
+  commitMessageRuler: number;
+  /**
+   * Show Gravatar pictures for commit authors. Off by default: looking one up
+   * sends a hash of the author's email address to gravatar.com.
+   */
+  showAvatars: boolean;
+  /** Order of the branch list: by name, or most recently committed first. */
+  branchSort: 'name' | 'recent';
+  /**
+   * Where an issue reference in a commit message links to. `{id}` is replaced
+   * with the matched id, and an empty string turns linking off.
+   */
+  issueTrackerUrl: string;
+  /**
+   * What an issue reference looks like, as a regular expression whose first
+   * group is the id. The default matches '#123'.
+   */
+  issueTrackerPattern: string;
+  /** Commands added to the context menus. */
+  customActions: CustomAction[];
+  /** Repository groups shown in the repository manager. */
+  repositoryGroups: RepositoryGroup[];
+  /**
+   * API tokens for creating pull requests, keyed by host (e.g. 'github.com').
+   * Stored in ugit's settings file in plain text, like git's own credential
+   * store options, so use a token with the narrowest scope that works.
+   */
+  pullRequestTokens: Record<string, string>;
+  /** API base URL per host, for self-hosted GitLab, Bitbucket or Azure DevOps. */
+  pullRequestApiBases: Record<string, string>;
   pushAllTags: boolean;
   maxCommits: number;
   externalEditor: string;
@@ -22,6 +88,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
   localFileRefreshTime: 5,
   lockedBranchPatterns: ['trunk', '*/staging'],
   diffViewMode: 'line-by-line',
+  diffIgnoreWhitespace: false,
+  diffShowWhitespace: false,
+  commitMessageRuler: 50,
+  showAvatars: false,
+  branchSort: 'name',
+  issueTrackerUrl: '',
+  issueTrackerPattern: '#(\\d+)',
+  customActions: [],
+  repositoryGroups: [],
+  pullRequestTokens: {},
+  pullRequestApiBases: {},
   pushAllTags: false,
   maxCommits: 100,
   externalEditor: 'code',

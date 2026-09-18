@@ -14,6 +14,7 @@ import ReflogDialog from './ReflogDialog';
 import RevisionTreeDialog from './RevisionTreeDialog';
 import SigningDialog from './SigningDialog';
 import GitFlowDialog from './GitFlowDialog';
+import CreatePullRequestDialog from './CreatePullRequestDialog';
 import ApplyStashDialog from './ApplyStashDialog';
 import DeleteStashDialog from './DeleteStashDialog';
 import ContentViewer from './ContentViewer';
@@ -34,6 +35,7 @@ import CreateWorktreeDialog, { CreateWorktreeParams } from './CreateWorktreeDial
 import { ipcRenderer, shell } from 'electron';
 import path from 'path';
 import { convertGitSshToHttps } from '../utils/utils';
+import { actionFromMenuId, describeResult, runCustomAction } from '../utils/customActions';
 import { useGitAdapter, useRepositoryData } from '../hooks/useGit';
 import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
@@ -68,7 +70,7 @@ const REMOTE_POLL_MAX_BACKOFF_MS = 60 * 60 * 1000;
 
 function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0, onOpenRepository }: RepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
-  const { settings, getSetting } = useSettings();
+  const { settings, getSetting, updateSetting } = useSettings();
 
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [lastContentPanel, setLastContentPanel] = useState<string>('local-changes');
@@ -92,6 +94,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   const [flowDialogMode, setFlowDialogMode] = useState<'init' | 'start' | 'finish' | null>(null);
   // The revision whose tree is being browsed, with a label for the header.
   const [treeTarget, setTreeTarget] = useState<{ revision: string; label?: string } | null>(null);
+  // Last commit date per branch, for ordering the branch list by recency.
+  const [branchDates, setBranchDates] = useState<Record<string, string>>({});
+  // The branch a pull request is being opened for.
+  const [pullRequestBranch, setPullRequestBranch] = useState<string | null>(null);
   // Bumped by any command that brings new commits into the repository. The selected
   // branch's commit list was rendered from the cache as it stood before the command
   // ran, so it has to be reloaded; see the effect next to the branch loaders.
@@ -375,6 +381,26 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       console.error('Error checking bisect status:', error);
     }
   }, [gitAdapter]);
+
+  // Branch dates only matter for the recent ordering, and they change whenever a
+  // commit lands, so they're read with the rest of the repository data.
+  useEffect(() => {
+    if (!gitAdapter)
+      return;
+
+    let cancelled = false;
+    gitAdapter.getBranchesByDate()
+      .then(list => {
+        if (cancelled)
+          return;
+        const byName: Record<string, string> = {};
+        for (const entry of list)
+          byName[entry.name] = entry.date;
+        setBranchDates(byName);
+      })
+      .catch(() => { if (!cancelled) setBranchDates({}); });
+    return () => { cancelled = true; };
+  }, [gitAdapter, branches]);
 
   const refreshSubmodules = useCallback(async () => {
     if (!gitAdapter)
@@ -755,6 +781,45 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setErrorWithDialog(`Sync tags failed: ${(error as Error).message}`);
     }
   }, [gitAdapter, loadRepoData, showAlert, showConfirm, setErrorWithDialog]);
+
+  const handlePushMultiple = useCallback(async (branchNames: string[], pushAllTags: boolean) => {
+    hidePushDialog();
+    if (!gitAdapter || branchNames.length === 0)
+      return;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(`git push origin ${branchNames.length} branches`);
+      // One push with several refspecs, so the remote is contacted once.
+      await gitAdapter.push('origin', branchNames.map(name => `${name}:${name}`));
+
+      if (pushAllTags) {
+        setBusyMessage('git ls-remote --tags origin');
+        const tags = await gitAdapter.compareTags('origin');
+        if (tags.toPush.length > 0) {
+          setBusyMessage(`git push origin ${tags.toPush.length} tag${tags.toPush.length === 1 ? '' : 's'}`);
+          await gitAdapter.pushTags('origin', tags.toPush);
+        }
+        if (tags.conflicting.length > 0) {
+          const one = tags.conflicting.length === 1;
+          await confirmAndSyncTags(
+            `Pushed ${branchNames.length} branches.
+
+` +
+            `${tags.conflicting.length} tag${one ? '' : 's'} not pushed because origin ` +
+            `already has ${one ? 'it' : 'them'} at a different commit:`,
+            tags.conflicting);
+        }
+      }
+
+      await loadRepoData(true);
+    } catch (error: any) {
+      setErrorWithDialog(`Push failed: ${error.message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, hidePushDialog, loadRepoData, confirmAndSyncTags, setErrorWithDialog]);
 
   const handlePush = useCallback(async (branch: string, remoteBranch: string, pushAllTags: boolean) => {
     hidePushDialog();
@@ -1409,6 +1474,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   }, []);
 
   const handleBranchContextMenu = useCallback(async (action: string, branchName: string) => {
+    if (await runMenuCustomAction(action, { branchName }))
+      return;
+
     switch (action) {
       case 'checkout':
         handleBranchSwitch(branchName);
@@ -1457,6 +1525,9 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         if (originUrl) {
           shell.openExternal(`${convertGitSshToHttps(originUrl)}/commits/${branchName}`);
         }
+        break;
+      case 'create-pr':
+        setPullRequestBranch(branchName);
         break;
       case 'open-pr':
         if (originUrl) {
@@ -2373,8 +2444,42 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, interactiveRebase, clearBranchCache, loadRepoData, selectedItem, handleBranchSelect, showAlert, setErrorWithDialog]);
 
+  /**
+   * Run one of the user's commands from a context menu, and say how it went.
+   * @returns True when the action was a custom one and has been handled
+   */
+  const runMenuCustomAction = useCallback(async (menuId: string,
+                                                 context: { filePath?: string; commitHash?: string; branchName?: string }): Promise<boolean> => {
+    const action = actionFromMenuId(menuId, getSetting('customActions'));
+    if (!action || !gitAdapter)
+      return false;
+
+    try {
+      setIsBusy(true);
+      setBusyMessage(action.name);
+      const result = await runCustomAction(action, {
+        repoPath: gitAdapter.repoPath,
+        remoteUrl: originUrl || '',
+        ...context
+      });
+      const message = describeResult(action, result);
+      if (message)
+        showAlert(message, action.name);
+      await loadRepoData(true);
+    } catch (error) {
+      setErrorWithDialog(`${action.name} failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+    return true;
+  }, [gitAdapter, getSetting, originUrl, showAlert, loadRepoData, setErrorWithDialog]);
+
   const handleCommitContextMenu = useCallback(async (action: string, commit: Commit, _currentBranch: string, tagName?: string) => {
     if (!gitAdapter) 
+      return;
+
+    if (await runMenuCustomAction(action, { commitHash: commit.hash, branchName: currentBranch }))
       return;
 
     switch (action) {
@@ -2620,6 +2725,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                   onRemoteAdded={() => loadRepoData(true)}
                   gitAdapter={gitAdapter}
                   lockedPatterns={getSetting('lockedBranchPatterns')}
+                  branchSort={getSetting('branchSort') || 'name'}
+                  branchDates={branchDates}
+                  onToggleSort={() => updateSetting('branchSort',
+                    (getSetting('branchSort') || 'name') === 'name' ? 'recent' : 'name')}
                   worktrees={worktrees}
                   submodules={submodules}
                   onOpenSubmodule={(submodulePath) => handleSubmoduleAction('open', submodules.find(s => s.path === submodulePath) || null)}
@@ -2679,6 +2788,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       )}
       {dialogStates.showPushDialog && (
         <PushDialog
+          onPushMultiple={handlePushMultiple}
           onClose={hidePushDialog}
           onPush={handlePush}
           branches={branches}
@@ -2759,6 +2869,16 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           gitAdapter={gitAdapter}
         />
       )}
+      {pullRequestBranch && (
+        <CreatePullRequestDialog
+          gitAdapter={gitAdapter}
+          originUrl={originUrl}
+          branches={branches}
+          sourceBranch={pullRequestBranch}
+          onClose={() => setPullRequestBranch(null)}
+        />
+      )}
+
       {showReflogDialog && (
         <ReflogDialog
           gitAdapter={gitAdapter}

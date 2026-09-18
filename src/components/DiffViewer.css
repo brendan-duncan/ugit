@@ -924,3 +924,75 @@
   padding-right: 8px;
   color: var(--text-primary);
 }
+
+/* Find in diff */
+.diff-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.diff-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.diff-search-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.diff-search-count {
+  flex-shrink: 0;
+  min-width: 70px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.diff-search-button {
+  padding: 2px 8px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.diff-search-button:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.diff-search-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.diff-search-hit {
+  background-color: var(--warning-color);
+  color: #1e1e1e;
+  border-radius: 2px;
+}
+
+.diff-search-hit-current {
+  background-color: var(--accent-color);
+  color: #ffffff;
+  outline: 1px solid var(--text-highlight);
+}
+
+/* Whitespace made visible */
+.diff-whitespace-mark {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}

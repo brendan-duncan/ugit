@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { SelectedItem } from './types';
 import { isBranchLocked } from '../utils/settings';
+import { useSettings } from '../contexts/SettingsContext';
+import { ACTION_PREFIX, actionsFor } from '../utils/customActions';
 import './BranchTree.css';
 
 interface TreeNodeProps {
@@ -33,6 +35,12 @@ interface BranchTreeProps {
   lockedPatterns?: ReadonlyArray<string>;
   onAddBranch?: () => void;
   originUrl?: string | null;
+  // 'name' groups branches into folders; 'recent' lists them flat, newest commit
+  // first, which is how you find what you were working on.
+  sortMode?: 'name' | 'recent';
+  // Date of each branch's last commit, used by the 'recent' ordering.
+  branchDates?: Record<string, string>;
+  onToggleSort?: () => void;
 }
 
 function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch, pullingBranch,
@@ -161,7 +169,10 @@ function TreeNode({ node, currentBranch, branchStatus, level = 0, onBranchSwitch
 }
 
 function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch, onBranchSelect, selectedItem,
-      collapsed, onToggleCollapse, onContextMenu, stashes, lockedPatterns, onAddBranch, originUrl }: BranchTreeProps) {
+      collapsed, onToggleCollapse, onContextMenu, stashes, lockedPatterns, onAddBranch, originUrl,
+      sortMode = 'name', branchDates, onToggleSort }: BranchTreeProps) {
+  const { getSetting } = useSettings();
+  const branchActions = actionsFor(getSetting('customActions'), 'branch');
   const lockPatterns = lockedPatterns || [];
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; branchName: string } | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -263,13 +274,41 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
     ? branches.filter(branch => branch.toLowerCase().includes(branchFilter.toLowerCase()))
     : branches;
 
-  const tree = buildTree(filteredBranches);
+  // Sorting by date and grouping by folder pull in different directions, so the
+  // recent view is a flat list: one node per branch, in the order given.
+  const buildFlat = (branchNames: string[]): any => {
+    const root = { children: {} };
+    for (const branchName of branchNames)
+      root.children[branchName] = { name: branchName, fullPath: branchName, children: {} };
+    return root;
+  };
+
+  const orderedBranches = sortMode === 'recent' && branchDates
+    ? [...filteredBranches].sort((a, b) => (branchDates[b] || '').localeCompare(branchDates[a] || ''))
+    : filteredBranches;
+
+  const tree = sortMode === 'recent' ? buildFlat(orderedBranches) : buildTree(orderedBranches);
+  // Object key order is insertion order, which the flat list relies on.
+  const topLevelKeys = sortMode === 'recent'
+    ? Object.keys(tree.children)
+    : Object.keys(tree.children).sort();
 
   return (
     <div className="branch-tree">
       <div className="panel-header">
         <h3>Branches</h3>
         <div className="panel-header-buttons">
+          {onToggleSort && (
+            <button
+              className="add-button"
+              onClick={onToggleSort}
+              title={sortMode === 'recent'
+                ? 'Sorted by most recent commit - click to group by name'
+                : 'Grouped by name - click to sort by most recent commit'}
+            >
+              <span>{sortMode === 'recent' ? '🕓' : 'A↓'}</span>
+            </button>
+          )}
           {onAddBranch && (
             <button className="add-button" onClick={onAddBranch} title="New Branch">
               <span>+</span>
@@ -344,6 +383,22 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
                 Delete...
               </div>
               <div className="context-menu-separator"></div>
+              {branchActions.length > 0 && (
+                <>
+                  <div className="context-menu-separator"></div>
+                  {branchActions.map(action => (
+                    <div
+                      key={action.id}
+                      className="context-menu-item"
+                      title={action.command}
+                      onClick={() => handleMenuAction(`${ACTION_PREFIX}${action.id}`)}
+                    >
+                      {action.name}
+                    </div>
+                  ))}
+                  <div className="context-menu-separator"></div>
+                </>
+              )}
               <div className="context-menu-item" onClick={() => handleMenuAction('copy-branch-name')}>
                 Copy Branch Name
               </div>
@@ -352,6 +407,9 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
                   <div className="context-menu-separator"></div>
                   <div className="context-menu-item" onClick={() => handleMenuAction('open-remote-url')}>
                     🌐 Open Remote URL
+                  </div>
+                  <div className="context-menu-item" onClick={() => handleMenuAction('create-pr')}>
+                    🔀 Create Pull Request...
                   </div>
                   <div className="context-menu-item" onClick={() => handleMenuAction('open-pr')}>
                     🌐 Open PR
@@ -363,7 +421,7 @@ function BranchTree({ branches, currentBranch, branchStatus, onBranchSwitch, pul
               )}
             </div>
           )}
-          {Object.keys(tree.children).sort().map(key => (
+          {topLevelKeys.map(key => (
             <TreeNode
               key={key}
               node={tree.children[key]}

@@ -66,15 +66,40 @@ Still to do for the above: user documentation under `docs/`.
 
 ## Polish
 
-- [ ] **Search inside a diff** (Ctrl+F in the diff viewer).
-- [ ] **Whitespace / hidden character options** in the diff viewer
-      (ignore whitespace, show tabs and line endings).
-- [ ] **Recent commit messages** — reuse a previous message when committing.
-- [ ] **Repository manager** — folders/favourites, beyond the recent list.
-- [ ] **Custom actions** — user-defined commands in the context menus.
-- [ ] **In-app PR creation** for GitHub/GitLab/Bitbucket/Azure. ugit generates a
-      compare URL and hands it to the browser.
-- [ ] **Push to several branches at once**, and a remote "test connection".
-- [ ] **Issue tracker link highlighting** in commit messages.
-- [ ] **Branch / tag sort options**, commit message ruler, avatars.
-- [ ] **Git LFS file locking** — ugit has locks for Lore only.
+- [x] **Search inside a diff** — Ctrl+F (or the diff settings menu) opens a find
+      bar with a match count and next/previous, highlighting hits in the rendered
+      diff. `src/utils/diffDecorate.ts` walks the code lines after diff2html has
+      rendered them.
+- [x] **Whitespace / hidden character options** — "Ignore Whitespace Changes"
+      re-fetches the diff with `-w`; "Show Whitespace" draws tabs, trailing
+      spaces and carriage returns.
+- [x] **Recent commit messages** — a picker beside the commit box offers the last
+      15 messages and splits the chosen one back into subject and description.
+- [x] **Repository manager** — File > Repository Manager (Ctrl+Shift+R): groups
+      the user names, favourites, filtering, moving a repository between groups,
+      and adding from the recent list. Kept in settings, so it survives restarts.
+- [x] **Custom actions** — commands defined in Preferences, shown in the file,
+      commit, branch and repository menus, with `$REPO`, `$FILE`, `$FILES`,
+      `$SHA`, `$BRANCH` and `$REMOTE_URL` substituted. They run in the repository
+      with their output reported.
+- [x] **In-app PR creation** — "Create Pull Request..." on a branch opens one
+      through the host's API: GitHub, GitLab (merge requests), Bitbucket and
+      Azure DevOps, including self-hosted installs via an API base override. The
+      token is per host, and the request is made from the main process so it
+      never goes through the page.
+- [x] **Push to several branches at once**, and a remote "test connection" —
+      the push dialog has a multi-branch mode that pushes with one command, and
+      the add-remote dialog can check a URL with `ls-remote` before saving it.
+- [x] **Issue tracker link highlighting** — issue references and bare URLs in a
+      commit's message and body become links, with the pattern and URL template
+      configurable (the default matches `#123`).
+- [x] **Branch sort options, commit message ruler, avatars** — the branch panel
+      toggles between grouped-by-name and most-recent-first; the commit box draws
+      a guide at a configurable column (hidden when the box is too narrow) with a
+      matching countdown; author pictures come from Gravatar when turned on, and
+      initials when not. Tags have no list view of their own to sort.
+- [x] **Git LFS file locking** — lock and unlock a tracked file from its context
+      menu, with a badge naming the holder. Needs an LFS server, and says so when
+      there isn't one.
+
+Still to do for everything above: user documentation under `docs/`.

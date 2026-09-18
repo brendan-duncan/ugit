@@ -2,6 +2,8 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { FixedSizeList, ListChildComponentProps } from 'react-window';
 import { FileInfo } from './types';
 import { matchesAnyLfsPattern } from '../utils/lfs';
+import { useSettings } from '../contexts/SettingsContext';
+import { ACTION_PREFIX, actionsFor } from '../utils/customActions';
 import './FileList.css';
 
 // Build tree structure from flat file list
@@ -52,6 +54,8 @@ interface FileListProps {
   onStageAll?: () => Promise<void>;
   /** Git LFS track patterns (from .gitattributes) used to badge tracked files. */
   lfsPatterns?: Array<string>;
+  /** Git LFS locks currently held, keyed by path, for badging and the menu. */
+  lfsLocks?: Record<string, { owner: string; id: string }>;
 }
 
 // Flat row representation derived from the tree + expansion state. Replacing
@@ -65,7 +69,10 @@ type Row =
 const RENDER_CAP = 500;
 const ROW_HEIGHT = 32;
 
-function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu, onDiscardAll, onStageAll, lfsPatterns = [] }: FileListProps) {
+function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, repoPath, onContextMenu, onDiscardAll, onStageAll, lfsPatterns = [], lfsLocks = {} }: FileListProps) {
+  const { getSetting } = useSettings();
+  // The user's own commands, for the files in this list.
+  const fileActions = actionsFor(getSetting('customActions'), 'file');
   const [dragOver, setDragOver] = useState<boolean>(false);
   const [expandedFolders, setExpandedFolders] = useState<{ [key: string]: boolean }>({});
   const [selectedItems, setSelectedItems] = useState(new Set<string>());
@@ -502,6 +509,11 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
         <span className={`file-status ${file.status === 'conflict' ? 'conflict' : ''}`}>{getStatusIcon(file.status)}</span>
         <span className="file-path">{fileName}</span>
         {isLfsTracked && <span className="file-lfs-badge" title="Tracked by Git LFS">LFS</span>}
+        {lfsLocks[file.path] && (
+          <span className="file-lock-badge" title={`Locked by ${lfsLocks[file.path].owner || 'someone'}`}>
+            🔒
+          </span>
+        )}
       </div>
     );
   };
@@ -684,6 +696,20 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
           <div className="context-menu-item" onClick={() => handleMenuAction('save-as-patch')}>
             Save as Patch
           </div>
+          {contextMenu.items.length === 1 && contextMenu.items[0].type === 'file' && matchesAnyLfsPattern(contextMenu.clickedItem, lfsPatterns) && (
+            <>
+              <div className="context-menu-separator"></div>
+              {lfsLocks[contextMenu.clickedItem] ? (
+                <div className="context-menu-item" onClick={() => handleMenuAction('lfs-unlock')}>
+                  Unlock (Git LFS)
+                </div>
+              ) : (
+                <div className="context-menu-item" onClick={() => handleMenuAction('lfs-lock')}>
+                  Lock (Git LFS)
+                </div>
+              )}
+            </>
+          )}
           {contextMenu.items.length === 1 && contextMenu.items[0].type === 'file' && !matchesAnyLfsPattern(contextMenu.clickedItem, lfsPatterns) && (
             <>
               <div className="context-menu-separator"></div>
@@ -763,6 +789,21 @@ function FileList({ title, files, onDrop, listType, onSelectFile, selectedFile, 
                   )}
                 </div>
               </div>
+            </>
+          )}
+          {fileActions.length > 0 && (
+            <>
+              <div className="context-menu-separator"></div>
+              {fileActions.map(action => (
+                <div
+                  key={action.id}
+                  className="context-menu-item"
+                  title={action.command}
+                  onClick={() => handleMenuAction(`${ACTION_PREFIX}${action.id}`)}
+                >
+                  {action.name}
+                </div>
+              ))}
             </>
           )}
           <div className="context-menu-separator"></div>

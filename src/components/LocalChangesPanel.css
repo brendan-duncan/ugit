@@ -505,3 +505,61 @@
 }
 
 /* End of file */
+
+/* Commit message guide and the recent-message picker. */
+.commit-message-ruler {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background-color: var(--border-color);
+  pointer-events: none;
+}
+
+.commit-recent-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.commit-recent-button {
+  padding: 2px 6px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.commit-recent-button:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.commit-recent-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 10001;
+  width: 420px;
+  max-height: 320px;
+  overflow-y: auto;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.commit-recent-item {
+  padding: 5px 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-recent-item:hover {
+  background-color: var(--accent-color);
+  color: var(--text-selected);
+}

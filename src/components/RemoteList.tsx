@@ -502,6 +502,7 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
         <AddRemoteDialog
           onClose={() => setShowAddRemoteDialog(false)}
           onAddRemote={handleAddRemote}
+          onTestConnection={(url) => gitAdapter.testRemoteConnection(url)}
         />
       )}
 

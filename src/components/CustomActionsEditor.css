@@ -1,0 +1,109 @@
+.custom-actions-empty {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: italic;
+  padding: 4px 0 8px;
+}
+
+.custom-actions-error {
+  color: var(--danger-color);
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.custom-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.custom-action-row {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--bg-primary);
+}
+
+.custom-action-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.custom-action-row input[type="text"],
+.custom-action-name,
+.custom-action-command,
+.custom-action-target {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.custom-action-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-action-target {
+  width: 170px;
+  flex-shrink: 0;
+}
+
+.custom-action-output {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.custom-action-command {
+  width: 100%;
+  font-family: monospace;
+}
+
+.custom-action-mini {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.custom-action-mini:hover:not(:disabled) {
+  background-color: var(--border-color);
+}
+
+.custom-action-mini:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.custom-action-mini.danger {
+  color: var(--danger-color);
+  border-color: var(--danger-color);
+}
+
+.custom-action-add {
+  padding: 5px 14px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.custom-action-add:hover {
+  background-color: var(--border-color);
+}

@@ -676,7 +676,8 @@ export abstract class GitAdapter {
    * @param filePath - Path to file
    * @param isStaged - Whether to get staged diff
    */
-  abstract diff(filePath: string, isStaged: boolean): Promise<string>;
+  abstract diff(filePath: string, isStaged: boolean,
+                options?: { ignoreWhitespace?: boolean }): Promise<string>;
 
   /**
    * Show file contents from a specific commit
@@ -770,6 +771,43 @@ export abstract class GitAdapter {
    * @throws when the patch doesn't apply
    */
   abstract applyPatch(patch: string, options?: { cached?: boolean; reverse?: boolean }): Promise<void>;
+
+  /**
+   * The last few commit messages on a branch, so one can be reused instead of
+   * retyped.
+   * @param maxCount - How many to read
+   * @param branchName - Branch to read from. Defaults to HEAD.
+   */
+  abstract getRecentCommitMessages(maxCount?: number, branchName?: string): Promise<string[]>;
+
+  /**
+   * Local branches with the date of their last commit, for ordering the branch
+   * list by what was worked on recently.
+   */
+  abstract getBranchesByDate(): Promise<Array<{ name: string; date: string }>>;
+
+  /**
+   * Check that a remote can be reached, without changing anything.
+   * @param remoteOrUrl - A remote name or a URL
+   * @returns Whether it answered, and what it said
+   */
+  abstract testRemoteConnection(remoteOrUrl: string): Promise<{ ok: boolean; message: string }>;
+
+  /** Git LFS locks held on files in this repository, as the server reports them. */
+  abstract lfsLocks(): Promise<Array<{ id: string; path: string; owner: string }>>;
+
+  /**
+   * Take a Git LFS lock on a file, so others are warned off editing it.
+   * @param filePath - Path relative to the repository root
+   */
+  abstract lfsLock(filePath: string): Promise<void>;
+
+  /**
+   * Release a Git LFS lock.
+   * @param filePath - Path relative to the repository root
+   * @param force - Release a lock someone else holds
+   */
+  abstract lfsUnlock(filePath: string, force?: boolean): Promise<void>;
 
   /** List the submodules of this repository. */
   abstract listSubmodules(): Promise<SubmoduleInfo[]>;

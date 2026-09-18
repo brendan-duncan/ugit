@@ -222,6 +222,15 @@ function createMenu(): void {
         },
         { type: 'separator' },
         {
+          label: 'Repository Manager...',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('show-repository-manager');
+            }
+          }
+        },
+        {
           label: 'Recent Repositories',
           submenu: recentSubmenu
         },
@@ -635,6 +644,111 @@ ipcMain.handle('open-in-console', async (event: any, itemPath: string) => {
   } catch (error) {
     console.error('Error opening console:', error);
   }
+});
+
+/**
+ * Run one of the user's custom actions.
+ *
+ * The command comes from the user's own settings and runs with the repository as
+ * its working directory, the way it would if they'd typed it in a terminal there.
+ */
+ipcMain.handle('run-custom-action', async (event: any, command: string, cwd: string) => {
+  return new Promise((resolve) => {
+    exec(command, { cwd, maxBuffer: 1024 * 1024 * 10, windowsHide: true },
+      (error: any, stdout: string, stderr: string) => {
+        resolve({
+          ok: !error,
+          code: error ? (error.code ?? 1) : 0,
+          stdout: stdout || '',
+          stderr: stderr || (error ? String(error.message) : '')
+        });
+      });
+  });
+});
+
+/**
+ * Create a pull request through a host's API.
+ *
+ * The request is made here rather than in the page so the token never reaches
+ * the renderer's network stack, and so the browser's cross-origin rules don't
+ * get in the way of a plain API call.
+ */
+ipcMain.handle('create-pull-request', async (_event: any, request: {
+  url: string;
+  token: string;
+  // 'bearer' for GitHub/GitLab-style tokens, 'basic' for Azure DevOps.
+  auth: 'bearer' | 'token' | 'basic' | 'private-token';
+  body: any;
+  // Extra headers a host needs, e.g. GitHub's Accept.
+  headers?: Record<string, string>;
+}) => {
+  const https = require('https');
+
+  return new Promise((resolve) => {
+    let target: URL;
+    try {
+      target = new URL(request.url);
+    } catch (error) {
+      resolve({ ok: false, status: 0, error: `Not a usable API URL: ${request.url}` });
+      return;
+    }
+
+    if (target.protocol !== 'https:') {
+      resolve({ ok: false, status: 0, error: 'Pull requests are only created over HTTPS.' });
+      return;
+    }
+
+    const payload = JSON.stringify(request.body ?? {});
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Content-Length': String(Buffer.byteLength(payload)),
+      'User-Agent': 'ugit',
+      ...(request.headers || {})
+    };
+
+    if (request.token) {
+      if (request.auth === 'basic')
+        headers['Authorization'] = `Basic ${Buffer.from(`:${request.token}`).toString('base64')}`;
+      else if (request.auth === 'private-token')
+        headers['PRIVATE-TOKEN'] = request.token;
+      else if (request.auth === 'token')
+        headers['Authorization'] = `token ${request.token}`;
+      else
+        headers['Authorization'] = `Bearer ${request.token}`;
+    }
+
+    const req = https.request({
+      method: 'POST',
+      hostname: target.hostname,
+      port: target.port || 443,
+      path: `${target.pathname}${target.search}`,
+      headers
+    }, (res: any) => {
+      let data = '';
+      res.on('data', (chunk: any) => { data += chunk; });
+      res.on('end', () => {
+        let parsed: any = null;
+        try {
+          parsed = data ? JSON.parse(data) : null;
+        } catch (error) {
+          // Some hosts answer with HTML on an error; keep the raw text instead.
+        }
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          body: parsed,
+          raw: parsed ? undefined : data.slice(0, 500)
+        });
+      });
+    });
+
+    req.on('error', (error: any) => {
+      resolve({ ok: false, status: 0, error: error.message });
+    });
+
+    req.write(payload);
+    req.end();
+  });
 });
 
 // Show save dialog

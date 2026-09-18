@@ -5,6 +5,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import MergeConflictResolver from './MergeConflictResolver';
 import { buildPartialPatch, listDiffLines } from '../utils/partialPatch';
+import { decorateDiff, focusHit } from '../utils/diffDecorate';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
@@ -224,7 +225,7 @@ interface DiffViewerProps {
 
 function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRefresh, onError }: DiffViewerProps): React.ReactElement {
   const { showAlert, showConfirm } = useAlert();
-  const { settings, getSetting } = useSettings();
+  const { settings, getSetting, updateSetting } = useSettings();
   const [diff, setDiff] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [diffHtml, setDiffHtml] = useState<string>('');
@@ -252,6 +253,13 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
   const [selectedLines, setSelectedLines] = useState<Set<number>>(new Set());
   const [lastClickedLine, setLastClickedLine] = useState<number | null>(null);
   const [lineActionRunning, setLineActionRunning] = useState<boolean>(false);
+  // Find-in-diff: the query, how many hits it has, and which one we're on.
+  const [searchOpen, setSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [hitCount, setHitCount] = useState<number>(0);
+  const [hitIndex, setHitIndex] = useState<number>(0);
+  const diffContainerRef = React.useRef<HTMLDivElement>(null);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [settingsDropdownOpen, setSettingsDropdownOpen] = useState<boolean>(false);
   const [fileMenuOpen, setFileMenuOpen] = useState<boolean>(false);
   const mergeToolDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -476,6 +484,62 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
     }
   };
 
+  // Re-decorate the rendered diff whenever the query, the whitespace setting or
+  // the diff itself changes. The container's markup is reset from diffHtml first,
+  // so each pass starts from what diff2html produced.
+  useEffect(() => {
+    const container = diffContainerRef.current;
+    if (!container || !diffHtml)
+      return;
+
+    const showWhitespace = !!getSetting('diffShowWhitespace');
+    container.innerHTML = diffHtml;
+
+    const hits = decorateDiff(container, { query: searchQuery, showWhitespace });
+    setHitCount(hits);
+    setHitIndex(previous => (hits === 0 ? 0 : Math.min(previous, hits - 1)));
+  }, [diffHtml, searchQuery, settings?.diffShowWhitespace, getSetting]);
+
+  // Step to a hit when the query or the position changes.
+  useEffect(() => {
+    const container = diffContainerRef.current;
+    if (container && hitCount > 0)
+      focusHit(container, hitIndex);
+  }, [hitIndex, hitCount, searchQuery]);
+
+  // Ctrl+F opens the find bar. Only the viewer with file actions - the one in the
+  // Local Changes panel - claims the shortcut, so the several viewers a commit's
+  // file list can have don't all answer at once.
+  useEffect(() => {
+    if (!showChunkControls)
+      return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setSearchOpen(true);
+        // Let the bar render before trying to focus it.
+        setTimeout(() => searchInputRef.current?.select(), 0);
+        return;
+      }
+
+      if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false);
+        setSearchQuery('');
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showChunkControls, searchOpen]);
+
+  const stepHit = (delta: number) => {
+    if (hitCount === 0)
+      return;
+    // Wrap around, which is what a find bar is expected to do.
+    setHitIndex(previous => (previous + delta + hitCount) % hitCount);
+  };
+
   // Lines of the current diff, and which of them can be picked.
   const diffLines = React.useMemo(() => (diff ? listDiffLines(diff) : []), [diff]);
   const selectableLines = React.useMemo(
@@ -638,7 +702,9 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
       if (file.diff) {
         diffResult = file.diff;
       } else {
-        diffResult = await gitAdapter.diff(file.path, isStaged);
+        diffResult = await gitAdapter.diff(file.path, isStaged, {
+          ignoreWhitespace: !!getSetting('diffIgnoreWhitespace')
+        });
       }
 
       setDiff(diffResult);
@@ -694,7 +760,9 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
 
   useEffect(() => {
     loadContent();
-  }, [file, gitAdapter, isStaged, diffViewMode, isLightMode]);
+    // The ignore-whitespace setting changes what git is asked for, so the diff
+    // has to be fetched again when it's toggled.
+  }, [file, gitAdapter, isStaged, diffViewMode, isLightMode, settings?.diffIgnoreWhitespace]);
 
   // Also reload when file status changes (e.g., after merge resolution)
   useEffect(() => {
@@ -873,11 +941,79 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
                     Side-by-Side
                   </button>
                 </div>
+                <div className="diff-viewer-settings-section">
+                  <div className="diff-viewer-settings-label">Whitespace</div>
+                  <button
+                    className={`diff-viewer-settings-option ${getSetting('diffIgnoreWhitespace') ? 'active' : ''}`}
+                    onClick={() => {
+                      updateSetting('diffIgnoreWhitespace', !getSetting('diffIgnoreWhitespace'));
+                      setSettingsDropdownOpen(false);
+                    }}
+                    title="Leave whitespace-only changes out of the diff (git diff -w)"
+                  >
+                    Ignore Whitespace Changes
+                  </button>
+                  <button
+                    className={`diff-viewer-settings-option ${getSetting('diffShowWhitespace') ? 'active' : ''}`}
+                    onClick={() => {
+                      updateSetting('diffShowWhitespace', !getSetting('diffShowWhitespace'));
+                      setSettingsDropdownOpen(false);
+                    }}
+                    title="Draw tabs, trailing spaces and carriage returns"
+                  >
+                    Show Whitespace
+                  </button>
+                </div>
+                <div className="diff-viewer-settings-section">
+                  <button
+                    className="diff-viewer-settings-option"
+                    onClick={() => {
+                      setSearchOpen(true);
+                      setSettingsDropdownOpen(false);
+                      setTimeout(() => searchInputRef.current?.select(), 0);
+                    }}
+                  >
+                    Find in Diff (Ctrl+F)
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
+      )}
+      {searchOpen && (
+        <div className="diff-search-bar">
+          <input
+            ref={searchInputRef}
+            className="diff-search-input"
+            placeholder="Find in diff"
+            value={searchQuery}
+            autoFocus
+            onChange={(e) => { setSearchQuery(e.target.value); setHitIndex(0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                stepHit(e.shiftKey ? -1 : 1);
+              } else if (e.key === 'Escape') {
+                setSearchOpen(false);
+                setSearchQuery('');
+              }
+            }}
+          />
+          <span className="diff-search-count">
+            {searchQuery ? (hitCount > 0 ? `${hitIndex + 1} of ${hitCount}` : 'No matches') : ''}
+          </span>
+          <button className="diff-search-button" onClick={() => stepHit(-1)} disabled={hitCount === 0} title="Previous match (Shift+Enter)">
+            ▲
+          </button>
+          <button className="diff-search-button" onClick={() => stepHit(1)} disabled={hitCount === 0} title="Next match (Enter)">
+            ▼
+          </button>
+          <button className="diff-search-button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} title="Close (Esc)">
+            ✕
+          </button>
+        </div>
       )}
       <div className="diff-content">
         {showConflictControls && (
@@ -1149,6 +1285,7 @@ function DiffViewer({ file, gitAdapter, isStaged, showChunkControls = true, onRe
         ) : fileType === 'diff' && diffHtml ? (
           <div style={{ position: 'relative' }}>
             <div
+              ref={diffContainerRef}
               className="diff2html-container"
               dangerouslySetInnerHTML={{ __html: diffHtml }}
             />

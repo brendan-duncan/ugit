@@ -12,6 +12,7 @@ import { useAlert } from '../contexts/AlertContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { isBranchLocked } from '../utils/settings';
 import { matchesAnyLfsPattern, suggestLfsPattern } from '../utils/lfs';
+import { actionFromMenuId, describeResult, runCustomAction } from '../utils/customActions';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
@@ -48,9 +49,20 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const [showLfsWarningDialog, setShowLfsWarningDialog] = useState<boolean>(false);
   const [lfsWarningFiles, setLfsWarningFiles] = useState<Array<LargeFile>>([]);
   const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
+  // Where to draw the subject-length guide, and the count it goes with. 0 hides it.
+  const rulerColumn = Math.max(0, Number(getSetting('commitMessageRuler') ?? 50));
+  const rulerLimit = rulerColumn > 0 ? rulerColumn : 50;
+  // Pixel offset of the guide, or null when the box is too narrow for the guide
+  // to fall inside it - a line drawn past the edge would be no help at all.
+  const [rulerOffset, setRulerOffset] = useState<number | null>(null);
+  const commitInputRef = useRef<HTMLInputElement>(null);
+  const [recentMessages, setRecentMessages] = useState<Array<string>>([]);
+  const [recentMessagesOpen, setRecentMessagesOpen] = useState<boolean>(false);
   const [fileHistoryTarget, setFileHistoryTarget] =
     useState<{ path: string; isDirectory: boolean; tab: 'history' | 'blame' } | null>(null);
   const [lfsPatterns, setLfsPatterns] = useState<Array<string>>([]);
+  // Git LFS locks, by path, for badges and the lock/unlock menu items.
+  const [lfsLocks, setLfsLocks] = useState<Record<string, { owner: string; id: string }>>({});
   const activeSplitter = useRef<string | null>(null);
 
   // Keep the set of LFS track patterns fresh so file rows can be badged and the
@@ -63,6 +75,84 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       .catch(() => { if (!cancelled) setLfsPatterns([]); });
     return () => { cancelled = true; };
   }, [gitAdapter, unstagedFiles, stagedFiles]);
+
+  // The last few commit messages, for reusing one instead of retyping it.
+  React.useEffect(() => {
+    let cancelled = false;
+    gitAdapter.getRecentCommitMessages(15)
+      .then(list => { if (!cancelled) setRecentMessages(list); })
+      .catch(() => { if (!cancelled) setRecentMessages([]); });
+    return () => { cancelled = true; };
+  }, [gitAdapter, currentBranch]);
+
+  // Close the picker when clicking elsewhere.
+  React.useEffect(() => {
+    if (!recentMessagesOpen)
+      return;
+    const close = () => setRecentMessagesOpen(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [recentMessagesOpen]);
+
+  /** Put a previous message back in the boxes, subject and body apart. */
+  const useRecentMessage = (message: string) => {
+    const [subject, ...rest] = message.split('\n');
+    setCommitMessage(subject);
+    setCommitDescription(rest.join('\n').trim());
+    setRecentMessagesOpen(false);
+  };
+
+  // Work out where the guide lands, from the input's own font, and keep it in
+  // step as the panel is resized.
+  React.useEffect(() => {
+    const input = commitInputRef.current;
+    if (!input || rulerColumn <= 0) {
+      setRulerOffset(null);
+      return;
+    }
+
+    const measure = () => {
+      const styles = window.getComputedStyle(input);
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) {
+        setRulerOffset(null);
+        return;
+      }
+
+      context.font = `${styles.fontSize} ${styles.fontFamily}`;
+      const padding = parseFloat(styles.paddingLeft) || 0;
+      // '0' is a fair stand-in: the box is monospace, and close enough if not.
+      const offset = padding + context.measureText('0'.repeat(rulerColumn)).width;
+      setRulerOffset(offset + 2 < input.clientWidth ? offset : null);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [rulerColumn]);
+
+  /** Re-read the LFS locks; they only change through a lock or unlock. */
+  const refreshLfsLocks = React.useCallback(async () => {
+    try {
+      const locks = await gitAdapter.lfsLocks();
+      const byPath: Record<string, { owner: string; id: string }> = {};
+      for (const lock of locks)
+        byPath[lock.path] = { owner: lock.owner, id: lock.id };
+      setLfsLocks(byPath);
+    } catch (error) {
+      // Locking needs an LFS server; without one there's nothing to show.
+      setLfsLocks({});
+    }
+  }, [gitAdapter]);
+
+  React.useEffect(() => {
+    // Only ask when the repository actually uses LFS, so repositories that
+    // don't aren't paying for a lock query.
+    if (lfsPatterns.length > 0)
+      refreshLfsLocks();
+  }, [lfsPatterns, refreshLfsLocks]);
 
   // Notify parent component when busy state changes
   React.useEffect(() => {
@@ -488,6 +578,24 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
 
       const git = gitAdapter;
 
+      // A custom action is the user's own command; run it with what was clicked.
+      const custom = actionFromMenuId(action, getSetting('customActions'));
+      if (custom) {
+        if (onBusyMessageChange)
+          onBusyMessageChange(custom.name);
+        const result = await runCustomAction(custom, {
+          repoPath: gitAdapter.repoPath,
+          filePath: clickedItem,
+          filePaths: allFilePaths,
+          branchName: currentBranch
+        });
+        const message = describeResult(custom, result);
+        if (message)
+          showAlert(message, custom.name);
+        await onRefresh();
+        return;
+      }
+
       switch (action) {
         case 'show-in-explorer':
           // Show the clicked item in file explorer
@@ -562,6 +670,25 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
             }
           }
           break;
+
+        case 'lfs-lock':
+        case 'lfs-unlock': {
+          const locking = action === 'lfs-lock';
+          if (onBusyMessageChange)
+            onBusyMessageChange(`git lfs ${locking ? 'lock' : 'unlock'} ${clickedItem}`);
+          try {
+            if (locking)
+              await git.lfsLock(clickedItem);
+            else
+              await git.lfsUnlock(clickedItem);
+            await refreshLfsLocks();
+          } catch (lockError: any) {
+            // The usual reason is no LFS server, or someone else holding it.
+            showAlert(`Could not ${locking ? 'lock' : 'unlock'} ${clickedItem}: ${lockError?.message || lockError}`,
+              'Git LFS');
+          }
+          break;
+        }
 
         case 'file-history':
         case 'blame':
@@ -695,6 +822,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
               lfsPatterns={lfsPatterns}
+              lfsLocks={lfsLocks}
               onDiscardAll={async () => {
                 const confirmed = await showConfirm(
                   `Are you sure you want to discard ${unstagedFiles.length} file(s)? This cannot be undone.`
@@ -753,6 +881,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               repoPath={gitAdapter.repoPath}
               onContextMenu={handleContextMenu}
               lfsPatterns={lfsPatterns}
+              lfsLocks={lfsLocks}
               onStageAll={async () => {
                 if (stagedFiles.length === 0)
                   return;
@@ -799,6 +928,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         <div className="commit-panel-content">
           <div className="commit-message-input-wrapper">
             <input
+              ref={commitInputRef}
               type="text"
               className="commit-message-input"
               value={commitMessage}
@@ -811,9 +941,44 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                 }
               }}
             />
-            <div className={`commit-message-counter ${commitMessage.length > 50 ? 'over-limit' : ''}`}>
-              {50 - commitMessage.length}
+            {rulerOffset !== null && (
+              // A guide at the column subjects should stay inside, drawn from the
+              // input's own character width so it lands on the right character.
+              <div
+                className="commit-message-ruler"
+                style={{ left: `${rulerOffset}px` }}
+                title={`Keep the subject under ${rulerColumn} characters`}
+              />
+            )}
+            <div className={`commit-message-counter ${commitMessage.length > rulerLimit ? 'over-limit' : ''}`}>
+              {rulerLimit - commitMessage.length}
             </div>
+            {recentMessages.length > 0 && (
+              <div className="commit-recent-wrapper">
+                <button
+                  className="commit-recent-button"
+                  title="Reuse a recent commit message"
+                  disabled={isBusy}
+                  onClick={(e) => { e.stopPropagation(); setRecentMessagesOpen(!recentMessagesOpen); }}
+                >
+                  🕓
+                </button>
+                {recentMessagesOpen && (
+                  <div className="commit-recent-menu" onClick={(e) => e.stopPropagation()}>
+                    {recentMessages.map((message, index) => (
+                      <div
+                        key={index}
+                        className="commit-recent-item"
+                        title={message}
+                        onClick={() => useRecentMessage(message)}
+                      >
+                        {message.split('\n')[0]}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <input
             type="text"

@@ -4,14 +4,32 @@ import './Dialog.css';
 interface AddRemoteDialogProps {
   onClose: () => void;
   onAddRemote: (name: string, url: string) => void | Promise<void>;
+  // Check a URL can be reached before committing to it. Read-only.
+  onTestConnection?: (url: string) => Promise<{ ok: boolean; message: string }>;
 }
 
-function AddRemoteDialog({ onClose, onAddRemote }: AddRemoteDialogProps) {
+function AddRemoteDialog({ onClose, onAddRemote, onTestConnection }: AddRemoteDialogProps) {
   const [remoteName, setRemoteName] = useState<string>('');
   const [remoteUrl, setRemoteUrl] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [testing, setTesting] = useState<boolean>(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTest = async (): Promise<void> => {
+    if (!onTestConnection || !remoteUrl.trim())
+      return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult(await onTestConnection(remoteUrl.trim()));
+    } catch (err: any) {
+      setTestResult({ ok: false, message: err?.message || String(err) });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   useEffect(() => {
     // Focus on the name input when dialog opens
@@ -99,6 +117,24 @@ function AddRemoteDialog({ onClose, onAddRemote }: AddRemoteDialogProps) {
               disabled={loading}
             />
           </div>
+
+          {onTestConnection && (
+            <div className="dialog-field remote-test-row">
+              <button
+                className="dialog-button dialog-button-cancel remote-test-button"
+                onClick={handleTest}
+                disabled={testing || !remoteUrl.trim()}
+                title="Ask the remote for its branches, without changing anything"
+              >
+                {testing ? 'Testing...' : 'Test Connection'}
+              </button>
+              {testResult && (
+                <span className={`remote-test-result ${testResult.ok ? 'ok' : 'failed'}`}>
+                  {testResult.ok ? '✓' : '✕'} {testResult.message}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="dialog-info">
             <p>Enter a name and URL for the new remote repository.</p>

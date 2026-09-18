@@ -1,0 +1,115 @@
+.create-pr-dialog {
+  min-width: 560px;
+  max-width: 680px;
+}
+
+.create-pr-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 6px 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 3px;
+}
+
+.create-pr-branch {
+  color: var(--repo-info-branch-color, var(--text-primary));
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.create-pr-arrow {
+  color: var(--text-secondary);
+}
+
+.create-pr-target {
+  width: 200px;
+  margin: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.create-pr-host {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-pr-description {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.create-pr-token-row {
+  display: flex;
+  gap: 6px;
+}
+
+.create-pr-token-row .dialog-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.create-pr-mini {
+  padding: 4px 10px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.create-pr-mini:hover {
+  background-color: var(--border-color);
+}
+
+.create-pr-hint {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.create-pr-advanced {
+  margin-top: 4px;
+}
+
+.create-pr-advanced summary {
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.create-pr-advanced .dialog-field {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.create-pr-problem {
+  margin-top: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--danger-color);
+  border-radius: 3px;
+  color: var(--danger-color);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.create-pr-created {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.create-pr-created .dialog-input {
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 12px;
+}

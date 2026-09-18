@@ -22,6 +22,25 @@
   when git finds it.
 * Stashes now appear in the commit list against the commit they were made on, as
   well as in the Stashes panel.
+* Added Ctrl+F to the diff viewer, with a match count and next/previous.
+* Added "Ignore Whitespace Changes" and "Show Whitespace" to the diff settings.
+* Added a picker beside the commit box for reusing a recent commit message.
+* Added a Repository Manager (File menu, Ctrl+Shift+R) with groups and
+  favourites, kept alongside the recent repository list.
+* Added custom actions: commands you define in Preferences that appear in the
+  file, commit, branch and repository menus, with the path, commit, branch and
+  remote URL filled in.
+* Added "Create Pull Request..." to the branch menu, which opens one through the
+  host's API - GitHub, GitLab, Bitbucket or Azure DevOps, self-hosted included.
+* The push dialog can now push several branches in one command, and the add
+  remote dialog can test a URL before saving it.
+* Issue references and URLs in commit messages are now links, with a configurable
+  pattern and URL template.
+* The branch panel can sort by most recent commit instead of grouping by name.
+* The commit box now draws a guide at a configurable column, and can show author
+  pictures from Gravatar (off by default).
+* Added Git LFS file locking: lock and unlock a tracked file from its context
+  menu, with a badge showing who holds a lock.
 
 * Added "File History" to the file and folder context menus: the commits that
   touched a path, the diff each one made, rename tracking and paging.

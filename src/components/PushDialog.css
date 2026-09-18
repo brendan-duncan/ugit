@@ -1,0 +1,30 @@
+
+/* Pushing several branches at once. */
+.push-branch-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background-color: var(--bg-primary);
+  padding: 4px 0;
+}
+
+.push-branch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.push-branch-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.push-branch-current {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 10px;
+}

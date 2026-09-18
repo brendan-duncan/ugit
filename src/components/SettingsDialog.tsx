@@ -4,6 +4,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import { resolveLoreBin, resolveLoreServerBin, setLoreBinOverride, setLoreServerOverride } from '../lore';
 import './Dialog.css';
+import CustomActionsEditor from './CustomActionsEditor';
 import './SettingsDialog.css';
 
 interface SettingsDialogProps {
@@ -25,6 +26,10 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const [detect, setDetect] = useState<{ loreVersion: string | null; serverVersion: string | null } | null>(null);
   const [installing, setInstalling] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [commitMessageRuler, setCommitMessageRuler] = useState<number>(50);
+  const [showAvatars, setShowAvatars] = useState<boolean>(false);
+  const [issueTrackerUrl, setIssueTrackerUrl] = useState<string>('');
+  const [issueTrackerPattern, setIssueTrackerPattern] = useState<string>('');
 
   // Detect installed lore/loreserver using the currently-entered (or resolved) paths.
   const runDetect = useCallback(async () => {
@@ -57,6 +62,10 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       setPushAllTags(settings.pushAllTags);
       setMaxCommits(settings.maxCommits);
       setExternalEditor(settings.externalEditor);
+      setCommitMessageRuler(settings.commitMessageRuler ?? 50);
+      setShowAvatars(!!settings.showAvatars);
+      setIssueTrackerUrl(settings.issueTrackerUrl || '');
+      setIssueTrackerPattern(settings.issueTrackerPattern || '');
       setLfsWarnEnabled(settings.lfsWarnEnabled);
       setLfsWarnThresholdMB(settings.lfsWarnThresholdMB);
       setLoreBinPath(settings.loreBinPath ?? '');
@@ -95,6 +104,10 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       await updateSetting('lfsWarnThresholdMB', lfsWarnThresholdMB);
       await updateSetting('loreBinPath', loreBinPath.trim());
       await updateSetting('loreServerPath', loreServerPath.trim());
+      await updateSetting('commitMessageRuler', commitMessageRuler);
+      await updateSetting('showAvatars', showAvatars);
+      await updateSetting('issueTrackerUrl', issueTrackerUrl.trim());
+      await updateSetting('issueTrackerPattern', issueTrackerPattern.trim());
 
       onClose();
     } catch (err) {
@@ -240,6 +253,68 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
               <small>GitHub warns at 50 MB and rejects pushes over 100 MB.</small>
             </div>
           </div>
+
+          <div className="settings-section">
+            <h4 className="settings-section-title">Commits &amp; History</h4>
+
+            <div className="setting-group half-width">
+              <label htmlFor="commitMessageRuler">Commit Message Guide</label>
+              <div className="input-with-unit">
+                <input
+                  id="commitMessageRuler"
+                  type="number"
+                  min="0"
+                  max="200"
+                  value={commitMessageRuler}
+                  onChange={(e) => setCommitMessageRuler(parseInt(e.target.value) || 0)}
+                />
+                <span className="unit">chars</span>
+              </div>
+              <small>A line in the commit box at this column, and the countdown beside it. 0 hides both.</small>
+            </div>
+
+            <div className="setting-group">
+              <label htmlFor="showAvatars" className="checkbox-label">
+                <input
+                  id="showAvatars"
+                  type="checkbox"
+                  checked={showAvatars}
+                  onChange={(e) => setShowAvatars(e.target.checked)}
+                />
+                <span>Show author pictures from Gravatar</span>
+              </label>
+              <small>
+                Off by default: fetching a picture tells gravatar.com the hash of that author's
+                email address. With it off, initials are shown instead.
+              </small>
+            </div>
+
+            <div className="setting-group">
+              <label htmlFor="issueTrackerUrl">Issue Tracker URL</label>
+              <input
+                id="issueTrackerUrl"
+                type="text"
+                value={issueTrackerUrl}
+                onChange={(e) => setIssueTrackerUrl(e.target.value)}
+                placeholder="https://github.com/owner/repo/issues/{id}"
+              />
+              <small>Issue references in commit messages become links. {'{id}'} is replaced with the reference. Empty turns this off.</small>
+            </div>
+
+            <div className="setting-group">
+              <label htmlFor="issueTrackerPattern">Issue Reference Pattern</label>
+              <input
+                id="issueTrackerPattern"
+                type="text"
+                value={issueTrackerPattern}
+                onChange={(e) => setIssueTrackerPattern(e.target.value)}
+                placeholder="#(\d+)"
+              />
+              <small>A regular expression whose first group is the id. Use e.g. ([A-Z]+-\d+) for Jira keys.</small>
+            </div>
+          </div>
+
+          <CustomActionsEditor />
 
           <div className="settings-section">
             <h4 className="settings-section-title">Performance</h4>

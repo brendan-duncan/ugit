@@ -316,3 +316,10 @@
   background-color: #6f42c1;
   flex-shrink: 0;
 }
+
+/* A Git LFS lock held on a file. */
+.file-lock-badge {
+  flex-shrink: 0;
+  margin-left: 4px;
+  font-size: 10px;
+}

@@ -4,6 +4,7 @@ import EditOriginDialog from './EditOriginDialog';
 import LfsTrackDialog from './LfsTrackDialog';
 import GitAdapter from '../git/GitAdapter';
 import { useAlert } from '../contexts/AlertContext';
+import { actionsFor, describeResult, runCustomAction } from '../utils/customActions';
 import { useSettings } from '../contexts/SettingsContext';
 import { convertGitSshToHttps } from '../utils/utils';
 import { exec } from 'child_process';
@@ -47,6 +48,27 @@ interface RepoInfoProps {
 const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUrl, modifiedCount, selectedItem, onSelectItem, usingCache, onResetToOrigin, onCleanWorkingDirectory, onGitGC, onCleanPackTemps, onPushTags, onSyncTags, onShowReflog, onShowSigning, onFlowAction, remoteStatusError, onOriginChanged, onStashChanges, onDiscardChanges, onRefresh, onError }) => {
   const { showAlert, showConfirm } = useAlert();
   const { getSetting } = useSettings();
+  const repoActions = actionsFor(getSetting('customActions'), 'repository');
+
+  /** Run one of the user's repository-level commands and report what it said. */
+  const handleCustomAction = async (actionId: string) => {
+    const action = repoActions.find(candidate => candidate.id === actionId);
+    if (!action)
+      return;
+
+    try {
+      const result = await runCustomAction(action, {
+        repoPath: gitAdapter.repoPath,
+        branchName: currentBranch,
+        remoteUrl: originUrl || ''
+      });
+      const message = describeResult(action, result);
+      if (message)
+        showAlert(message, action.name);
+    } catch (error: any) {
+      showAlert(error?.message || String(error), action.name);
+    }
+  };
   const [showEditOriginDialog, setShowEditOriginDialog] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isLfsInitialized, setIsLfsInitialized] = useState(false);
@@ -439,6 +461,15 @@ const RepoInfo: React.FC<RepoInfoProps> = ({ gitAdapter, currentBranch, originUr
             <DropdownItem onClick={onShowSigning}>
               🔒 Commit Signing...
             </DropdownItem>
+          )}
+          {repoActions.length > 0 && (
+            <DropdownSubmenu label="Custom Actions">
+              {repoActions.map(action => (
+                <DropdownItem key={action.id} onClick={() => handleCustomAction(action.id)}>
+                  {action.name}
+                </DropdownItem>
+              ))}
+            </DropdownSubmenu>
           )}
           <DropdownSeparator />
           <DropdownItem onClick={handleApplyPatch}>

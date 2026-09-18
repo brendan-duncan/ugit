@@ -27,6 +27,10 @@ interface BranchStashPanelProps {
   onRemoteBranchAction: (action: string, remoteName: string, branchName: string, fullName: string) => void;
   onRemoteAdded?: () => void;
   lockedPatterns?: ReadonlyArray<string>;
+  // Branch list ordering, and the dates the 'recent' ordering needs.
+  branchSort?: 'name' | 'recent';
+  branchDates?: Record<string, string>;
+  onToggleSort?: () => void;
   worktrees: Array<WorktreeInfo>;
   submodules: Array<SubmoduleInfo>;
   onOpenSubmodule: (submodulePath: string) => void;
@@ -43,6 +47,7 @@ interface BranchStashPanelProps {
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
       onBranchSelect, stashes, onSelectStash, onStashDoubleClick, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
       remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded, lockedPatterns,
+      branchSort, branchDates, onToggleSort,
       worktrees, submodules, onOpenSubmodule, onSubmoduleAction,
       onOpenWorktree, onAddWorktree, onWorktreeAction, onAddBranch, onStashAll, canStash,
       originUrl }: BranchStashPanelProps) {
@@ -69,6 +74,9 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           onContextMenu={onBranchContextMenu}
           stashes={stashes}
           lockedPatterns={lockedPatterns}
+          sortMode={branchSort}
+          branchDates={branchDates}
+          onToggleSort={onToggleSort}
           onAddBranch={onAddBranch}
           originUrl={originUrl}
         />

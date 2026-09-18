@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Commit, SearchQuery, StashCommit } from '../git/GitAdapter';
+import { useSettings } from '../contexts/SettingsContext';
+import { ACTION_PREFIX, actionsFor } from '../utils/customActions';
 import './CommitList.css';
 
 interface CommitSearchState {
@@ -86,6 +88,8 @@ function CommitList({
   commits, stashCommits, onStashContextMenu, selectedCommit, onSelectCommit, onContextMenu,
   onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch
 }: CommitListProps) {
+  const { getSetting } = useSettings();
+  const commitActions = actionsFor(getSetting('customActions'), 'commit');
   const [contextMenu, setContextMenu] = useState(null);
   const [tagSubmenuOpen, setTagSubmenuOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -579,6 +583,21 @@ function CommitList({
           <div className="context-menu-item" onClick={() => handleMenuAction('copy-info')}>
             Copy Commit Info
           </div>
+          {commitActions.length > 0 && (
+            <>
+              <div className="context-menu-separator"></div>
+              {commitActions.map(action => (
+                <div
+                  key={action.id}
+                  className="context-menu-item"
+                  title={action.command}
+                  onClick={() => handleMenuAction(`${ACTION_PREFIX}${action.id}`)}
+                >
+                  {action.name}
+                </div>
+              ))}
+            </>
+          )}
           </>
           )}
         </div>

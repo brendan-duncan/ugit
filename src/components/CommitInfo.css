@@ -182,3 +182,36 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Author picture, and links found in commit messages. */
+.commit-info-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.commit-info-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.commit-info-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.commit-info-link {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.commit-info-link:hover {
+  text-decoration: underline;
+}

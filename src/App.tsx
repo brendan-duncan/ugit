@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import TabBar from './components/TabBar';
 import RepositoryView from './components/RepositoryView';
+import RepositoryManagerDialog from './components/RepositoryManagerDialog';
 import LoreRepositoryView from './components/LoreRepositoryView';
 import { detectRepositoryType, RepoType } from './utils/repoType';
 import CloneDialog from './components/CloneDialog';
@@ -78,6 +79,7 @@ function App(): React.ReactElement {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [hasLoadedRecent, setHasLoadedRecent] = useState<boolean>(false);
   const [showCloneDialog, setShowCloneDialog] = useState<boolean>(false);
+  const [showRepositoryManager, setShowRepositoryManager] = useState<boolean>(false);
   const [showSharedStoreDialog, setShowSharedStoreDialog] = useState<boolean>(false);
   const [showLocalServerDialog, setShowLocalServerDialog] = useState<boolean>(false);
   const [initRepoPath, setInitRepoPath] = useState<string | null>(null);
@@ -238,12 +240,17 @@ function App(): React.ReactElement {
       setShowLocalServerDialog(true);
     };
 
+    const handleShowRepositoryManager = () => {
+      setShowRepositoryManager(true);
+    };
+
     ipcRenderer.on('init-repository', handleInitRepo);
     ipcRenderer.on('open-repository', handleOpenRepo);
     ipcRenderer.on('show-clone-dialog', handleShowCloneDialog);
     ipcRenderer.on('show-settings-dialog', handleShowSettingsDialog);
     ipcRenderer.on('show-shared-store-dialog', handleShowSharedStoreDialog);
     ipcRenderer.on('show-local-server-dialog', handleShowLocalServerDialog);
+    ipcRenderer.on('show-repository-manager', handleShowRepositoryManager);
 
     const handleFetch = () => {
       if (activeTabId !== null && tabs.length > 0) {
@@ -726,6 +733,13 @@ function App(): React.ReactElement {
       <UpdateNotification />
       {showSettings && (
         <SettingsDialog onClose={() => setShowSettings(false)} />
+      )}
+      {showRepositoryManager && (
+        <RepositoryManagerDialog
+          recentRepos={getRecentRepos()}
+          onClose={() => setShowRepositoryManager(false)}
+          onOpenRepository={openRepository}
+        />
       )}
       {showCloneDialog && (
         <CloneDialog

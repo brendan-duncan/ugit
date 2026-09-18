@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import { shell } from 'electron';
+import { useSettings } from '../contexts/SettingsContext';
+import { linkifyMessage } from '../utils/issueLinks';
+import { avatarUrl, authorInitials } from '../utils/avatars';
 import DiffViewer from './DiffViewer';
 import GitAdapter from '../git/GitAdapter';
 import { Commit, CommitFile } from '../git/GitAdapter';
@@ -12,8 +16,34 @@ interface CommitInfoProps {
 }
 
 function CommitInfo({ commit, files, loadingFiles = false, gitAdapter }: CommitInfoProps) {
+  const { getSetting } = useSettings();
   const [expandedFiles, setExpandedFiles] = useState<{[key: string]: boolean}>({});
   const [fileDiffs, setFileDiffs] = useState<{[key: string]: string}>({});
+
+  /**
+   * Render a message with its issue references and URLs as links. The pattern and
+   * the URL template are the user's, since what a reference looks like is a
+   * per-project convention.
+   */
+  const renderMessage = (text: string): React.ReactNode => {
+    const parts = linkifyMessage(text, getSetting('issueTrackerPattern') || '', getSetting('issueTrackerUrl') || '');
+    if (parts.length === 0)
+      return text;
+
+    return parts.map((part, index) => part.url
+      ? (
+        <a
+          key={index}
+          className="commit-info-link"
+          href={part.url}
+          title={part.url}
+          onClick={(e) => { e.preventDefault(); shell.openExternal(part.url as string); }}
+        >
+          {part.text}
+        </a>
+      )
+      : <React.Fragment key={index}>{part.text}</React.Fragment>);
+  };
 
   if (!commit) {
     return (
@@ -87,7 +117,21 @@ function CommitInfo({ commit, files, loadingFiles = false, gitAdapter }: CommitI
         </div>
         <div className="commit-info-row">
           <span className="commit-info-label">Author:</span>
-          <span className="commit-info-value">{commit.author_name} &lt;{commit.author_email}&gt;</span>
+          <span className="commit-info-value commit-info-author">
+            {getSetting('showAvatars') ? (
+              <img
+                className="commit-info-avatar"
+                src={avatarUrl(commit.author_email, 32)}
+                alt=""
+                title={commit.author_email}
+              />
+            ) : (
+              <span className="commit-info-avatar commit-info-initials" title={commit.author_email}>
+                {authorInitials(commit.author_name)}
+              </span>
+            )}
+            {commit.author_name} &lt;{commit.author_email}&gt;
+          </span>
         </div>
         <div className="commit-info-row">
           <span className="commit-info-label">Date:</span>
@@ -95,12 +139,12 @@ function CommitInfo({ commit, files, loadingFiles = false, gitAdapter }: CommitI
         </div>
         <div className="commit-info-row">
           <span className="commit-info-label">Message:</span>
-          <span className="commit-info-value commit-full-message">{commit.message}</span>
+          <span className="commit-info-value commit-full-message">{renderMessage(commit.message)}</span>
         </div>
         {commit.body && (
           <div className="commit-info-row">
             <span className="commit-info-label">Body:</span>
-            <pre className="commit-info-value commit-body">{commit.body}</pre>
+            <pre className="commit-info-value commit-body">{renderMessage(commit.body)}</pre>
           </div>
         )}
         {(files && files.length > 0) || loadingFiles ? (

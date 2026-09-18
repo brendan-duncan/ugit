@@ -826,28 +826,27 @@ export class SimpleGitAdapter extends GitAdapter {
     this._endCommand(id, startTime);
   }
 
-  async diff(filePath: string, isStaged: boolean): Promise<string> {  
+  async diff(filePath: string, isStaged: boolean,
+             options: { ignoreWhitespace?: boolean } = {}): Promise<string> {
+    // -w drops changes that are only whitespace, for reading a diff where
+    // reindenting has buried the real change.
+    const args = ['--ignore-space-at-eol'];
+    if (isStaged)
+      args.unshift('--cached');
+    if (options.ignoreWhitespace)
+      args.push('-w');
+    args.push('--', filePath);
+
     const startTime = performance.now();
+    const id = this._startCommand(`git diff ${args.join(' ')}`, startTime);
     let result: string;
-    if (isStaged) {
-      const id = this._startCommand(`git diff --cached --ignore-space-at-eol -- ${filePath}`, startTime);
-      try {
-        result = await this.git.diff(['--cached', '--ignore-space-at-eol', '--', filePath]);
-      } catch (error: any) {
-        console.log("Error getting staged diff for", filePath, error);
-        result = `Error getting staged diff for ${filePath}: ${error.message}`;
-      }
-      this._endCommand(id, startTime);
-    } else {
-      const id = this._startCommand(`git diff --ignore-space-at-eol -- ${filePath}`, startTime);
-      try {
-        result = await this.git.diff(['--ignore-space-at-eol', '--', filePath]);
-      } catch (error: any) {
-        console.log("Error getting diff for", filePath, error);
-        result = `Error getting diff for ${filePath}: ${error.message}`;
-      }
-      this._endCommand(id, startTime);
+    try {
+      result = await this.git.diff(args);
+    } catch (error: any) {
+      console.log(`Error getting ${isStaged ? 'staged ' : ''}diff for`, filePath, error);
+      result = `Error getting ${isStaged ? 'staged ' : ''}diff for ${filePath}: ${error.message}`;
     }
+    this._endCommand(id, startTime);
     return result;
   }
 
@@ -1432,6 +1431,104 @@ export class SimpleGitAdapter extends GitAdapter {
       await fs.rm(path.dirname(file), { recursive: true, force: true }).catch(() => {});
     }
     this._endCommand(id, startTime);
+  }
+
+  async getRecentCommitMessages(maxCount: number = 20, branchName: string = 'HEAD'): Promise<string[]> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git log --max-count=${maxCount} --format=%B ${branchName}`, startTime);
+    try {
+      // %B is the whole message; the record separator keeps multi-line ones intact.
+      const output = await this.git.raw([
+        'log', `--max-count=${maxCount}`, `--format=%B%x1e`, branchName
+      ]);
+      this._endCommand(id, startTime);
+      return output
+        .split(LOG_RECORD_SEP)
+        .map(message => message.trim())
+        .filter(message => message.length > 0);
+    } catch (error) {
+      // A repository with no commits yet has nothing to offer.
+      this._endCommand(id, startTime);
+      return [];
+    }
+  }
+
+  async getBranchesByDate(): Promise<Array<{ name: string; date: string }>> {
+    const startTime = performance.now();
+    const id = this._startCommand('git for-each-ref --sort=-committerdate refs/heads', startTime);
+    try {
+      const output = await this.git.raw([
+        'for-each-ref', '--sort=-committerdate', 'refs/heads',
+        '--format=%(refname:short)%09%(committerdate:iso)'
+      ]);
+      this._endCommand(id, startTime);
+      return output.split('\n')
+        .map(line => line.split('\t'))
+        .filter(parts => parts.length >= 2 && parts[0])
+        .map(parts => ({ name: parts[0], date: parts[1] }));
+    } catch (error) {
+      this._endCommand(id, startTime);
+      return [];
+    }
+  }
+
+  async testRemoteConnection(remoteOrUrl: string): Promise<{ ok: boolean; message: string }> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git ls-remote --exit-code ${remoteOrUrl}`, startTime);
+    try {
+      // ls-remote only reads, so this can't disturb the repository. --exit-code
+      // makes an empty remote a failure rather than a silent success.
+      const output = await this.git.raw(['ls-remote', '--exit-code', '-h', remoteOrUrl]);
+      this._endCommand(id, startTime);
+      const refs = output.split('\n').filter(line => line.trim()).length;
+      return { ok: true, message: `Connected. ${refs} branch${refs === 1 ? '' : 'es'} on the remote.` };
+    } catch (error: any) {
+      this._endCommand(id, startTime);
+      const message = (error?.message || String(error)).split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line && !line.startsWith('Error:'))
+        .slice(0, 3)
+        .join(' ');
+      return { ok: false, message: message || 'Could not reach the remote.' };
+    }
+  }
+
+  async lfsLocks(): Promise<Array<{ id: string; path: string; owner: string }>> {
+    const startTime = performance.now();
+    const id = this._startCommand('git lfs locks --json', startTime);
+    try {
+      const output = await this.git.raw(['lfs', 'locks', '--json']);
+      this._endCommand(id, startTime);
+      if (!output.trim())
+        return [];
+
+      const parsed = JSON.parse(output);
+      if (!Array.isArray(parsed))
+        return [];
+
+      return parsed.map((lock: any) => ({
+        id: String(lock.id ?? ''),
+        path: String(lock.path ?? ''),
+        owner: String(lock.owner?.name ?? '')
+      }));
+    } catch (error) {
+      // Locking needs an LFS server, and `git lfs locks` fails without one -
+      // which isn't worth an error dialog on a repository that doesn't use it.
+      this._endCommand(id, startTime);
+      return [];
+    }
+  }
+
+  async lfsLock(filePath: string): Promise<void> {
+    await this._runWrite(['lfs', 'lock', filePath]);
+  }
+
+  async lfsUnlock(filePath: string, force: boolean = false): Promise<void> {
+    const args = ['lfs', 'unlock'];
+    if (force)
+      args.push('--force');
+    args.push(filePath);
+    await this._runWrite(args);
   }
 
   async listSubmodules(): Promise<SubmoduleInfo[]> {
