@@ -953,33 +953,36 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
             <div className={`commit-message-counter ${commitMessage.length > rulerLimit ? 'over-limit' : ''}`}>
               {rulerLimit - commitMessage.length}
             </div>
-            {recentMessages.length > 0 && (
-              <div className="commit-recent-wrapper">
-                <button
-                  className="commit-recent-button"
-                  title="Reuse a recent commit message"
-                  disabled={isBusy}
-                  onClick={(e) => { e.stopPropagation(); setRecentMessagesOpen(!recentMessagesOpen); }}
-                >
-                  🕓
-                </button>
-                {recentMessagesOpen && (
-                  <div className="commit-recent-menu" onClick={(e) => e.stopPropagation()}>
-                    {recentMessages.map((message, index) => (
-                      <div
-                        key={index}
-                        className="commit-recent-item"
-                        title={message}
-                        onClick={() => useRecentMessage(message)}
-                      >
-                        {message.split('\n')[0]}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
+          {/* A sibling of the message box, not a child of it: the box is only a
+              positioning context for the guide and the countdown, so a button
+              inside it would sit below the input and stretch the row. */}
+          {recentMessages.length > 0 && (
+            <div className="commit-recent-wrapper">
+              <button
+                className="commit-recent-button"
+                title="Reuse a recent commit message"
+                disabled={isBusy}
+                onClick={(e) => { e.stopPropagation(); setRecentMessagesOpen(!recentMessagesOpen); }}
+              >
+                🕓
+              </button>
+              {recentMessagesOpen && (
+                <div className="commit-recent-menu" onClick={(e) => e.stopPropagation()}>
+                  {recentMessages.map((message, index) => (
+                    <div
+                      key={index}
+                      className="commit-recent-item"
+                      title={message}
+                      onClick={() => useRecentMessage(message)}
+                    >
+                      {message.split('\n')[0]}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <input
             type="text"
             className="commit-description-input"

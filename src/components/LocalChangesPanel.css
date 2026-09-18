@@ -519,10 +519,17 @@
 .commit-recent-wrapper {
   position: relative;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .commit-recent-button {
-  padding: 2px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   background-color: transparent;
   border: 1px solid var(--border-color);
   border-radius: 3px;
