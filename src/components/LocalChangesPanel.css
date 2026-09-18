@@ -543,9 +543,9 @@
 }
 
 .commit-recent-menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 4px);
+  /* Fixed rather than absolute: the commit row is only 60px tall and clips
+     anything outside it. */
+  position: fixed;
   z-index: 10001;
   width: 420px;
   max-height: 320px;

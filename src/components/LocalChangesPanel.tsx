@@ -58,6 +58,9 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const commitInputRef = useRef<HTMLInputElement>(null);
   const [recentMessages, setRecentMessages] = useState<Array<string>>([]);
   const [recentMessagesOpen, setRecentMessagesOpen] = useState<boolean>(false);
+  // Where to draw the picker. The commit row clips what overflows it, so the
+  // menu is positioned against the window instead of inside the row.
+  const [recentMenuPos, setRecentMenuPos] = useState<{ left: number; bottom: number } | null>(null);
   const [fileHistoryTarget, setFileHistoryTarget] =
     useState<{ path: string; isDirectory: boolean; tab: 'history' | 'blame' } | null>(null);
   const [lfsPatterns, setLfsPatterns] = useState<Array<string>>([]);
@@ -963,12 +966,21 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                 className="commit-recent-button"
                 title="Reuse a recent commit message"
                 disabled={isBusy}
-                onClick={(e) => { e.stopPropagation(); setRecentMessagesOpen(!recentMessagesOpen); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setRecentMenuPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4 });
+                  setRecentMessagesOpen(!recentMessagesOpen);
+                }}
               >
                 🕓
               </button>
               {recentMessagesOpen && (
-                <div className="commit-recent-menu" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="commit-recent-menu"
+                  style={recentMenuPos ? { left: recentMenuPos.left, bottom: recentMenuPos.bottom } : undefined}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {recentMessages.map((message, index) => (
                     <div
                       key={index}
