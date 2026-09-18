@@ -1,3 +1,19 @@
+## v1.9.1
+
+### New Features
+
+* Added "Push Tags..." to the repository menu, to push local tags without pushing a branch.
+* Added "Sync Tags from Origin..." to the repository menu, which resets local tags that differ from origin back to the commits origin has them on. Local-only tags are left alone.
+
+### Improvements
+
+* Tags that can't be pushed because origin already has them at a different commit now offer to reset them to origin, instead of just naming the git command to run.
+
+### Bug Fixes
+
+* The remote list is no longer empty in a partial clone, where `git remote -v` appends a filter spec to each line.
+* Release builds now upload installers with a retry instead of timing out on a slow transfer, and the release stays a draft until every installer is uploaded.
+
 ## v1.9.0
 
 ### New Features
