@@ -120,6 +120,15 @@ body.light-theme .tab-icon.lore {
 .version-info {
   margin-left: auto;
   padding: 8px 12px;
+  background: none;
+  border: none;
   color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
   font-size: 12px;
+  transition: color 0.2s;
+}
+
+.version-info:hover {
+  color: var(--text-highlight);
 }

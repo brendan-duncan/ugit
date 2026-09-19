@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './TabBar.css';
+import { CHECK_FOR_UPDATES_EVENT } from './UpdateNotification';
 import gitIcon from '../../assets/Git-Icon-White.svg';
 import loreIcon from '../../assets/Lore_Icon_White_V1.svg';
 
@@ -118,7 +119,14 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
           </div>
         );
       })}
-      <div className="version-info">v{process.env.APP_VERSION}</div>
+      <button
+        type="button"
+        className="version-info"
+        title="Check for updates"
+        onClick={() => window.dispatchEvent(new CustomEvent(CHECK_FOR_UPDATES_EVENT))}
+      >
+        v{process.env.APP_VERSION}
+      </button>
     </div>
   );
 };

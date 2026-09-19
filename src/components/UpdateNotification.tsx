@@ -3,6 +3,10 @@ import './UpdateNotification.css';
 
 const { ipcRenderer } = window.require('electron');
 
+// Dispatched on window by anything in the renderer that wants a manual update check,
+// the same one the "Check for Updates..." menu item asks for over IPC.
+export const CHECK_FOR_UPDATES_EVENT = 'ugit:check-for-updates';
+
 interface UpdateInfo {
   version: string;
   releaseDate?: string;
@@ -24,6 +28,7 @@ function UpdateNotification() {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNotification, setShowNotification] = useState(false);
+  const [upToDate, setUpToDate] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('');
 
   useEffect(() => {
@@ -39,12 +44,14 @@ function UpdateNotification() {
       setUpdateInfo(info);
       setShowNotification(true);
       setChecking(false);
+      setUpToDate(false);
     };
 
     const handleUpdateNotAvailable = (event: any, info: any) => {
       console.log('No updates available');
       setChecking(false);
       setError(null);
+      setUpToDate(true);
     };
 
     const handleUpdateError = (event: any, error: { message: string }) => {
@@ -76,6 +83,7 @@ function UpdateNotification() {
     const handleCheckForUpdatesManual = () => {
       setChecking(true);
       setError(null);
+      setUpToDate(false);
       setShowNotification(true);
       ipcRenderer.invoke('check-for-updates').then((result: any) => {
         if (!result.success) {
@@ -92,6 +100,7 @@ function UpdateNotification() {
     ipcRenderer.on('update-downloaded', handleUpdateDownloaded);
     ipcRenderer.on('update-status', handleUpdateStatus);
     ipcRenderer.on('check-for-updates-manual', handleCheckForUpdatesManual);
+    window.addEventListener(CHECK_FOR_UPDATES_EVENT, handleCheckForUpdatesManual);
 
     return () => {
       ipcRenderer.removeListener('update-available', handleUpdateAvailable);
@@ -101,6 +110,7 @@ function UpdateNotification() {
       ipcRenderer.removeListener('update-downloaded', handleUpdateDownloaded);
       ipcRenderer.removeListener('update-status', handleUpdateStatus);
       ipcRenderer.removeListener('check-for-updates-manual', handleCheckForUpdatesManual);
+      window.removeEventListener(CHECK_FOR_UPDATES_EVENT, handleCheckForUpdatesManual);
     };
   }, []);
 
@@ -125,6 +135,7 @@ function UpdateNotification() {
     setUpdateDownloaded(false);
     setChecking(false);
     setError(null);
+    setUpToDate(false);
   };
 
   if (!showNotification) {
@@ -159,6 +170,15 @@ function UpdateNotification() {
         {checking && (
           <div className="update-notification-body">
             <p>Checking for updates...</p>
+          </div>
+        )}
+
+        {upToDate && !checking && !error && !updateAvailable && !updateDownloaded && (
+          <div className="update-notification-body">
+            <p>ugit {currentVersion ? `v${currentVersion} ` : ''}is up to date.</p>
+            <div className="update-notification-actions">
+              <button onClick={handleDismiss}>Close</button>
+            </div>
           </div>
         )}
 
