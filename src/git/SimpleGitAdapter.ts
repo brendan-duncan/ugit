@@ -1139,23 +1139,25 @@ export class SimpleGitAdapter extends GitAdapter {
   }
 
   private async _enrichCommits(commits: Commit[], branchName: string): Promise<void> {
-    // Get all tags and their target commits
-    const tagResult = await this.git.raw(['tag', '-l', '--format=%(refname:short) %(objectname:short)']);
+    // Get all tags and their target commits. '%(*objectname)' is the commit an annotated
+    // tag dereferences to and is empty for lightweight tags, so peeling is just "use the
+    // dereferenced hash if there is one". Full hashes here, because the abbreviation git
+    // picks for a tag isn't necessarily the length we'd slice off a commit hash.
+    const tagResult = await this.git.raw(['for-each-ref',
+      '--format=%(refname:strip=2)%09%(objectname)%09%(*objectname)', 'refs/tags']);
     const tagMap = new Map<string, string[]>();
-    if (tagResult.trim()) {
-      tagResult.trim().split('\n').forEach((line: string) => {
-        const [tag, hash] = line.split(' ');
-        if (tag && hash) {
-          const existing = tagMap.get(hash) || [];
-          existing.push(tag);
-          tagMap.set(hash, existing);
-        }
-      });
+    for (const line of tagResult.split('\n')) {
+      const [tag, objectName, peeled] = line.trim().split('\t');
+      const hash = peeled || objectName;
+      if (tag && hash) {
+        const existing = tagMap.get(hash) || [];
+        existing.push(tag);
+        tagMap.set(hash, existing);
+      }
     }
 
     commits.forEach((commit) => {
-      const shortHash = commit.hash.substring(0, 7);
-      commit.tags = tagMap.get(shortHash) || [];
+      commit.tags = tagMap.get(commit.hash) || [];
     });
 
     const isRemoteBranch = branchName.startsWith('origin/');
