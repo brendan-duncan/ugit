@@ -1,3 +1,16 @@
+## v1.10.4
+
+### New Features
+
+* Clicking the version number in the tab bar now checks for updates, the same as
+  the "Check for Updates..." menu item. The update window also says when ugit is
+  already up to date instead of showing an empty panel.
+
+### Bug Fixes
+
+* Fixed annotated tags never appearing in the commit list; only lightweight tags
+  were shown.
+
 ## v1.10.3
 
 ### Bug Fixes
