@@ -255,14 +255,18 @@ function createMenu(): void {
       ]
     },
     {
+      // macOS routes the clipboard shortcuts through the application menu, so a
+      // text field can only be cut from or pasted into if these items exist.
+      // Select All stays out: Cmd+A is the file lists' select-all, and a menu
+      // accelerator would swallow the key before the renderer ever saw it.
       label: 'Edit',
       submenu: [
-        //{ role: 'undo' },
-        //{ role: 'redo' },
-        //{ type: 'separator' },
-        //{ role: 'cut' },
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
         { role: 'copy' },
-        //{ role: 'paste' },
+        { role: 'paste' }
         //{ role: 'selectAll' }
       ]
     },
@@ -541,6 +545,22 @@ ipcMain.on('renderer-ready', () => {
   if (mainWindow && pendingOpenPath) {
     mainWindow.webContents.send('open-repository', pendingOpenPath);
     pendingOpenPath = null;
+  }
+});
+
+// Editing commands for the renderer's own right-click menus. Going through the
+// window's editing commands (rather than writing the field's value directly)
+// keeps the edit in the same undo stack as typing and fires the input event the
+// React fields listen for.
+ipcMain.on('edit-command', (event: any, command: string) => {
+  const contents = event.sender;
+  switch (command) {
+    case 'cut': contents.cut(); break;
+    case 'copy': contents.copy(); break;
+    case 'paste': contents.paste(); break;
+    case 'selectAll': contents.selectAll(); break;
+    case 'undo': contents.undo(); break;
+    case 'redo': contents.redo(); break;
   }
 });
 

@@ -6,6 +6,7 @@ import PullCommitDialog from './PullCommitDialog';
 import StashConflictDialog from './StashConflictDialog';
 import LfsWarningDialog, { LargeFile } from './LfsWarningDialog';
 import FileHistoryDialog from './FileHistoryDialog';
+import { useTextContextMenu } from './TextContextMenu';
 import { GitAdapter } from '../git/GitAdapter';
 import { FileInfo } from './types';
 import { useAlert } from '../contexts/AlertContext';
@@ -36,6 +37,8 @@ interface LocalChangesPanelProps {
 function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, onStashCreated }: LocalChangesPanelProps) {
   const { showAlert, showConfirm } = useAlert();
   const { getSetting } = useSettings();
+  // Right-click cut/copy/paste for the commit message and description fields.
+  const { textMenu, openTextMenu } = useTextContextMenu();
   const [fileListsHeight, setFileListsHeight] = useState<number>(50);
   const [leftWidth, setLeftWidth] = useState<number>(50);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -938,6 +941,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
               onChange={(e) => setCommitMessage(e.target.value)}
               placeholder="Commit message"
               disabled={isBusy}
+              onContextMenu={openTextMenu}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleCommit();
@@ -1002,6 +1006,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
             onChange={(e) => setCommitDescription(e.target.value)}
             placeholder="Description (optional)"
             disabled={isBusy}
+            onContextMenu={openTextMenu}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 handleCommit();
@@ -1087,6 +1092,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
                 className="dialog-input description-editor-textarea"
                 value={commitDescription}
                 onChange={(e) => setCommitDescription(e.target.value)}
+                onContextMenu={openTextMenu}
                 autoFocus
                 rows={10}
               />
@@ -1102,6 +1108,8 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
           </div>
         </div>
       )}
+
+      {textMenu}
     </div>
   );
 }

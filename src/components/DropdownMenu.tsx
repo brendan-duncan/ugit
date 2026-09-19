@@ -38,6 +38,9 @@ function DropdownMenu({ trigger, children }: DropdownMenuProps): React.ReactElem
       {isOpen && (
         <div className="dropdown-menu">
           {React.Children.map(children, (child) => {
+            // Conditional entries ({cond && <Item />}) arrive as null; leave them out.
+            if (!React.isValidElement(child))
+              return null;
             const element = child as React.ReactElement<any>;
             // Don't add click handler to DropdownSeparator
             if (element.type === DropdownSeparator) {
@@ -105,6 +108,9 @@ function DropdownSubmenu({ label, children, onItemClick }: DropdownSubmenuProps)
       {isSubmenuOpen && (
         <div className="dropdown-submenu-content">
           {React.Children.map(children, (child) => {
+            // Conditional entries ({cond && <Item />}) arrive as null; leave them out.
+            if (!React.isValidElement(child))
+              return null;
             const element = child as React.ReactElement<any>;
             // Don't add click handler to DropdownSeparator
             if (element.type === DropdownSeparator) {
