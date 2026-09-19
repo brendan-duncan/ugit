@@ -1,3 +1,15 @@
+## v1.10.2
+
+### New Features
+
+* Added a right-click menu with Cut, Copy, Paste and Select All to the commit
+  message and description fields.
+
+### Bug Fixes
+
+* Fixed the repository menu failing to open with "Something went wrong".
+* Fixed Cut, Paste and Undo doing nothing in text fields on macOS.
+
 ## v1.10.1
 
 ### Bug Fixes
