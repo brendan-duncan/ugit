@@ -1,3 +1,10 @@
+## v1.10.3
+
+### Bug Fixes
+
+* Fixed the repository menu running off the bottom of shorter screens; it now
+  fits the window and scrolls.
+
 ## v1.10.2
 
 ### New Features
