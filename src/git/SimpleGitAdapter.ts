@@ -24,6 +24,7 @@ import GitAdapter, {
   FlowConfig,
   FlowKind,
   StashCommit,
+  RefSnapshot,
   IncompleteHistoryError } from './GitAdapter';
 import { GitCommandError, gitErrorHandler } from './gitErrors';
 import { withGitLock, isGitBusy } from './gitQueue';
@@ -423,6 +424,37 @@ export class SimpleGitAdapter extends GitAdapter {
     } finally {
       this._endCommand(id, startTime);
     }
+  }
+
+  async getRefSnapshot(): Promise<RefSnapshot | null> {
+    // show-ref is read-only, and with optional locks off git won't even refresh
+    // the index, so this can run alongside anything - including git started
+    // outside ugit. Not queued and not reported: it runs on the status poll.
+    let raw: string;
+    try {
+      raw = await simpleGit({ baseDir: this.repoPath })
+        .env({ GIT_OPTIONAL_LOCKS: '0' })
+        .raw(['show-ref', '--head']);
+    } catch {
+      // A repository with no refs yet makes show-ref exit 1 silently, which
+      // simple-git resolves as empty output; anything that lands here is real.
+      return null;
+    }
+
+    let head = '';
+    const refs: Record<string, string> = {};
+    for (const line of raw.split('\n')) {
+      const space = line.indexOf(' ');
+      if (space < 0)
+        continue;
+      const sha = line.slice(0, space);
+      const name = line.slice(space + 1).trim();
+      if (name === 'HEAD')
+        head = sha;
+      else
+        refs[name] = sha;
+    }
+    return { raw, head, refs };
   }
 
   async gc(): Promise<void> {

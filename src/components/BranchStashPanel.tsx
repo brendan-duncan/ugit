@@ -26,6 +26,7 @@ interface BranchStashPanelProps {
   gitAdapter: GitAdapter;
   onRemoteBranchAction: (action: string, remoteName: string, branchName: string, fullName: string) => void;
   onRemoteAdded?: () => void;
+  remoteRefsKey?: number;
   lockedPatterns?: ReadonlyArray<string>;
   // Branch list ordering, and the dates the 'recent' ordering needs.
   branchSort?: 'name' | 'recent';
@@ -46,7 +47,7 @@ interface BranchStashPanelProps {
 
 function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitch, pullingBranch,
       onBranchSelect, stashes, onSelectStash, onStashDoubleClick, selectedItem, onMouseDown, onBranchContextMenu, onStashContextMenu,
-      remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded, lockedPatterns,
+      remotes, onSelectRemoteBranch, gitAdapter, onRemoteBranchAction, onRemoteAdded, remoteRefsKey, lockedPatterns,
       branchSort, branchDates, onToggleSort,
       worktrees, submodules, onOpenSubmodule, onSubmoduleAction,
       onOpenWorktree, onAddWorktree, onWorktreeAction, onAddBranch, onStashAll, canStash,
@@ -129,6 +130,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
           onRemoteBranchAction={onRemoteBranchAction}
           currentBranch={currentBranch}
           onRemoteAdded={onRemoteAdded}
+          refreshKey={remoteRefsKey}
         />
       </div>
       {!remotesCollapsed && !stashesCollapsed && (

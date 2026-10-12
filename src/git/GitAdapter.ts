@@ -63,6 +63,20 @@ export interface AheadBehind {
   behind: number;
 }
 
+/**
+ * Every ref in the repository with the commit it points at, as read by one
+ * lock-free command. Comparing two of these is how changes made outside ugit -
+ * a commit or checkout in a terminal, a fetch from an IDE - are noticed.
+ */
+export interface RefSnapshot {
+  /** Raw command output; identical text means nothing changed. */
+  raw: string;
+  /** SHA of HEAD, or '' when HEAD is unborn. */
+  head: string;
+  /** Full ref name (refs/heads/main, refs/remotes/origin/main, ...) to SHA. */
+  refs: Record<string, string>;
+}
+
 export interface RebaseStatus {
   // Backend used by the in-progress rebase: 'merge' for .git/rebase-merge (the
   // default for `git rebase` and interactive rebases), 'apply' for the older
@@ -536,6 +550,12 @@ export abstract class GitAdapter {
 
   /** Whether this process has a git command queued or running for this repository. */
   abstract isRepoBusy(): Promise<boolean>;
+
+  /**
+   * Read every ref and HEAD without taking any lock and without reporting the
+   * command to the UI, so it is safe to poll. Returns null if git failed.
+   */
+  abstract getRefSnapshot(): Promise<RefSnapshot | null>;
 
   /**
    * Repack the object database and refresh the commit-graph. Can take minutes on a

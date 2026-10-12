@@ -41,7 +41,7 @@ import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
-import { GitAdapter, BisectStatus, Commit, FlowConfig, FlowKind, IncompleteHistoryError, RebaseStatus, RebaseTodoEntry, ReflogEntry, SearchQuery, StashCommit, SubmoduleInfo, WorktreeInfo } from "../git/GitAdapter"
+import { GitAdapter, BisectStatus, Commit, FlowConfig, FlowKind, IncompleteHistoryError, RebaseStatus, RebaseTodoEntry, ReflogEntry, RefSnapshot, SearchQuery, StashCommit, SubmoduleInfo, WorktreeInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
 
@@ -67,6 +67,17 @@ const REMOTE_POLL_FETCH_COST_FACTOR = 4;
 // that cannot complete a fetch at all - must not be retried every interval forever;
 // each failed attempt on a large repo can abandon hundreds of megabytes of pack.
 const REMOTE_POLL_MAX_BACKOFF_MS = 60 * 60 * 1000;
+// Coming back to the window re-asks the remote early, but no more often than this:
+// returning from a terminal or browser is a good sign something was pushed.
+const REMOTE_FOCUS_RECHECK_MS = 2 * 60 * 1000;
+
+/** Short stand-in for a ref snapshot, persisted so a cold open can tell if refs moved. */
+function refsFingerprint(raw: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < raw.length; i++)
+    hash = Math.imul(hash ^ raw.charCodeAt(i), 0x01000193);
+  return `${raw.length}:${(hash >>> 0).toString(16)}`;
+}
 
 function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSignal = 0, onOpenRepository }: RepositoryViewProps) {
   const { showAlert, showConfirm } = useAlert();
@@ -102,6 +113,10 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   // branch's commit list was rendered from the cache as it stood before the command
   // ran, so it has to be reloaded; see the effect next to the branch loaders.
   const [commitViewReloadKey, setCommitViewReloadKey] = useState(0);
+  // Bumped when remote branches appear or disappear, so the remotes panel reloads.
+  const [remoteRefsKey, setRemoteRefsKey] = useState(0);
+  // Bumped when any local branch moves; branch dates for recency sorting follow it.
+  const [localRefsKey, setLocalRefsKey] = useState(0);
 
   const activeSplitter = useRef<number | string | null>(null);
   const currentBranchLoadId = useRef(0);
@@ -112,6 +127,11 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   // double-click can't start a second reload before `refreshing` re-renders.
   const manualRefreshInFlight = useRef(false);
   const remoteFetchInFlight = useRef(false);
+  // Refs as of the last look, for spotting what changed outside ugit.
+  const refSnapshotRef = useRef<RefSnapshot | null>(null);
+  // Latest checkRefs, so the poll doesn't restart every time its inputs change.
+  const checkRefsRef = useRef<(() => Promise<void>) | null>(null);
+  const selectedItemRef = useRef<SelectedItem | null>(null);
   const branchStatusRef = useRef<{ [branchName: string]: { ahead: number; behind: number } }>({});
   const currentBranchCacheRef = useRef<string>('');
   // Last background remote-status failure, shown inline rather than as a dialog:
@@ -157,6 +177,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     refreshWorktrees,
     updateBranchCache,
     clearBranchCache,
+    dropBranchCaches,
+    setBranches,
     getFileStatusType
   } = useRepositoryData(repoPath, gitAdapter);
 
@@ -400,7 +422,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       })
       .catch(() => { if (!cancelled) setBranchDates({}); });
     return () => { cancelled = true; };
-  }, [gitAdapter, branches]);
+  }, [gitAdapter, branches, localRefsKey]);
 
   const refreshSubmodules = useCallback(async () => {
     if (!gitAdapter)
@@ -474,7 +496,11 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         return;
       refreshInFlight.current = true;
       try {
-        await Promise.allSettled([refreshFileStatus(true), refreshRebaseStatus()]);
+        await Promise.allSettled([
+          refreshFileStatus(true),
+          refreshRebaseStatus(),
+          checkRefsRef.current?.() ?? Promise.resolve(),
+        ]);
       } finally {
         refreshInFlight.current = false;
       }
@@ -482,7 +508,20 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     const intervalId = setInterval(refresh, refreshTime * 1000);
     refresh();
 
-    return () => clearInterval(intervalId);
+    // Coming back to ugit is when work done elsewhere is most likely waiting, so
+    // look right away rather than up to one interval later.
+    const handleVisible = () => {
+      if (!document.hidden)
+        refresh();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', handleVisible);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
   }, [loading, isActiveTab, settings, getSetting, refreshFileStatus, refreshRebaseStatus]);
 
   useEffect(() => {
@@ -514,6 +553,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     let timer: ReturnType<typeof setTimeout> | null = null;
     let consecutiveFailures = 0;
     let lastFetchDurationMs = 0;
+    let lastCheckAt = 0;
 
     const nextDelay = () => {
       if (consecutiveFailures > 0) {
@@ -561,6 +601,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       }
 
       remoteFetchInFlight.current = true;
+      lastCheckAt = Date.now();
       try {
         if (await gitAdapter.isRepoBusy())
           return;
@@ -603,10 +644,23 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
 
     checkRemoteStatus();
 
+    // Not while backing off: an unreachable remote stays on its backoff schedule.
+    const handleFocus = () => {
+      if (cancelled || remoteFetchInFlight.current || consecutiveFailures > 0)
+        return;
+      if (Date.now() - lastCheckAt < REMOTE_FOCUS_RECHECK_MS)
+        return;
+      if (timer)
+        clearTimeout(timer);
+      checkRemoteStatus();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       cancelled = true;
       if (timer)
         clearTimeout(timer);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [loading, gitAdapter, currentBranch, setBranchStatus]);
 
@@ -1074,14 +1128,16 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   }, [gitAdapter, hideLocalChangesDialog, pendingState.pendingBranchSwitch, performBranchSwitch,
       refreshFileStatus, refreshStashes, stagedFiles, unstagedFiles, currentBranch, setErrorWithDialog]);
 
-  const handleBranchSelect = useCallback(async (branchName: string, page?: number) => {
+  // `quiet` is for reloads nobody asked for (the branch moved underneath us): the
+  // list on screen stays until the new one is ready, and failures only log.
+  const handleBranchSelect = useCallback(async (branchName: string, page?: number, quiet = false) => {
     const pageSize = getSetting('maxCommits') || 100;
     const cached = branchCommitsCache.current.get(branchName);
     const targetPage = page ?? cached?.currentPage ?? 0;
 
     // Cache hit: render the page instantly, skip git entirely.
     const cachedPage = cached?.pages?.[targetPage];
-    if (cachedPage) {
+    if (cachedPage && !quiet) {
       if (cached.currentPage !== targetPage) {
         updateBranchCache(branchName, { ...cached, currentPage: targetPage });
       }
@@ -1102,14 +1158,16 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     if (!gitAdapter)
       return;
 
-    setSelectedItem({
-      type: 'branch',
-      branchName,
-      commits: [],
-      loading: true,
-      page: targetPage,
-      totalCount: cached?.totalCount
-    });
+    if (!quiet) {
+      setSelectedItem({
+        type: 'branch',
+        branchName,
+        commits: [],
+        loading: true,
+        page: targetPage,
+        totalCount: cached?.totalCount
+      });
+    }
 
     try {
       const offset = targetPage * pageSize;
@@ -1125,18 +1183,25 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       });
 
       if (thisLoadId === currentBranchLoadId.current) {
-        setSelectedItem({
-          type: 'branch',
-          branchName,
-          commits,
-          loading: false,
-          page: targetPage,
-          totalCount
-        });
+        if (quiet) {
+          // Keep whatever else is on the item (an open search) if it's still selected.
+          setSelectedItem(prev => (prev?.type === 'branch' && prev.branchName === branchName)
+            ? { ...prev, commits, loading: false, page: targetPage, totalCount }
+            : prev);
+        } else {
+          setSelectedItem({
+            type: 'branch',
+            branchName,
+            commits,
+            loading: false,
+            page: targetPage,
+            totalCount
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading branch commits:', error);
-      if (thisLoadId === currentBranchLoadId.current) {
+      if (thisLoadId === currentBranchLoadId.current && !quiet) {
         // A partial log still lets the user work with the history git could read.
         const partialCommits = error instanceof IncompleteHistoryError ? error.commits : [];
         setErrorWithDialog(partialCommits.length > 0
@@ -1654,13 +1719,13 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, hideDeleteStashDialog, loadRepoData, setErrorWithDialog]);
 
-  const loadRemoteBranchCommits = useCallback(async (remoteName: string, branchName: string, fullName: string, page?: number) => {
+  const loadRemoteBranchCommits = useCallback(async (remoteName: string, branchName: string, fullName: string, page?: number, quiet = false) => {
     const pageSize = getSetting('maxCommits') || 100;
     const cached = branchCommitsCache.current.get(fullName);
     const targetPage = page ?? cached?.currentPage ?? 0;
 
     const cachedPage = cached?.pages?.[targetPage];
-    if (cachedPage) {
+    if (cachedPage && !quiet) {
       if (cached.currentPage !== targetPage) {
         updateBranchCache(fullName, { ...cached, currentPage: targetPage });
       }
@@ -1683,16 +1748,18 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     currentBranchLoadId.current += 1;
     const thisLoadId = currentBranchLoadId.current;
 
-    setSelectedItem({
-      type: 'remote-branch',
-      remoteName,
-      branchName,
-      fullName,
-      commits: [],
-      loading: true,
-      page: targetPage,
-      totalCount: cached?.totalCount
-    });
+    if (!quiet) {
+      setSelectedItem({
+        type: 'remote-branch',
+        remoteName,
+        branchName,
+        fullName,
+        commits: [],
+        loading: true,
+        page: targetPage,
+        totalCount: cached?.totalCount
+      });
+    }
 
     try {
       const offset = targetPage * pageSize;
@@ -1708,20 +1775,26 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       });
 
       if (thisLoadId === currentBranchLoadId.current) {
-        setSelectedItem({
-          type: 'remote-branch',
-          remoteName,
-          branchName,
-          fullName,
-          commits,
-          loading: false,
-          page: targetPage,
-          totalCount
-        });
+        if (quiet) {
+          setSelectedItem(prev => (prev?.type === 'remote-branch' && prev.fullName === fullName)
+            ? { ...prev, commits, loading: false, page: targetPage, totalCount }
+            : prev);
+        } else {
+          setSelectedItem({
+            type: 'remote-branch',
+            remoteName,
+            branchName,
+            fullName,
+            commits,
+            loading: false,
+            page: targetPage,
+            totalCount
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading remote branch commits:', error);
-      if (thisLoadId === currentBranchLoadId.current) {
+      if (thisLoadId === currentBranchLoadId.current && !quiet) {
         // A partial log still lets the user work with the history git could read.
         const partialCommits = error instanceof IncompleteHistoryError ? error.commits : [];
         setErrorWithDialog(partialCommits.length > 0
@@ -1767,6 +1840,168 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         selectedItem.remoteName, selectedItem.branchName, selectedItem.fullName, selectedItem.page ?? 0);
     }
   }, [commitViewReloadKey]);
+
+  useEffect(() => {
+    selectedItemRef.current = selectedItem;
+  }, [selectedItem]);
+
+  // Notice ref changes made outside ugit - a commit, checkout or fetch from a
+  // terminal or IDE - and update just the parts of the view they affect.
+  //
+  // Runs on the file-status poll. `git show-ref` is read-only and runs with optional
+  // locks off, so polling it can't contend with git running elsewhere, and when the
+  // output is unchanged (nearly every tick) nothing else runs at all.
+  const checkRefs = useCallback(async () => {
+    // One of our own commands is running; it reloads what it changes. Diff once
+    // it's done rather than against its half-finished state.
+    if (!gitAdapter || isBusyRef.current)
+      return;
+
+    const next = await gitAdapter.getRefSnapshot();
+    if (!next || isBusyRef.current)
+      return;
+    const prev = refSnapshotRef.current;
+    if (prev && prev.raw === next.raw)
+      return;
+    refSnapshotRef.current = next;
+
+    const fingerprint = refsFingerprint(next.raw);
+
+    const reloadSelected = () => {
+      const sel = selectedItemRef.current;
+      if (sel?.type === 'branch')
+        handleBranchSelect(sel.branchName, sel.page ?? 0, true);
+      else if (sel?.type === 'remote-branch')
+        loadRemoteBranchCommits(sel.remoteName, sel.branchName, sel.fullName, sel.page ?? 0, true);
+    };
+
+    if (!prev) {
+      // First look since the tab opened. If what's on screen came from the cache
+      // file and refs moved since it was written - ugit was closed while work
+      // happened - re-read everything, in the background.
+      const cachedFingerprint = cacheManager.loadCache(repoPath)?.refsFingerprint;
+      if (usingCache && cachedFingerprint === fingerprint)
+        return;
+      if (usingCache) {
+        clearBranchCache();
+        await loadRepoData(true, true);
+        setRemoteRefsKey(key => key + 1);
+        setLocalRefsKey(key => key + 1);
+        reloadSelected();
+      }
+      const cacheData = cacheManager.loadCache(repoPath) || {};
+      cacheData.refsFingerprint = fingerprint;
+      cacheManager.saveCache(repoPath, cacheData);
+      return;
+    }
+
+    const changed = new Set<string>();
+    for (const [name, sha] of Object.entries(next.refs)) {
+      if (prev.refs[name] !== sha)
+        changed.add(name);
+    }
+    for (const name of Object.keys(prev.refs)) {
+      if (!(name in next.refs))
+        changed.add(name);
+    }
+
+    const localChanged = new Set<string>();
+    const remoteChanged = new Set<string>();
+    let localSetChanged = false;
+    let remoteSetChanged = false;
+    let tagsChanged = false;
+    let stashChanged = false;
+    for (const name of changed) {
+      const addedOrRemoved = !(name in prev.refs) || !(name in next.refs);
+      if (name.startsWith('refs/heads/')) {
+        localChanged.add(name.slice('refs/heads/'.length));
+        localSetChanged ||= addedOrRemoved;
+      } else if (name.startsWith('refs/remotes/')) {
+        remoteChanged.add(name.slice('refs/remotes/'.length));
+        remoteSetChanged ||= addedOrRemoved;
+      } else if (name.startsWith('refs/tags/')) {
+        tagsChanged = true;
+      } else if (name === 'refs/stash') {
+        stashChanged = true;
+      }
+    }
+
+    // Local branches whose own tip or upstream moved: their ahead/behind counts
+    // and their commit lists' pushed markers are both stale.
+    const affectedLocal = new Set(localChanged);
+    for (const remoteBranch of remoteChanged) {
+      if (remoteBranch.startsWith('origin/'))
+        affectedLocal.add(remoteBranch.slice('origin/'.length));
+    }
+
+    // Tags decorate commits on every branch, so any tag change stales every list.
+    if (tagsChanged)
+      clearBranchCache();
+    else
+      dropBranchCaches([...affectedLocal, ...remoteChanged]);
+
+    const sel = selectedItemRef.current;
+    if (sel?.type === 'branch' && (tagsChanged || affectedLocal.has(sel.branchName))) {
+      const tip = next.refs[`refs/heads/${sel.branchName}`];
+      // Skip when the list already shows the new tip, which is what happens after
+      // a command run from ugit that reloaded the list itself.
+      const upToDate = !tagsChanged && !remoteChanged.has(`origin/${sel.branchName}`)
+        && (sel.page ?? 0) === 0 && sel.commits?.[0]?.hash === tip;
+      if (tip && !upToDate)
+        reloadSelected();
+    } else if (sel?.type === 'remote-branch' && (tagsChanged || remoteChanged.has(sel.fullName))) {
+      const tip = next.refs[`refs/remotes/${sel.fullName}`];
+      const upToDate = !tagsChanged && (sel.page ?? 0) === 0 && sel.commits?.[0]?.hash === tip;
+      if (tip && !upToDate)
+        reloadSelected();
+    }
+
+    if (stashChanged)
+      refreshStashes().catch(error => console.error('Error refreshing stashes:', error));
+    if (remoteSetChanged)
+      setRemoteRefsKey(key => key + 1);
+    if (localChanged.size > 0)
+      setLocalRefsKey(key => key + 1);
+
+    try {
+      let branchNames: string[] | null = null;
+      if (localSetChanged) {
+        branchNames = (await gitAdapter.branchLocal()).all;
+        setBranches(branchNames);
+      }
+
+      // Only the branches that moved: re-counting every branch on every change
+      // would cost a process per branch on a repository with hundreds of them.
+      const counts = await Promise.all([...affectedLocal]
+        .filter(name => `refs/heads/${name}` in next.refs)
+        .map(async name => ({ name, ...(await gitAdapter.getAheadBehind(name, `origin/${name}`)) })));
+
+      const statusMap = { ...branchStatusRef.current };
+      for (const name of affectedLocal)
+        delete statusMap[name];
+      for (const { name, ahead, behind } of counts) {
+        if (ahead > 0 || behind > 0)
+          statusMap[name] = { ahead, behind };
+      }
+      if (affectedLocal.size > 0)
+        setBranchStatus(statusMap);
+
+      const cacheData = cacheManager.loadCache(repoPath) || {};
+      if (branchNames)
+        cacheData.branches = branchNames;
+      if (affectedLocal.size > 0)
+        cacheData.branchStatus = statusMap;
+      cacheData.refsFingerprint = fingerprint;
+      cacheManager.saveCache(repoPath, cacheData);
+    } catch (error) {
+      console.error('Error updating branches after ref change:', error);
+    }
+  }, [gitAdapter, repoPath, usingCache, clearBranchCache, dropBranchCaches, loadRepoData, refreshStashes,
+      setBranches, setBranchStatus, handleBranchSelect, loadRemoteBranchCommits]);
+
+  useEffect(() => {
+    checkRefsRef.current = checkRefs;
+  }, [checkRefs]);
 
   const handleLoadCommitPage = useCallback((page: number) => {
     if (!selectedItem)
@@ -2723,6 +2958,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                   onSelectRemoteBranch={handleRemoteBranchSelect}
                   onRemoteBranchAction={handleRemoteBranchContextMenu}
                   onRemoteAdded={() => loadRepoData(true)}
+                  remoteRefsKey={remoteRefsKey}
                   gitAdapter={gitAdapter}
                   lockedPatterns={getSetting('lockedBranchPatterns')}
                   branchSort={getSetting('branchSort') || 'name'}

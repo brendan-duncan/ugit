@@ -128,6 +128,8 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
   const [error, setError] = useState<string | null>(null);
 
   const branchCommitsCache = useRef(new Map<string, BranchCacheEntry>());
+  // Read synchronously so a background reload can't start on top of another one.
+  const loadInFlight = useRef(false);
 
   const getFileStatusType = useCallback((code: string): string => {
     switch (code) {
@@ -168,6 +170,20 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     cacheManager.saveCache(repoPath, cacheData);
   }, [repoPath]);
 
+  /** Drop several branches' cached commits with one write of the cache file. */
+  const dropBranchCaches = useCallback((branchNames: string[]) => {
+    if (branchNames.length === 0)
+      return;
+    for (const name of branchNames)
+      branchCommitsCache.current.delete(name);
+    const cacheData = cacheManager.loadCache(repoPath) || {};
+    if (cacheData.branchCommits) {
+      for (const name of branchNames)
+        delete cacheData.branchCommits[name];
+      cacheManager.saveCache(repoPath, cacheData);
+    }
+  }, [repoPath]);
+
   const clearBranchCache = useCallback((branchName?: string) => {
     if (branchName) {
       branchCommitsCache.current.delete(branchName);
@@ -184,15 +200,16 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     }
   }, [repoPath]);
 
-  const loadRepoData = useCallback(async (isRefresh = false) => {
-    if (!gitAdapter || loading)
+  // `background` re-reads everything from git like a refresh, but leaves the view
+  // on screen: `loading` swaps the whole repository view for a placeholder, which
+  // is fine after a command the user ran and jarring when nothing was clicked.
+  const loadRepoData = useCallback(async (isRefresh = false, background = false) => {
+    if (!gitAdapter || loading || loadInFlight.current)
       return;
 
-    if (isRefresh) {
+    loadInFlight.current = true;
+    if (!background)
       setLoading(true);
-    } else {
-      setLoading(true);
-    }
 
     try {
       const cachedData = cacheManager.loadCache(repoPath);
@@ -205,7 +222,6 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
         setStashes(cachedData.stashes || []);
         setWorktrees(cachedData.worktrees || []);
         setUsingCache(true);
-        setLoading(false);
         return;
       }
 
@@ -298,6 +314,8 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       }
 
       const cacheData = {
+        // Owned by the ref watcher in RepositoryView; carried over untouched.
+        refsFingerprint: cacheManager.loadCache(repoPath)?.refsFingerprint,
         currentBranch: status.current,
         originUrl: url,
         branches: branchSummary.all,
@@ -312,9 +330,12 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
 
     } catch (err) {
       console.error('Error loading repo data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load repository data');
+      if (!background)
+        setError(err instanceof Error ? err.message : 'Failed to load repository data');
     } finally {
-      setLoading(false);
+      loadInFlight.current = false;
+      if (!background)
+        setLoading(false);
     }
   }, [gitAdapter, loading, repoPath, getFileStatusType]);
 
@@ -362,6 +383,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     remotes,
     branchStatus,
     setBranchStatus,
+    setBranches,
     stashes,
     worktrees,
     loading,
@@ -374,6 +396,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     refreshWorktrees,
     updateBranchCache,
     clearBranchCache,
+    dropBranchCaches,
     getFileStatusType
   };
 }

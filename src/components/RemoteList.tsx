@@ -19,6 +19,8 @@ interface RemoteListProps {
   onRemoteBranchAction?: (action: string, remoteName: string, branchName: string, fullName: string) => void;
   currentBranch?: string;
   onRemoteAdded?: () => void;
+  // Changes whenever the set of remote branches does, so cached lists reload.
+  refreshKey?: number;
 }
 
 interface TreeNode {
@@ -148,7 +150,7 @@ const BranchTreeNode: React.FC<{
   );
 };
 
-function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch, onRemoteAdded }: RemoteListProps) {
+function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, onToggleCollapse, gitAdapter, onRemoteBranchAction, currentBranch, onRemoteAdded, refreshKey = 0 }: RemoteListProps) {
   const [expandedRemotes, setExpandedRemotes] = useState<Record<string, boolean>>({});
   const [remoteBranchesCache, setRemoteBranchesCache] = useState<Record<string, Array<string>>>({});
   const [remoteBranchesTreeCache, setRemoteBranchesTreeCache] = useState<Record<string, Record<string, TreeNode>>>({});
@@ -180,50 +182,56 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
       }));
 
       // Load branches if not already cached
-      if (!remoteBranchesCache[remoteName] && !loadingRemotes[remoteName]) {
-        setLoadingRemotes(prev => ({
-          ...prev,
-          [remoteName]: true
-        }));
+      if (!remoteBranchesCache[remoteName] && !loadingRemotes[remoteName])
+        loadRemoteBranches(remoteName);
+    }
+  };
 
-        try {
-          console.log(`Loading branches for remote: ${remoteName}`);
-          const branches = await gitAdapter.raw(['branch', '-r', '--format=%(refname:short)', '--list']);
+  const loadRemoteBranches = async (remoteName: string, quiet = false) => {
+    // A quiet reload keeps the current list on screen instead of a spinner.
+    if (!quiet) {
+      setLoadingRemotes(prev => ({
+        ...prev,
+        [remoteName]: true
+      }));
+    }
 
-          // Filter branches for this remote and clean up names
-          const remoteBranches = branches
-            .split('\n')
-            .filter(branch => branch.trim().startsWith(`${remoteName}/`))
-            .map(branch => branch.trim())
-            .map(branch => branch.replace(`${remoteName}/`, '')); // Remove remote prefix
+    try {
+      console.log(`Loading branches for remote: ${remoteName}`);
+      const branches = await gitAdapter.raw(['branch', '-r', '--format=%(refname:short)', '--list']);
 
-          setRemoteBranchesCache(prev => ({
-            ...prev,
-            [remoteName]: remoteBranches
-          }));
-          
-          // Build tree structure for hierarchical display
-          const tree = buildBranchTree(remoteBranches);
-          setRemoteBranchesTreeCache(prev => ({
-            ...prev,
-            [remoteName]: tree
-          }));
+      // Filter branches for this remote and clean up names
+      const remoteBranches = branches
+        .split('\n')
+        .filter(branch => branch.trim().startsWith(`${remoteName}/`))
+        .map(branch => branch.trim())
+        .map(branch => branch.replace(`${remoteName}/`, '')); // Remove remote prefix
 
-          console.log(`Loaded ${remoteBranches.length} branches for remote: ${remoteName}`);
-        } catch (error) {
-          console.error(`Failed to load branches for remote ${remoteName}:`, error);
-          // Set empty array to prevent retry attempts
-          setRemoteBranchesCache(prev => ({
-            ...prev,
-            [remoteName]: []
-          }));
-        } finally {
-          setLoadingRemotes(prev => ({
-            ...prev,
-            [remoteName]: false
-          }));
-        }
-      }
+      setRemoteBranchesCache(prev => ({
+        ...prev,
+        [remoteName]: remoteBranches
+      }));
+      
+      // Build tree structure for hierarchical display
+      const tree = buildBranchTree(remoteBranches);
+      setRemoteBranchesTreeCache(prev => ({
+        ...prev,
+        [remoteName]: tree
+      }));
+
+      console.log(`Loaded ${remoteBranches.length} branches for remote: ${remoteName}`);
+    } catch (error) {
+      console.error(`Failed to load branches for remote ${remoteName}:`, error);
+      // Set empty array to prevent retry attempts
+      setRemoteBranchesCache(prev => ({
+        ...prev,
+        [remoteName]: []
+      }));
+    } finally {
+      setLoadingRemotes(prev => ({
+        ...prev,
+        [remoteName]: false
+      }));
     }
   };
 
@@ -360,6 +368,27 @@ function RemoteList({ remotes, onSelectRemoteBranch, selectedItem, collapsed, on
         break;
     }
   };
+
+  // Remote branches changed (a fetch, or a push that made one): reload the lists
+  // being shown and forget the rest so they load fresh when expanded.
+  const prevRefreshKey = React.useRef(refreshKey);
+  React.useEffect(() => {
+    if (refreshKey === prevRefreshKey.current)
+      return;
+    prevRefreshKey.current = refreshKey;
+    for (const remoteName of Object.keys(remoteBranchesCache)) {
+      if (expandedRemotes[remoteName])
+        loadRemoteBranches(remoteName, true);
+    }
+    setRemoteBranchesCache(prev => {
+      const next: Record<string, Array<string>> = {};
+      for (const name of Object.keys(prev)) {
+        if (expandedRemotes[name])
+          next[name] = prev[name];
+      }
+      return next;
+    });
+  }, [refreshKey]);
 
   // Close context menus when clicking outside
   React.useEffect(() => {
