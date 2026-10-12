@@ -626,6 +626,29 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async getPushTargets(remote: string): Promise<{ upstreams: Record<string, string>; remoteBranches: string[] }> {
+    const prefix = `refs/remotes/${remote}/`;
+    const out = await this.raw(['for-each-ref',
+      '--format=%(refname)%09%(upstream:remotename)%09%(upstream:remoteref)', 'refs/heads', prefix.slice(0, -1)]);
+
+    const upstreams: Record<string, string> = {};
+    const remoteBranches: string[] = [];
+    for (const line of out.split('\n')) {
+      if (!line.trim())
+        continue;
+      const [ref, upstreamRemote, upstreamRef] = line.split('\t');
+      if (ref.startsWith(prefix)) {
+        const name = ref.slice(prefix.length);
+        // origin/HEAD is a pointer to the default branch, not a branch to push to.
+        if (name !== 'HEAD')
+          remoteBranches.push(name);
+      } else if (ref.startsWith('refs/heads/') && upstreamRemote === remote && upstreamRef?.startsWith('refs/heads/')) {
+        upstreams[ref.slice('refs/heads/'.length)] = upstreamRef.slice('refs/heads/'.length);
+      }
+    }
+    return { upstreams, remoteBranches };
+  }
+
   async fastForwardBranch(branchName: string): Promise<void> {
     const startTime = performance.now();
     let id = -1;

@@ -23,6 +23,11 @@
   background-color: var(--bg-tertiary);
 }
 
+.push-branch-target {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 .push-branch-current {
   margin-left: auto;
   color: var(--text-secondary);

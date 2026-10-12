@@ -575,6 +575,12 @@ export abstract class GitAdapter {
    */
   abstract fastForwardBranch(branchName: string): Promise<void>;
 
+  /**
+   * For the push dialog: each local branch's upstream branch name on `remote` (only
+   * branches whose upstream is on that remote), and the remote's known branches.
+   */
+  abstract getPushTargets(remote: string): Promise<{ upstreams: Record<string, string>; remoteBranches: string[] }>;
+
   /** Whether this process has a git command queued or running for this repository. */
   abstract isRepoBusy(): Promise<boolean>;
 

@@ -873,16 +873,16 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, reloadAfterCommand, showAlert, showConfirm, setErrorWithDialog]);
 
-  const handlePushMultiple = useCallback(async (branchNames: string[], pushAllTags: boolean) => {
+  const handlePushMultiple = useCallback(async (targets: Array<{ branch: string; remoteBranch: string }>, pushAllTags: boolean) => {
     hidePushDialog();
-    if (!gitAdapter || branchNames.length === 0)
+    if (!gitAdapter || targets.length === 0)
       return;
 
     try {
       setIsBusy(true);
-      setBusyMessage(`git push origin ${branchNames.length} branches`);
+      setBusyMessage(`git push origin ${targets.length} branches`);
       // One push with several refspecs, so the remote is contacted once.
-      await gitAdapter.push('origin', branchNames.map(name => `${name}:${name}`));
+      await gitAdapter.push('origin', targets.map(({ branch, remoteBranch }) => `${branch}:${remoteBranch}`));
 
       if (pushAllTags) {
         setBusyMessage('git ls-remote --tags origin');
@@ -894,7 +894,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         if (tags.conflicting.length > 0) {
           const one = tags.conflicting.length === 1;
           await confirmAndSyncTags(
-            `Pushed ${branchNames.length} branches.
+            `Pushed ${targets.length} branches.
 
 ` +
             `${tags.conflicting.length} tag${one ? '' : 's'} not pushed because origin ` +
@@ -3089,6 +3089,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           onPush={handlePush}
           branches={branches}
           currentBranch={dialogStates.showPushDialog}
+          gitAdapter={gitAdapter}
         />
       )}
       {dialogStates.showStashDialog && (
