@@ -1985,9 +1985,14 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   // Cached pages were cut at the old page size, so a new size (from the commit
   // list or the settings dialog) drops them and reloads the page that holds the
   // first commit that was on screen.
-  const maxCommits = getSetting('maxCommits') || 100;
+  // Undefined until settings load, so loading them isn't mistaken for a change.
+  const maxCommits = settings ? (settings.maxCommits || 100) : undefined;
   const prevMaxCommits = useRef(maxCommits);
   useEffect(() => {
+    if (maxCommits === undefined)
+      return;
+    if (prevMaxCommits.current === undefined)
+      prevMaxCommits.current = maxCommits;
     if (prevMaxCommits.current === maxCommits)
       return;
     const sel = selectedItemRef.current;
