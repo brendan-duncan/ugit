@@ -130,7 +130,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   // Refs as of the last look, for spotting what changed outside ugit.
   const refSnapshotRef = useRef<RefSnapshot | null>(null);
   // Latest checkRefs, so the poll doesn't restart every time its inputs change.
-  const checkRefsRef = useRef<(() => Promise<void>) | null>(null);
+  const checkRefsRef = useRef<((force?: boolean) => Promise<void>) | null>(null);
   const selectedItemRef = useRef<SelectedItem | null>(null);
   const branchStatusRef = useRef<{ [branchName: string]: { ahead: number; behind: number } }>({});
   const currentBranchCacheRef = useRef<string>('');
@@ -181,6 +181,14 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     setBranches,
     getFileStatusType
   } = useRepositoryData(repoPath, gitAdapter);
+
+  // After a command run from ugit: re-read in the background, so the view stays put,
+  // then diff refs straight away so the commit list and counts catch up now rather
+  // than on the next poll.
+  const reloadAfterCommand = useCallback(async () => {
+    await loadRepoData(true, true);
+    await checkRefsRef.current?.(true);
+  }, [loadRepoData]);
 
   // Reload from git when the parent bumps the refresh signal (e.g. after init).
   // Skip the initial mount value so we don't double-load on top of the mount fetch.
@@ -789,7 +797,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage(`git pull origin ${branch}${rebase ? ' --rebase' : ''}`);
       await gitAdapter.pull('origin', branch, rebase);
       clearBranchCache(branch);
-      await loadRepoData(true);
+      await reloadAfterCommand();
       setCommitViewReloadKey(key => key + 1);
     } catch (error) {
       console.error('Error during pull:', error);
@@ -799,7 +807,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hidePullDialog, hasLocalChanges, clearBranchCache, loadRepoData, refreshRebaseStatus, setErrorWithDialog]);
+  }, [gitAdapter, hidePullDialog, hasLocalChanges, clearBranchCache, reloadAfterCommand, refreshRebaseStatus, setErrorWithDialog]);
 
   // Tags origin already has at a different commit can only be reconciled by
   // overwriting one side. A plain fetch never updates a tag that already exists
@@ -825,7 +833,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     try {
       setBusyMessage(`git fetch origin --force ${conflicting.length} tag${one ? '' : 's'}`);
       await gitAdapter.syncTags('origin', conflicting);
-      await loadRepoData(true);
+      await reloadAfterCommand();
       setCommitViewReloadKey(key => key + 1);
       showAlert(`Reset ${conflicting.length} local tag${one ? '' : 's'} to origin.`, 'Sync Tags');
     } catch (error) {
@@ -834,7 +842,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       console.error('Error syncing tags:', error);
       setErrorWithDialog(`Sync tags failed: ${(error as Error).message}`);
     }
-  }, [gitAdapter, loadRepoData, showAlert, showConfirm, setErrorWithDialog]);
+  }, [gitAdapter, reloadAfterCommand, showAlert, showConfirm, setErrorWithDialog]);
 
   const handlePushMultiple = useCallback(async (branchNames: string[], pushAllTags: boolean) => {
     hidePushDialog();
@@ -866,14 +874,14 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         }
       }
 
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error: any) {
       setErrorWithDialog(`Push failed: ${error.message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hidePushDialog, loadRepoData, confirmAndSyncTags, setErrorWithDialog]);
+  }, [gitAdapter, hidePushDialog, reloadAfterCommand, confirmAndSyncTags, setErrorWithDialog]);
 
   const handlePush = useCallback(async (branch: string, remoteBranch: string, pushAllTags: boolean) => {
     hidePushDialog();
@@ -914,7 +922,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         }
       }
 
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error: any) {
       const prUrlMatch = error.message?.match(/https?:\/\/[^\s\)]+\/pull\/new\/[^\s\)]+/);
       if (prUrlMatch) {
@@ -926,7 +934,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hidePushDialog, loadRepoData, confirmAndSyncTags, showPullRequestDialog, setErrorWithDialog]);
+  }, [gitAdapter, hidePushDialog, reloadAfterCommand, confirmAndSyncTags, showPullRequestDialog, setErrorWithDialog]);
 
   // Tags on their own. The Push dialog can only send tags along with a branch, but
   // tags are often created and pushed without any branch having moved.
@@ -1236,7 +1244,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         await handleBranchSelect(branchName);
       }
 
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error creating branch:', error);
       setErrorWithDialog(`Branch creation failed: ${(error as Error).message}`);
@@ -1244,7 +1252,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, handleBranchSelect, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, handleBranchSelect, reloadAfterCommand, setErrorWithDialog]);
 
   const handleDeleteBranchDialog = useCallback(async ({ deleteRemote }: { deleteRemote: boolean }) => {
     hideDeleteBranchDialog();
@@ -1268,7 +1276,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         await gitAdapter.raw(['push', 'origin', '--delete', branchName]);
       }
 
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error deleting branch:', error);
       setErrorWithDialog(`Failed to delete branch: ${(error as Error).message}`);
@@ -1276,7 +1284,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideDeleteBranchDialog, pendingState.branchToDelete, currentBranch, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideDeleteBranchDialog, pendingState.branchToDelete, currentBranch, reloadAfterCommand, setErrorWithDialog]);
 
   const handleRenameBranchDialog = useCallback(async (newName: string) => {
     hideRenameBranchDialog();
@@ -1298,7 +1306,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       }
 
       branchCommitsCache.current.delete(oldName);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error renaming branch:', error);
       setErrorWithDialog(`Failed to rename branch: ${(error as Error).message}`);
@@ -1306,7 +1314,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideRenameBranchDialog, pendingState.branchToRename, selectedItem, currentBranch, loadRepoData, setCurrentBranch, setErrorWithDialog]);
+  }, [gitAdapter, hideRenameBranchDialog, pendingState.branchToRename, selectedItem, currentBranch, reloadAfterCommand, setCurrentBranch, setErrorWithDialog]);
 
   const handleMergeBranchDialog = useCallback(async ({ sourceBranch, targetBranch, flag }: { sourceBranch: string; targetBranch: string; flag?: string }) => {
     hideMergeBranchDialog();
@@ -1318,7 +1326,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage(`git merge ${flag || ''} ${sourceBranch}`);
       await gitAdapter.raw(['merge', ...(flag ? [flag] : []), sourceBranch]);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error merging branch:', error);
       setErrorWithDialog(`Failed to merge: ${(error as Error).message}`);
@@ -1326,7 +1334,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideMergeBranchDialog, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideMergeBranchDialog, clearBranchCache, reloadAfterCommand, setErrorWithDialog]);
 
   const handleRebaseBranchDialog = useCallback(async ({ sourceBranch, targetBranch }: { sourceBranch: string; targetBranch: string }) => {
     hideRebaseBranchDialog();
@@ -1348,7 +1356,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage(`git rebase ${targetBranch}`);
       await gitAdapter.rebase(targetBranch);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
 
       if (stashed) {
         setBusyMessage('git stash pop');
@@ -1368,7 +1376,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideRebaseBranchDialog, clearBranchCache, loadRepoData, hasLocalChanges, refreshRebaseStatus, setErrorWithDialog]);
+  }, [gitAdapter, hideRebaseBranchDialog, clearBranchCache, reloadAfterCommand, hasLocalChanges, refreshRebaseStatus, setErrorWithDialog]);
 
   const runRebaseStep = useCallback(async (action: 'continue' | 'skip') => {
     if (!gitAdapter)
@@ -1393,13 +1401,13 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       }
     } finally {
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
       await refreshFileStatus(false);
       await refreshRebaseStatus();
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, clearBranchCache, loadRepoData, refreshFileStatus, refreshRebaseStatus, setErrorWithDialog]);
+  }, [gitAdapter, clearBranchCache, reloadAfterCommand, refreshFileStatus, refreshRebaseStatus, setErrorWithDialog]);
 
   const handleRebaseContinue = useCallback(() => runRebaseStep('continue'), [runRebaseStep]);
   const handleRebaseSkip = useCallback(() => runRebaseStep('skip'), [runRebaseStep]);
@@ -1423,13 +1431,13 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setErrorWithDialog(`Failed to abort rebase: ${(error as Error).message}`);
     } finally {
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
       await refreshFileStatus(false);
       await refreshRebaseStatus();
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, showConfirm, clearBranchCache, loadRepoData, refreshFileStatus, refreshRebaseStatus, setErrorWithDialog]);
+  }, [gitAdapter, showConfirm, clearBranchCache, reloadAfterCommand, refreshFileStatus, refreshRebaseStatus, setErrorWithDialog]);
 
   const handleStash = useCallback(async (message: string, stageNewFiles: boolean, keepChanges: boolean) => {
     hideStashDialog();
@@ -1470,7 +1478,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage(`git reset --hard origin/${currentBranch}`);
       await gitAdapter.resetToOrigin(currentBranch);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error resetting to origin:', error);
       setErrorWithDialog(`Reset to origin failed: ${(error as Error).message}`);
@@ -1478,7 +1486,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideResetDialog, currentBranch, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideResetDialog, currentBranch, clearBranchCache, reloadAfterCommand, setErrorWithDialog]);
 
   const handleCleanWorkingDirectory = useCallback(async () => {
     hideCleanWorkingDirectoryDialog();
@@ -1489,7 +1497,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(true);
       setBusyMessage('git clean -fdx');
       await gitAdapter.raw(['clean', '-fdx']);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error cleaning working directory:', error);
       setErrorWithDialog(`Clean working directory failed: ${(error as Error).message}`);
@@ -1497,7 +1505,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideCleanWorkingDirectoryDialog, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideCleanWorkingDirectoryDialog, reloadAfterCommand, setErrorWithDialog]);
 
   const handleDiscardAllChanges = useCallback(async () => {
     if (modifiedCount === 0 || !gitAdapter) 
@@ -1520,7 +1528,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         await gitAdapter.discard(unstagedFiles.map(f => f.path));
       }
 
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error discarding changes:', error);
       setErrorWithDialog(`Discard changes failed: ${(error as Error).message}`);
@@ -1528,7 +1536,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, modifiedCount, stagedFiles, unstagedFiles, showConfirm, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, modifiedCount, stagedFiles, unstagedFiles, showConfirm, reloadAfterCommand, setErrorWithDialog]);
 
   const handleItemSelect = useCallback((item: SelectedItem) => {
     if (item.type !== 'branch' && item.type !== 'remote-branch') {
@@ -1674,12 +1682,12 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         await gitAdapter.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
       }
       await refreshFileStatus(false);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error applying stash:', error);
       setErrorWithDialog(`Failed to apply stash: ${(error as Error).message}`);
     }
-  }, [gitAdapter, hideApplyStashDialog, refreshFileStatus, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideApplyStashDialog, refreshFileStatus, reloadAfterCommand, setErrorWithDialog]);
 
   const handleStashDoubleClick = useCallback(async (stashIndex: number) => {
     showApplyStashDialog({ message: stashes[stashIndex].message, index: stashIndex });
@@ -1700,12 +1708,12 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       const stashContent = await gitAdapter.raw(['show', `stash@{${stash.index}}`]);
       await gitAdapter.raw(['stash', 'drop', `stash@{${stash.index}}`]);
       await gitAdapter.raw(['stash', 'store', '-m', finalName, stashContent]);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error renaming stash:', error);
       setErrorWithDialog(`Failed to rename stash: ${(error as Error).message}`);
     }
-  }, [gitAdapter, hideRenameStashDialog, pendingState.stashToRename, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideRenameStashDialog, pendingState.stashToRename, reloadAfterCommand, setErrorWithDialog]);
 
   const handleDeleteStashDialog = useCallback(async (stashIndex: number) => {
     hideDeleteStashDialog();
@@ -1714,12 +1722,12 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
 
     try {
       await gitAdapter.raw(['stash', 'drop', `stash@{${stashIndex}}`]);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error deleting stash:', error);
       setErrorWithDialog(`Failed to delete stash: ${(error as Error).message}`);
     }
-  }, [gitAdapter, hideDeleteStashDialog, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideDeleteStashDialog, reloadAfterCommand, setErrorWithDialog]);
 
   const loadRemoteBranchCommits = useCallback(async (remoteName: string, branchName: string, fullName: string, page?: number, quiet = false) => {
     const pageSize = getSetting('maxCommits') || 100;
@@ -1853,14 +1861,16 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   // Runs on the file-status poll. `git show-ref` is read-only and runs with optional
   // locks off, so polling it can't contend with git running elsewhere, and when the
   // output is unchanged (nearly every tick) nothing else runs at all.
-  const checkRefs = useCallback(async () => {
+  // `force` is for the call right after one of our commands, which may still have
+  // the busy flag up while it reloads.
+  const checkRefs = useCallback(async (force = false) => {
     // One of our own commands is running; it reloads what it changes. Diff once
     // it's done rather than against its half-finished state.
-    if (!gitAdapter || isBusyRef.current)
+    if (!gitAdapter || (isBusyRef.current && !force))
       return;
 
     const next = await gitAdapter.getRefSnapshot();
-    if (!next || isBusyRef.current)
+    if (!next || (isBusyRef.current && !force))
       return;
     const prev = refSnapshotRef.current;
     if (prev && prev.raw === next.raw)
@@ -2081,7 +2091,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(true);
       setBusyMessage(`git push ${remoteName} --delete ${branchName}`);
       await gitAdapter.raw(['push', remoteName, '--delete', branchName]);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error deleting remote branch:', error);
       setErrorWithDialog(`Failed to delete remote branch: ${(error as Error).message}`);
@@ -2089,7 +2099,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, showConfirm, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, showConfirm, reloadAfterCommand, setErrorWithDialog]);
 
   const handleCheckoutRemoteBranch = useCallback(async (remoteName: string, branchName: string) => {
     if (!gitAdapter) 
@@ -2099,7 +2109,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(true);
       setBusyMessage(`git checkout -b ${branchName} ${remoteName}/${branchName}`);
       await gitAdapter.raw(['checkout', '-b', branchName, `${remoteName}/${branchName}`]);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error checking out remote branch:', error);
       setErrorWithDialog(`Failed to checkout remote branch: ${(error as Error).message}`);
@@ -2107,7 +2117,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, reloadAfterCommand, setErrorWithDialog]);
 
   const handleRemoteBranchContextMenu = useCallback(async (action: string, remoteName: string, branchName: string, fullName: string) => {
     switch (action) {
@@ -2168,7 +2178,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         await handleBranchSelect(branchName);
       }
       
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error creating branch from commit:', error);
       setErrorWithDialog(`Branch creation failed: ${(error as Error).message}`);
@@ -2176,7 +2186,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideCreateBranchFromCommitDialog, pendingState.commitForDialog, handleBranchSelect, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideCreateBranchFromCommitDialog, pendingState.commitForDialog, handleBranchSelect, reloadAfterCommand, setErrorWithDialog]);
 
   const handleCreateTagFromCommit = useCallback(async (tagName: string, tagMessage: string) => {
     const commit = pendingState.commitForDialog;
@@ -2195,7 +2205,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       }
 
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
 
       // Refresh the currently selected branch to show the new tag
       if (selectedItem?.type === 'branch' && selectedItem.branchName) {
@@ -2208,7 +2218,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideCreateTagFromCommitDialog, pendingState.commitForDialog, clearBranchCache, loadRepoData, selectedItem, handleBranchSelect, setErrorWithDialog]);
+  }, [gitAdapter, hideCreateTagFromCommitDialog, pendingState.commitForDialog, clearBranchCache, reloadAfterCommand, selectedItem, handleBranchSelect, setErrorWithDialog]);
 
   const handleAmendCommit = useCallback(async (newMessage: string) => {
     const commit = pendingState.commitForDialog;
@@ -2221,7 +2231,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage(`git commit --amend -m "${newMessage.replace(/"/g, '\\"')}"`);
       await gitAdapter.raw(['commit', '--amend', '-m', newMessage]);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error amending commit:', error);
       setErrorWithDialog(`Failed to amend commit: ${(error as Error).message}`);
@@ -2229,7 +2239,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideAmendCommitDialog, pendingState.commitForDialog, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideAmendCommitDialog, pendingState.commitForDialog, clearBranchCache, reloadAfterCommand, setErrorWithDialog]);
 
   const handleCommitDoubleClick = useCallback((commit: Commit) => {
     showCheckoutCommitDialog(commit.hash);
@@ -2246,7 +2256,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage(`git checkout ${commitHash}`);
       await gitAdapter.checkout(commitHash);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       console.error('Error checking out commit:', error);
       setErrorWithDialog(`Failed to checkout commit: ${(error as Error).message}`);
@@ -2254,7 +2264,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideCheckoutCommitDialog, pendingState.commitToCheckout, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, hideCheckoutCommitDialog, pendingState.commitToCheckout, clearBranchCache, reloadAfterCommand, setErrorWithDialog]);
 
   const handleOpenWorktree = useCallback((worktreePath: string) => {
     onOpenRepository?.(worktreePath);
@@ -2278,7 +2288,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         force: params.force,
       });
       // A new branch may have been created and the worktree list changed.
-      await Promise.all([loadRepoData(true), refreshWorktrees()]);
+      await Promise.all([reloadAfterCommand(), refreshWorktrees()]);
       // Open the freshly created worktree as its own tab.
       onOpenRepository?.(params.worktreePath);
     } catch (error) {
@@ -2288,7 +2298,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hideCreateWorktreeDialog, loadRepoData, refreshWorktrees, onOpenRepository, setErrorWithDialog]);
+  }, [gitAdapter, hideCreateWorktreeDialog, reloadAfterCommand, refreshWorktrees, onOpenRepository, setErrorWithDialog]);
 
   const handleWorktreeAction = useCallback(async (action: string, worktree: WorktreeInfo) => {
     if (!gitAdapter)
@@ -2414,7 +2424,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage(label);
       await operation();
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
       await refreshRebaseStatus();
       if (options.reloadBranch && selectedItem?.type === 'branch' && selectedItem.branchName)
         await handleBranchSelect(selectedItem.branchName);
@@ -2425,7 +2435,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, clearBranchCache, loadRepoData, refreshRebaseStatus, selectedItem,
+  }, [gitAdapter, clearBranchCache, reloadAfterCommand, refreshRebaseStatus, selectedItem,
       handleBranchSelect, setErrorWithDialog]);
 
   /**
@@ -2523,14 +2533,14 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       const status = await gitAdapter.bisectMark(mark);
       setBisectStatus(status);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       setErrorWithDialog(`Bisect failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, clearBranchCache, reloadAfterCommand, setErrorWithDialog]);
 
   const handleBisectReset = useCallback(async () => {
     if (!gitAdapter)
@@ -2542,14 +2552,14 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       await gitAdapter.bisectReset();
       setBisectStatus(null);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       setErrorWithDialog(`Bisect reset failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, clearBranchCache, reloadAfterCommand, setErrorWithDialog]);
 
   /** Start a bisect with the clicked commit as the bad one. */
   const handleStartBisect = useCallback(async (commit: Commit) => {
@@ -2573,7 +2583,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       const result = await gitAdapter.bisectStart(commit.hash);
       setBisectStatus(result);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
       showAlert('Now mark a commit you know was good - use "Good" in the banner once git checks one out, or mark an older commit good from its context menu.',
         'Bisect');
     } catch (error) {
@@ -2582,7 +2592,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, showAlert, showConfirm, clearBranchCache, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, showAlert, showConfirm, clearBranchCache, reloadAfterCommand, setErrorWithDialog]);
 
   const handleFlowInit = useCallback(async (config: Partial<FlowConfig>) => {
     if (!gitAdapter)
@@ -2674,7 +2684,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage('git rebase -i');
       await gitAdapter.rebaseInteractive(interactiveRebase.base, entries);
       clearBranchCache();
-      await loadRepoData(true);
+      await reloadAfterCommand();
 
       // The rebase rewrote the commits the branch view is showing, so reload it.
       if (selectedItem?.type === 'branch' && selectedItem.branchName)
@@ -2698,7 +2708,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, interactiveRebase, clearBranchCache, loadRepoData, selectedItem, handleBranchSelect, showAlert, setErrorWithDialog]);
+  }, [gitAdapter, interactiveRebase, clearBranchCache, reloadAfterCommand, selectedItem, handleBranchSelect, showAlert, setErrorWithDialog]);
 
   /**
    * Run one of the user's commands from a context menu, and say how it went.
@@ -2721,7 +2731,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       const message = describeResult(action, result);
       if (message)
         showAlert(message, action.name);
-      await loadRepoData(true);
+      await reloadAfterCommand();
     } catch (error) {
       setErrorWithDialog(`${action.name} failed: ${(error as Error).message}`);
     } finally {
@@ -2729,7 +2739,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setBusyMessage('');
     }
     return true;
-  }, [gitAdapter, getSetting, originUrl, showAlert, loadRepoData, setErrorWithDialog]);
+  }, [gitAdapter, getSetting, originUrl, showAlert, reloadAfterCommand, setErrorWithDialog]);
 
   const handleCommitContextMenu = useCallback(async (action: string, commit: Commit, _currentBranch: string, tagName?: string) => {
     if (!gitAdapter) 
@@ -2760,7 +2770,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           if (confirmed) {
             await gitAdapter.raw(['tag', '-d', tagName]);
             clearBranchCache();
-            await loadRepoData(true);
+            await reloadAfterCommand();
             // Refresh the currently selected branch to remove the deleted tag
             if (selectedItem?.type === 'branch' && selectedItem.branchName) {
               await handleBranchSelect(selectedItem.branchName);
@@ -2776,7 +2786,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       case 'checkout-commit':
         if (await showConfirm(`Checkout commit ${commit.hash.substring(0, 7)}?`)) {
           await gitAdapter.checkoutBranch(commit.hash);
-          await loadRepoData(true);
+          await reloadAfterCommand();
         }
         break;
       case 'rebase-interactive':
@@ -2804,21 +2814,21 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         if (await showConfirm(`Cherry-pick ${commit.hash.substring(0, 7)}?`)) {
           await gitAdapter.raw(['cherry-pick', commit.hash]);
           clearBranchCache();
-          await loadRepoData(true);
+          await reloadAfterCommand();
         }
         break;
       case 'revert-commit':
         if (await showConfirm(`Revert ${commit.hash.substring(0, 7)}?`)) {
           await gitAdapter.raw(['revert', commit.hash]);
           clearBranchCache();
-          await loadRepoData(true);
+          await reloadAfterCommand();
         }
         break;
       case 'reset-to-here':
         if (await showConfirm(`Reset to ${commit.hash.substring(0, 7)}?`)) {
           await gitAdapter.raw(['reset', '--hard', commit.hash]);
           clearBranchCache();
-          await loadRepoData(true);
+          await reloadAfterCommand();
         }
         break;
       case 'amend-commit':
@@ -2843,7 +2853,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         URL.revokeObjectURL(url);
         break;
     }
-  }, [gitAdapter, showAlert, showConfirm, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, showAmendCommitDialog, clearBranchCache, loadRepoData, selectedItem, handleBranchSelect]);
+  }, [gitAdapter, showAlert, showConfirm, showCreateBranchFromCommitDialog, showCreateTagFromCommitDialog, showAmendCommitDialog, clearBranchCache, reloadAfterCommand, selectedItem, handleBranchSelect]);
 
   const handleMouseDown = useCallback((splitterIndex: number | string) => {
     activeSplitter.current = splitterIndex;
@@ -2954,7 +2964,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onOriginChanged={async () => { if (gitAdapter) setOriginUrl(await gitAdapter.getOriginUrl()); }}
                 onStashChanges={hasLocalChanges ? () => showStashDialog() : undefined}
                 onDiscardChanges={hasLocalChanges ? handleDiscardAllChanges : undefined}
-                onRefresh={() => loadRepoData(true)}
+                onRefresh={() => reloadAfterCommand()}
                 onError={setErrorWithDialog}
                 onShowReflog={() => setShowReflogDialog(true)}
                 onShowSigning={() => setShowSigningDialog(true)}
@@ -2978,7 +2988,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                   remotes={remotes}
                   onSelectRemoteBranch={handleRemoteBranchSelect}
                   onRemoteBranchAction={handleRemoteBranchContextMenu}
-                  onRemoteAdded={() => loadRepoData(true)}
+                  onRemoteAdded={() => reloadAfterCommand()}
                   remoteRefsKey={remoteRefsKey}
                   gitAdapter={gitAdapter}
                   lockedPatterns={getSetting('lockedBranchPatterns')}
@@ -3163,7 +3173,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
           onSaved={async () => {
             // Signature badges come from the log, so it has to be read again.
             clearBranchCache();
-            await loadRepoData(true);
+            await reloadAfterCommand();
             if (selectedItem?.type === 'branch' && selectedItem.branchName)
               await handleBranchSelect(selectedItem.branchName);
           }}

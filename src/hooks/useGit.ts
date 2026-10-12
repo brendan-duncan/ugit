@@ -128,8 +128,11 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
   const [error, setError] = useState<string | null>(null);
 
   const branchCommitsCache = useRef(new Map<string, BranchCacheEntry>());
-  // Read synchronously so a background reload can't start on top of another one.
-  const loadInFlight = useRef(false);
+  // The load running now, and at most one queued behind it. A command that
+  // finishes while a reload is running needs a reload that starts after it, or
+  // the one in flight may have read the repository before the command changed it.
+  const loadInFlight = useRef<Promise<void> | null>(null);
+  const loadQueued = useRef<Promise<void> | null>(null);
 
   const getFileStatusType = useCallback((code: string): string => {
     switch (code) {
@@ -200,14 +203,10 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     }
   }, [repoPath]);
 
-  // `background` re-reads everything from git like a refresh, but leaves the view
-  // on screen: `loading` swaps the whole repository view for a placeholder, which
-  // is fine after a command the user ran and jarring when nothing was clicked.
-  const loadRepoData = useCallback(async (isRefresh = false, background = false) => {
-    if (!gitAdapter || loading || loadInFlight.current)
+  const runLoad = useCallback(async (isRefresh: boolean, background: boolean) => {
+    if (!gitAdapter)
       return;
 
-    loadInFlight.current = true;
     if (!background)
       setLoading(true);
 
@@ -333,11 +332,35 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       if (!background)
         setError(err instanceof Error ? err.message : 'Failed to load repository data');
     } finally {
-      loadInFlight.current = false;
       if (!background)
         setLoading(false);
     }
-  }, [gitAdapter, loading, repoPath, getFileStatusType]);
+  }, [gitAdapter, repoPath, getFileStatusType]);
+
+  // `background` re-reads everything from git like a refresh, but leaves the view
+  // on screen: `loading` swaps the whole repository view for a placeholder, which
+  // only the Refresh button still asks for.
+  const loadRepoData = useCallback((isRefresh = false, background = false): Promise<void> => {
+    const start = () => {
+      const run = runLoad(isRefresh, background).finally(() => {
+        if (loadInFlight.current === run)
+          loadInFlight.current = null;
+      });
+      loadInFlight.current = run;
+      return run;
+    };
+
+    if (!loadInFlight.current)
+      return start();
+    // Callers queued while one is waiting share it: it starts after every one of them.
+    if (!loadQueued.current) {
+      loadQueued.current = loadInFlight.current.then(() => {
+        loadQueued.current = null;
+        return start();
+      });
+    }
+    return loadQueued.current;
+  }, [runLoad]);
 
   const refreshStashes = useCallback(async () => {
     if (!gitAdapter)
