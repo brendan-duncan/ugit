@@ -455,28 +455,6 @@ export class SimpleGitAdapter extends GitAdapter {
     return true;
   }
 
-  /**
-   * SHA a remote currently has for `branch`, or null if the remote doesn't have it.
-   *
-   * This is the cheap way to answer "has the remote moved?": one round trip, no
-   * object transfer, no pack writes, and it cannot trigger maintenance. Prefer it
-   * over a fetch whenever the answer is only needed to update an indicator.
-   */
-  async getRemoteHeadSha(remote: string, branch: string): Promise<string | null> {
-    const startTime = performance.now();
-    const id = this._startCommand(`git ls-remote --heads ${remote} ${branch}`, startTime);
-    try {
-      const out = await this.git.raw(['ls-remote', '--heads', remote, `refs/heads/${branch}`]);
-      const sha = out.trim().split(/\s+/)[0];
-      return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
-    } catch (error) {
-      console.error(`Error reading ${remote}/${branch} from remote:`, error);
-      throw error;
-    } finally {
-      this._endCommand(id, startTime);
-    }
-  }
-
   async getRefSnapshot(): Promise<RefSnapshot | null> {
     // show-ref is read-only, and with optional locks off git won't even refresh
     // the index, so this can run alongside anything - including git started
@@ -506,6 +484,61 @@ export class SimpleGitAdapter extends GitAdapter {
         refs[name] = sha;
     }
     return { raw, head, refs };
+  }
+
+  async getRemoteHeads(remote: string, branches?: string[]): Promise<Record<string, string>> {
+    // The cheap way to answer "has the remote moved?": one round trip, no object
+    // transfer, no pack writes, and it cannot trigger maintenance.
+    //
+    // Naming the branches lets the server filter, but a long list would run into
+    // the command-line limit on Windows; past that, ask for every branch.
+    const patterns = branches && branches.length <= 100 ? branches.map(name => `refs/heads/${name}`) : [];
+    const startTime = performance.now();
+    const id = this._startCommand(`git ls-remote --heads ${remote}${patterns.length ? ` (${patterns.length} branches)` : ''}`, startTime);
+    try {
+      const out = await this.git.raw(['ls-remote', '--heads', remote, ...patterns]);
+      const heads: Record<string, string> = {};
+      for (const line of out.split('\n')) {
+        const [sha, ref] = line.trim().split(/\s+/);
+        if (sha && ref?.startsWith('refs/heads/'))
+          heads[ref.slice('refs/heads/'.length)] = sha;
+      }
+      return heads;
+    } finally {
+      this._endCommand(id, startTime);
+    }
+  }
+
+  async getTrackedRemoteBranches(remote: string): Promise<Record<string, string>> {
+    const prefix = `refs/remotes/${remote}/`;
+    const out = await this.git.raw(['for-each-ref', '--format=%(refname)%09%(objectname)%09%(upstream)',
+      'refs/heads', prefix.slice(0, -1)]);
+
+    const remoteShas = new Map<string, string>();
+    const locals: Array<{ name: string; upstream: string }> = [];
+    for (const line of out.split('\n')) {
+      if (!line.trim())
+        continue;
+      const [ref, sha, upstream] = line.split('\t');
+      if (ref.startsWith(prefix))
+        remoteShas.set(ref.slice(prefix.length), sha);
+      else if (ref.startsWith('refs/heads/'))
+        locals.push({ name: ref.slice('refs/heads/'.length), upstream });
+    }
+
+    const tracked: Record<string, string> = {};
+    for (const { name, upstream } of locals) {
+      if (upstream) {
+        // An upstream on another remote isn't this remote's business.
+        if (upstream.startsWith(prefix)) {
+          const branch = upstream.slice(prefix.length);
+          tracked[branch] = remoteShas.get(branch) ?? '';
+        }
+      } else if (remoteShas.has(name)) {
+        tracked[name] = remoteShas.get(name)!;
+      }
+    }
+    return tracked;
   }
 
   async gc(): Promise<void> {

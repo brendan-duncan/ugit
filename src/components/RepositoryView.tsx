@@ -585,22 +585,24 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         if (await gitAdapter.isRepoBusy())
           return;
 
-        const remoteSha = await gitAdapter.getRemoteHeadSha('origin', currentBranch);
+        // Every branch some local branch follows, in one round trip, so behind
+        // counts stay current for all of them and not only the checked-out one.
+        const tracked = await gitAdapter.getTrackedRemoteBranches('origin');
+        const names = Object.keys(tracked);
+        const remoteHeads = names.length > 0 ? await gitAdapter.getRemoteHeads('origin', names) : {};
         if (cancelled)
           return;
 
-        if (remoteSha) {
-          const localSha = (await gitAdapter.raw(
-            ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${currentBranch}`])).trim();
-          if (remoteSha !== localSha) {
-            // Only this branch, not every ref: the indicator needs one branch, and
-            // a full fetch on a repository with thousands of refs is not free.
-            const startedAt = Date.now();
-            if (await gitAdapter.fetchIfIdle('origin', [currentBranch]))
-              lastFetchDurationMs = Date.now() - startedAt;
-            if (cancelled)
-              return;
-          }
+        // Fetch only the branches that moved, not every ref: a full fetch on a
+        // repository with thousands of refs is not free. A branch deleted on the
+        // remote is left for an explicit Fetch, whose --prune handles it.
+        const moved = names.filter(name => remoteHeads[name] && remoteHeads[name] !== tracked[name]);
+        if (moved.length > 0) {
+          const startedAt = Date.now();
+          if (await gitAdapter.fetchIfIdle('origin', moved))
+            lastFetchDurationMs = Date.now() - startedAt;
+          if (cancelled)
+            return;
         }
 
         consecutiveFailures = 0;

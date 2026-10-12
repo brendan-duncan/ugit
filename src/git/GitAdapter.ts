@@ -555,11 +555,18 @@ export abstract class GitAdapter {
   abstract fetchIfIdle(remote: string, options?: string[]): Promise<boolean>;
 
   /**
-   * SHA a remote currently has for a branch, or null if it doesn't have it.
-   * One round trip with no object transfer - use this, not a fetch, when the
-   * answer only feeds an ahead/behind indicator.
+   * Branch name to SHA for the remote's branches, from one ls-remote round trip.
+   * With `branches`, only those are asked for. Throws if the remote can't be reached.
+   * No object transfer - use this, not a fetch, when the answer only feeds an
+   * ahead/behind indicator.
    */
-  abstract getRemoteHeadSha(remote: string, branch: string): Promise<string | null>;
+  abstract getRemoteHeads(remote: string, branches?: string[]): Promise<Record<string, string>>;
+
+  /**
+   * The remote's branches that some local branch follows - its upstream, else the
+   * same name on `remote` - mapped to our remote-tracking SHA ('' if never fetched).
+   */
+  abstract getTrackedRemoteBranches(remote: string): Promise<Record<string, string>>;
 
   /** Whether this process has a git command queued or running for this repository. */
   abstract isRepoBusy(): Promise<boolean>;
