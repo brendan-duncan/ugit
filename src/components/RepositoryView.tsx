@@ -284,14 +284,13 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       if (commitsToCheck.length === 0)
         continue;
 
-      for (const commit of commitsToCheck) {
-        try {
-          const unpushedCommits = await git.raw(['branch', '-r', `--contains`, `${commit.hash}`]);
-          commit.onOrigin = unpushedCommits.trim().length !== 0;
-        } catch {
-          commit.onOrigin = false;
-        }
-      }
+      // One rev-list per branch rather than a `branch -r --contains` per commit,
+      // with the same rule the commit list uses.
+      const unpushed = await git.getUnpushedCommits(branchName);
+      if (!unpushed)
+        continue;
+      for (const commit of commitsToCheck)
+        commit.onOrigin = !unpushed.has(commit.hash);
 
       updateBranchCache(branchName, entry);
     }
@@ -1910,12 +1909,15 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       }
     }
 
-    // Local branches whose own tip or upstream moved: their ahead/behind counts
-    // and their commit lists' pushed markers are both stale.
+    // Local branches whose commit lists' pushed markers may be stale: their own tip
+    // moved, or a remote ref did - which could be any branch's upstream, since an
+    // upstream needn't share the branch's name.
     const affectedLocal = new Set(localChanged);
-    for (const remoteBranch of remoteChanged) {
-      if (remoteBranch.startsWith('origin/'))
-        affectedLocal.add(remoteBranch.slice('origin/'.length));
+    if (remoteChanged.size > 0) {
+      for (const name of Object.keys(next.refs)) {
+        if (name.startsWith('refs/heads/'))
+          affectedLocal.add(name.slice('refs/heads/'.length));
+      }
     }
 
     // Tags decorate commits on every branch, so any tag change stales every list.
@@ -1929,7 +1931,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       const tip = next.refs[`refs/heads/${sel.branchName}`];
       // Skip when the list already shows the new tip, which is what happens after
       // a command run from ugit that reloaded the list itself.
-      const upToDate = !tagsChanged && !remoteChanged.has(`origin/${sel.branchName}`)
+      const upToDate = !tagsChanged && remoteChanged.size === 0
         && (sel.page ?? 0) === 0 && sel.commits?.[0]?.hash === tip;
       if (tip && !upToDate)
         reloadSelected();

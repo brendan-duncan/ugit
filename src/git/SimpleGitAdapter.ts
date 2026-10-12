@@ -1246,18 +1246,36 @@ export class SimpleGitAdapter extends GitAdapter {
     if (branchName.startsWith('origin/') || commits.length === 0)
       return;
 
-    // One rev-list for the whole page rather than a `git log` per commit: the
-    // commits not yet on origin are exactly those reachable from the branch but
-    // not from its origin counterpart.
+    // One rev-list for the whole page rather than a `git log` per commit.
+    const unpushed = await this.getUnpushedCommits(branchName);
+    for (const commit of commits)
+      commit.onOrigin = unpushed !== null && !unpushed.has(commit.hash);
+  }
+
+  async getUnpushedCommits(branchName: string): Promise<Set<string> | null> {
+    // Same counterpart as getAllAheadBehind: the upstream, else origin/<name>.
+    let counterpart: string | null = null;
     try {
-      const out = await this.git.raw(['rev-list', `origin/${branchName}..${branchName}`, '--']);
-      const unpushed = new Set(out.split('\n').map(line => line.trim()).filter(Boolean));
-      for (const commit of commits)
-        commit.onOrigin = !unpushed.has(commit.hash);
+      const upstream = (await this.git.raw(['rev-parse', '--symbolic-full-name', `${branchName}@{upstream}`])).trim();
+      if (upstream.startsWith('refs/remotes/'))
+        counterpart = upstream;
     } catch {
-      // No origin counterpart: nothing on this branch has been pushed under its name.
-      for (const commit of commits)
-        commit.onOrigin = false;
+      // No upstream configured.
+    }
+    if (!counterpart) {
+      const ref = `refs/remotes/origin/${branchName}`;
+      // --quiet exits 1 with no output for a missing ref, which simple-git resolves.
+      if ((await this.git.raw(['rev-parse', '--verify', '--quiet', ref]).catch(() => '')).trim())
+        counterpart = ref;
+    }
+    if (!counterpart)
+      return null;
+
+    try {
+      const out = await this.git.raw(['rev-list', `${counterpart}..refs/heads/${branchName}`, '--']);
+      return new Set(out.split('\n').map(line => line.trim()).filter(Boolean));
+    } catch {
+      return null;
     }
   }
 

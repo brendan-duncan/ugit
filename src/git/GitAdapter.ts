@@ -491,6 +491,12 @@ export abstract class GitAdapter {
   abstract getAllAheadBehind(): Promise<Record<string, AheadBehind>>;
 
   /**
+   * Hashes on a local branch that its counterpart (as for getAllAheadBehind) doesn't
+   * have, or null when the branch has no counterpart and so nothing is pushed.
+   */
+  abstract getUnpushedCommits(branchName: string): Promise<Set<string> | null>;
+
+  /**
    * Get remote origin URL
    */
   abstract getOriginUrl(): Promise<string>;
