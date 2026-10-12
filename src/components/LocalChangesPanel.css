@@ -570,3 +570,44 @@
   background-color: var(--accent-color);
   color: var(--text-selected);
 }
+
+/* Changes held in an auto-stash after a pull stopped on conflicts */
+.auto-stash-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--warning-color);
+  border-left: 3px solid var(--warning-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.auto-stash-banner span {
+  flex: 1;
+  min-width: 200px;
+}
+
+.auto-stash-button {
+  background-color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.auto-stash-button.secondary {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.auto-stash-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

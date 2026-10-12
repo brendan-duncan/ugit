@@ -41,6 +41,7 @@ import { useRepositoryViewDialogs } from '../hooks/useRepositoryViewDialogs';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAlert } from '../contexts/AlertContext';
 import cacheManager from '../utils/cacheManager';
+import { pullWithAutoStash } from '../utils/autoStash';
 import { GitAdapter, BisectStatus, Commit, FlowConfig, FlowKind, IncompleteHistoryError, RebaseStatus, RebaseTodoEntry, ReflogEntry, RefSnapshot, SearchQuery, StashCommit, SubmoduleInfo, WorktreeInfo } from "../git/GitAdapter"
 import { RunningCommand, RemoteInfo, FileInfo, SelectedItem } from './types';
 import './RepositoryView.css';
@@ -818,12 +819,27 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(true);
       
       if (stashAndReapply && hasLocalChanges) {
-        setBusyMessage('git stash push');
-        await gitAdapter.stashPush(`Auto-stash before pull at ${new Date().toISOString()}`);
+        // Stash, pull and put the changes back. This used to stash and never
+        // re-apply, leaving the changes in the stash list with nothing said.
+        const result = await pullWithAutoStash(gitAdapter, {
+          branch,
+          rebase,
+          stagedPaths: stagedFiles.map(file => file.path),
+          onProgress: setBusyMessage,
+        });
+        if (result.kind === 'pull-conflict') {
+          showAlert(`The pull stopped on conflicts. Your local changes are saved in the stash ` +
+            `"${result.pending.message}". Resolve the conflicts and finish the pull, then restore them from ` +
+            `Local Changes.`, 'Pull Conflicts');
+        } else if (result.kind === 'apply-conflict') {
+          showAlert(`The pull succeeded, but your local changes conflict with it in ` +
+            `${result.conflictedFiles.length} file${result.conflictedFiles.length === 1 ? '' : 's'}. ` +
+            `A copy stays in the stash "${result.pending.message}" until they're resolved.`, 'Stash Conflicts');
+        }
+      } else {
+        setBusyMessage(`git pull origin ${branch}${rebase ? ' --rebase' : ''}`);
+        await gitAdapter.pull('origin', branch, rebase);
       }
-
-      setBusyMessage(`git pull origin ${branch}${rebase ? ' --rebase' : ''}`);
-      await gitAdapter.pull('origin', branch, rebase);
       clearBranchCache(branch);
       await reloadAfterCommand();
       setCommitViewReloadKey(key => key + 1);
@@ -835,8 +851,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hidePullDialog, currentBranch, handleFastForwardBranch, hasLocalChanges, clearBranchCache,
-      reloadAfterCommand, refreshRebaseStatus, setErrorWithDialog]);
+  }, [gitAdapter, hidePullDialog, currentBranch, handleFastForwardBranch, hasLocalChanges, stagedFiles, clearBranchCache,
+      reloadAfterCommand, refreshRebaseStatus, showAlert, setErrorWithDialog]);
 
   // Tags origin already has at a different commit can only be reconciled by
   // overwriting one side. A plain fetch never updates a tag that already exists

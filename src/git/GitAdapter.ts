@@ -575,6 +575,24 @@ export abstract class GitAdapter {
    */
   abstract fastForwardBranch(branchName: string): Promise<void>;
 
+  // Stash primitives for flows that must know exactly what happened - the auto-stash
+  // around a pull. Unlike stashPush/stashApply/stashPop these throw on failure, and
+  // they name the stash by its commit SHA, which stays put when other stashes are
+  // pushed or dropped (stash@{0} doesn't).
+
+  /** Stash staged and unstaged changes; returns the stash's SHA, or null if nothing to stash. */
+  abstract stashSaveStrict(message: string): Promise<string | null>;
+  /** Apply a stash, restoring the staged/unstaged split when `restoreIndex`. Throws on conflict. */
+  abstract stashApplyStrict(sha: string, restoreIndex: boolean): Promise<void>;
+  /** Drop the stash with this SHA, if it's still in the list. */
+  abstract stashDropStrict(sha: string): Promise<void>;
+  /** Whether a stash with this SHA is still in the list. */
+  abstract stashExists(sha: string): Promise<boolean>;
+  /** Whether a merge is stopped waiting for conflicts to be resolved and committed. */
+  abstract isMergeInProgress(): Promise<boolean>;
+  /** Paths with unresolved conflicts in the index. */
+  abstract getConflictedFiles(): Promise<string[]>;
+
   /**
    * For the push dialog: each local branch's upstream branch name on `remote` (only
    * branches whose upstream is on that remote), and the remote's known branches.

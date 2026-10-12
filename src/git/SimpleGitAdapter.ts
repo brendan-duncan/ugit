@@ -864,6 +864,73 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async stashSaveStrict(message: string): Promise<string | null> {
+    const startTime = performance.now();
+    const id = this._startCommand(`git stash push -m "${message}"`, startTime);
+    try {
+      const before = (await this.git.raw(['rev-parse', '--verify', '--quiet', 'refs/stash']).catch(() => '')).trim();
+      await this.git.raw(['stash', 'push', '-m', message]);
+      const after = (await this.git.raw(['rev-parse', '--verify', '--quiet', 'refs/stash']).catch(() => '')).trim();
+      // "No local changes to save" exits 0 without creating anything.
+      return after && after !== before ? after : null;
+    } finally {
+      this._endCommand(id, startTime);
+    }
+  }
+
+  async stashApplyStrict(sha: string, restoreIndex: boolean): Promise<void> {
+    const args = ['stash', 'apply', ...(restoreIndex ? ['--index'] : []), sha];
+    const startTime = performance.now();
+    const id = this._startCommand(`git ${args.join(' ')}`, startTime);
+    try {
+      // A conflicted apply exits 1 but reports the conflict on stdout, which the
+      // shared instance's handler (like simple-git's default) doesn't count as an
+      // error. Here any non-zero exit is a failure, with git's output as the message.
+      const strict = simpleGit({
+        baseDir: this.repoPath,
+        errors: (error, result) => {
+          if (!result.exitCode)
+            return error;
+          const output = Buffer.concat([...result.stdErr, ...result.stdOut]).toString('utf8').trim();
+          return new Error(output || `git stash apply exited with code ${result.exitCode}`);
+        },
+      });
+      await strict.raw(args);
+    } finally {
+      this._endCommand(id, startTime);
+    }
+  }
+
+  async stashDropStrict(sha: string): Promise<void> {
+    const shas = (await this.git.raw(['stash', 'list', '--format=%H'])).split('\n').map(line => line.trim());
+    const index = shas.indexOf(sha);
+    if (index < 0)
+      return;
+    const startTime = performance.now();
+    const id = this._startCommand(`git stash drop stash@{${index}}`, startTime);
+    try {
+      await this.git.raw(['stash', 'drop', `stash@{${index}}`]);
+    } finally {
+      this._endCommand(id, startTime);
+    }
+  }
+
+  async stashExists(sha: string): Promise<boolean> {
+    const out = await this.git.raw(['stash', 'list', '--format=%H']).catch(() => '');
+    return out.split('\n').some(line => line.trim() === sha);
+  }
+
+  async isMergeInProgress(): Promise<boolean> {
+    // --quiet exits 1 with no output when there's no MERGE_HEAD.
+    const out = await this.git.raw(['rev-parse', '--verify', '--quiet', 'MERGE_HEAD']).catch(() => '');
+    return out.trim().length > 0;
+  }
+
+  async getConflictedFiles(): Promise<string[]> {
+    const out = await this.git.raw(['diff', '--name-only', '--diff-filter=U']).catch(() => '');
+    return out.split('\n').map(line => line.trim()).filter(Boolean);
+  }
+
   async stashPop(): Promise<void> {
     const startTime = performance.now();
     const id = this._startCommand('git stash pop', startTime);

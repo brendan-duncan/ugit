@@ -41,6 +41,9 @@ function PullCommitDialog({ onClose, onPullAndCommit, onCommitOnly }: PullCommit
           <div className="dialog-info">
             <p>The remote branch is ahead of local branch. Are you sure you want to commit?</p>
             <p>It's recommended to pull first to get the latest changes from the remote.</p>
+            <p>Pull &amp; Commit stashes your changes, pulls, puts them back and then commits.
+              If anything conflicts, nothing is committed and your changes stay in the stash
+              until the conflicts are resolved.</p>
           </div>
         </div>
 

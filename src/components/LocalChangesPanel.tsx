@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import FileList from './FileList';
 import DiffViewer from './DiffViewer';
 import StashDialog from './StashDialog';
@@ -14,6 +14,8 @@ import { useSettings } from '../contexts/SettingsContext';
 import { isBranchLocked } from '../utils/settings';
 import { matchesAnyLfsPattern, suggestLfsPattern } from '../utils/lfs';
 import { actionFromMenuId, describeResult, runCustomAction } from '../utils/customActions';
+import { AUTO_STASH_CHANGED_EVENT, PendingAutoStash, loadPendingAutoStash, pullWithAutoStash,
+  restoreAutoStash, savePendingAutoStash } from '../utils/autoStash';
 import { ipcRenderer } from 'electron';
 import path from 'path';
 import './LocalChangesPanel.css';
@@ -48,7 +50,14 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const [showStashDialog, setShowStashDialog] = useState<boolean>(false);
   const [showPullCommitDialog, setShowPullCommitDialog] = useState<boolean>(false);
-  const [showStashConflictDialog, setShowStashConflictDialog] = useState<boolean>(false);
+  // What stopped a pull-and-commit, for the conflict dialog.
+  const [stashConflict, setStashConflict] = useState<{
+    kind: 'pull-conflict' | 'apply-conflict'; stashMessage: string; conflictedFiles: string[];
+  } | null>(null);
+  // A stash still holding changes from a pull that stopped on conflicts.
+  const [pendingAutoStash, setPendingAutoStash] = useState<PendingAutoStash | null>(null);
+  // Whether that pull's merge or rebase is still waiting to be finished.
+  const [pullUnfinished, setPullUnfinished] = useState(false);
   const [showLfsWarningDialog, setShowLfsWarningDialog] = useState<boolean>(false);
   const [lfsWarningFiles, setLfsWarningFiles] = useState<Array<LargeFile>>([]);
   const [pendingStashFiles, setPendingStashFiles] = useState<Array<string>>([]);
@@ -377,15 +386,18 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
   const proceedWithRemoteCheck = async () => {
     // Actively check the remote for new commits before committing, so we don't
     // create a divergent history that requires a merge. We fetch first because
-    // the cached branchStatus may be stale.
+    // the cached branchStatus may be stale - but only the branch this one follows,
+    // not every ref on origin.
     let needsPull = false;
     if (currentBranch) {
       try {
         setIsBusy(true);
-        if (onBusyMessageChange) onBusyMessageChange('git fetch origin');
-        await gitAdapter.fetch('origin');
-        const { behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
-        needsPull = behind > 0;
+        const { upstreams } = await gitAdapter.getPushTargets('origin');
+        const remoteBranch = upstreams[currentBranch] || currentBranch;
+        if (onBusyMessageChange) onBusyMessageChange(`git fetch origin ${remoteBranch}`);
+        await gitAdapter.fetch('origin', [remoteBranch]);
+        const counts = await gitAdapter.getAllAheadBehind();
+        needsPull = (counts[currentBranch]?.behind ?? 0) > 0;
         if (onBranchStatusRefresh) {
           await onBranchStatusRefresh();
         }
@@ -416,63 +428,28 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       setIsBusy(true);
       const git = gitAdapter;
 
-      // Pull first if requested
+      // Pull first if requested: stash, pull, and put the changes back - staged
+      // files staged again - before committing.
       if (doPullFirst && currentBranch) {
-        // Stash local changes before pulling
-        if (onBusyMessageChange) onBusyMessageChange(`git stash push`);
-        console.log('Stashing local changes before pull...');
-        const stashMessage = `Auto-stash before pull at ${new Date().toISOString()}`;
-        await git.stashPush(stashMessage);
-        console.log('Stashed local changes successfully');
+        const result = await pullWithAutoStash(git, {
+          branch: currentBranch,
+          stagedPaths: stagedFiles.map(file => file.path),
+          onProgress: message => onBusyMessageChange?.(message),
+        });
 
-        try {
-          if (onBusyMessageChange) onBusyMessageChange(`git pull origin ${currentBranch}`);
-          console.log(`Pulling latest changes from origin/${currentBranch}...`);
-          await git.pull('origin', currentBranch);
-          console.log('Pull completed successfully');
-
-          // Try to apply the stash
-          try {
-            if (onBusyMessageChange) onBusyMessageChange(`git stash apply`);
-            console.log('Applying stashed changes...');
-            await git.stashApply();
-            console.log('Stash applied successfully');
-
-            // If apply succeeded, pop the stash to remove it
-            try {
-              await git.stashPop();
-              console.log('Stash removed successfully after successful apply');
-            } catch (popError) {
-              console.warn('Failed to remove stash after successful apply:', popError);
-              // Continue with commit since stash was applied
-            }
-          } catch (stashError) {
-            console.error('Conflicts detected when applying stash:', stashError);
-
-            // Show conflict dialog
-            setShowStashConflictDialog(true);
-            return;
-          }
-        } catch (pullError) {
-          console.error('Pull failed, attempting to restore stash:', pullError);
-
-          // Pull failed, try to restore stash
-          try {
-            await git.stashPop();
-            console.log('Restored stashed changes after failed pull');
-          } catch (restoreError) {
-            console.error('Failed to restore stash after failed pull:', restoreError);
-            // Just log the error, don't prevent the user from trying again
-          }
-
-          setIsBusy(false);
-          if (onBusyMessageChange) onBusyMessageChange('');
-          throw pullError;
-        }
-
-        // Refresh file status after pull (and possible stash apply)
         if (onRefresh) {
           await onRefresh();
+        }
+
+        // Conflicts: don't commit. The stash keeps the user's changes, and the
+        // banner above the file lists says what to do next.
+        if (result.kind !== 'done') {
+          setStashConflict({
+            kind: result.kind,
+            stashMessage: result.pending.message,
+            conflictedFiles: result.kind === 'apply-conflict' ? result.conflictedFiles : [],
+          });
+          return;
         }
       }
 
@@ -480,6 +457,12 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       const fullMessage = commitDescription.trim()
         ? `${commitMessage.trim()}\n\n${commitDescription.trim()}`
         : commitMessage.trim();
+
+      // Last guard: never commit over unresolved conflicts, whatever led here.
+      const conflicted = await git.getConflictedFiles();
+      if (conflicted.length > 0)
+        throw new Error(`${conflicted.length} file${conflicted.length === 1 ? ' has' : 's have'} unresolved conflicts: ` +
+          `${conflicted.slice(0, 5).join(', ')}${conflicted.length > 5 ? ', ...' : ''}`);
 
       if (onBusyMessageChange) onBusyMessageChange(`git commit -m "${commitMessage.trim()}"`);
       await git.commit(fullMessage);
@@ -504,7 +487,10 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
         await onBranchStatusRefresh();
       }
     } catch (error) {
+      // Reported, not just logged: a pull or commit that failed silently looked
+      // like the button did nothing.
       console.error('Error committing:', error);
+      onError?.(`${doPullFirst ? 'Pull and commit' : 'Commit'} failed: ${(error as Error).message}`);
     } finally {
       setIsBusy(false);
       if (onBusyMessageChange) onBusyMessageChange('');
@@ -520,6 +506,109 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
     setShowPullCommitDialog(false);
     await performCommit(false);
   };
+
+  // Track the auto-stash left by a pull that stopped on conflicts. Re-checked as
+  // the file lists refresh, which is when a merge being finished would show up.
+  const repoPath = gitAdapter?.repoPath;
+  const conflictCount = unstagedFiles.filter(file => file.status === 'conflict').length;
+  const refreshPendingAutoStash = useCallback(async () => {
+    if (!gitAdapter || !repoPath)
+      return;
+    const pending = loadPendingAutoStash(repoPath);
+    // Applied or dropped by hand since: nothing left to offer.
+    if (pending && !(await gitAdapter.stashExists(pending.sha))) {
+      savePendingAutoStash(repoPath, null);
+      setPendingAutoStash(null);
+      return;
+    }
+    setPendingAutoStash(pending);
+    if (pending?.phase === 'pull-conflict')
+      setPullUnfinished(await gitAdapter.isMergeInProgress() || !!(await gitAdapter.getRebaseStatus()));
+  }, [gitAdapter, repoPath]);
+
+  useEffect(() => {
+    refreshPendingAutoStash();
+  }, [refreshPendingAutoStash, unstagedFiles, stagedFiles]);
+
+  useEffect(() => {
+    const handleChanged = () => { refreshPendingAutoStash(); };
+    window.addEventListener(AUTO_STASH_CHANGED_EVENT, handleChanged);
+    return () => window.removeEventListener(AUTO_STASH_CHANGED_EVENT, handleChanged);
+  }, [refreshPendingAutoStash]);
+
+  // The pull's merge is committed: put the stashed changes back.
+  const handleRestoreAutoStash = async () => {
+    if (!gitAdapter || !repoPath || !pendingAutoStash)
+      return;
+    try {
+      setIsBusy(true);
+      onBusyMessageChange?.('git stash apply --index');
+      const conflicted = await restoreAutoStash(gitAdapter, pendingAutoStash);
+      if (conflicted.length > 0) {
+        savePendingAutoStash(repoPath, { ...pendingAutoStash, phase: 'apply-conflict' });
+        setStashConflict({ kind: 'apply-conflict', stashMessage: pendingAutoStash.message, conflictedFiles: conflicted });
+      } else {
+        savePendingAutoStash(repoPath, null);
+      }
+      await onRefresh?.();
+    } catch (error) {
+      onError?.(`Restoring your changes failed: ${(error as Error).message}`);
+    } finally {
+      setIsBusy(false);
+      onBusyMessageChange?.('');
+    }
+  };
+
+  // Re-applied changes' conflicts are resolved: the backup copy can go.
+  const handleDropAutoStash = async () => {
+    if (!gitAdapter || !repoPath || !pendingAutoStash)
+      return;
+    try {
+      await gitAdapter.stashDropStrict(pendingAutoStash.sha);
+      savePendingAutoStash(repoPath, null);
+      await onStashCreated?.();
+    } catch (error) {
+      onError?.(`Dropping the stash failed: ${(error as Error).message}`);
+    }
+  };
+
+  // Keep the stash but stop tracking it here; it's still in the stash list.
+  const handleDismissAutoStash = () => {
+    if (repoPath)
+      savePendingAutoStash(repoPath, null);
+  };
+
+  let autoStashBanner: React.ReactNode = null;
+  if (pendingAutoStash) {
+    const name = `"${pendingAutoStash.message}"`;
+    if (pendingAutoStash.phase === 'pull-conflict' && (pullUnfinished || conflictCount > 0)) {
+      autoStashBanner = (
+        <span>The pull stopped on conflicts. Your local changes are saved in the stash {name}.
+          Resolve the conflicts and finish the pull (commit the merge, or continue the rebase),
+          then restore them here.</span>
+      );
+    } else if (pendingAutoStash.phase === 'pull-conflict') {
+      autoStashBanner = (
+        <>
+          <span>The pull is finished. Your local changes are still in the stash {name}.</span>
+          <button className="auto-stash-button" onClick={handleRestoreAutoStash} disabled={isBusy}>Restore changes</button>
+        </>
+      );
+    } else if (conflictCount > 0) {
+      autoStashBanner = (
+        <span>Your re-applied changes have {conflictCount} conflicted file{conflictCount === 1 ? '' : 's'}.
+          A copy stays in the stash {name} until they're resolved.</span>
+      );
+    } else {
+      autoStashBanner = (
+        <>
+          <span>Conflicts resolved. The stash {name} still holds a copy of your changes.</span>
+          <button className="auto-stash-button" onClick={handleDropAutoStash} disabled={isBusy}>Drop the copy</button>
+          <button className="auto-stash-button secondary" onClick={handleDismissAutoStash}>Keep it</button>
+        </>
+      );
+    }
+  }
 
   const handleStash = async (message: string, stageNewFiles: boolean, keepChanges: boolean) => {
     setShowStashDialog(false);
@@ -814,6 +903,7 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
+      {autoStashBanner && <div className="auto-stash-banner">{autoStashBanner}</div>}
       {/* Top section: file lists on left, diff viewer on right */}
       <div className="local-changes-top-section" style={{ height: `calc(100% - 60px)` }}>
         <div className="local-changes-file-lists" style={{ width: `${leftWidth}%` }}>
@@ -1052,9 +1142,12 @@ function LocalChangesPanel({ unstagedFiles, stagedFiles, gitAdapter, onRefresh, 
       )}
 
       {/* Stash Conflict Dialog */}
-      {showStashConflictDialog && (
+      {stashConflict && (
         <StashConflictDialog
-          onClose={() => setShowStashConflictDialog(false)}
+          kind={stashConflict.kind}
+          stashMessage={stashConflict.stashMessage}
+          conflictedFiles={stashConflict.conflictedFiles}
+          onClose={() => setStashConflict(null)}
         />
       )}
 
