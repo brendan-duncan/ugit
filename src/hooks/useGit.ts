@@ -112,6 +112,26 @@ export function useGitAdapter({ repoPath, onError }: UseGitOptions): UseGitResul
   };
 }
 
+/** Parse `git remote -v` into one entry per remote, using its fetch URL. */
+function parseRemotes(output: string): RemoteInfo[] {
+  // Lines look like "origin\t<url> (fetch)". Partial clones append a filter
+  // spec, e.g. "origin\t<url> (fetch) [blob:none]", so don't anchor the end.
+  const seen = new Set<string>();
+  const remotes: RemoteInfo[] = [];
+  for (const line of output.split('\n')) {
+    const match = line.trim().match(/^(\S+)\s+(\S+)\s+\((fetch|push)\)/);
+    if (!match || seen.has(match[1]))
+      continue;
+    seen.add(match[1]);
+    remotes.push({ name: match[1], url: match[2] });
+  }
+  return remotes;
+}
+
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | null) {
   const [currentBranch, setCurrentBranch] = useState<string>('');
   const [originUrl, setOriginUrl] = useState<string>('');
@@ -258,30 +278,8 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       const branchSummary = await gitAdapter.branchLocal();
       setBranches(branchSummary.all);
 
-      let remotesList: RemoteInfo[] = [];
-      try {
-        const remotesOutput = await gitAdapter.raw(['remote', '-v']);
-        // Lines look like "origin\t<url> (fetch)". Partial clones append a filter
-        // spec, e.g. "origin\t<url> (fetch) [blob:none]", so don't anchor the end.
-        const seenRemotes = new Set<string>();
-        remotesList = remotesOutput
-          .split('\n')
-          .map(line => line.trim())
-          .filter(Boolean)
-          .map(line => {
-            const match = line.match(/^(\S+)\s+(\S+)\s+\((fetch|push)\)/);
-            if (!match || seenRemotes.has(match[1])) {
-              return null;
-            }
-            seenRemotes.add(match[1]);
-            return { name: match[1], url: match[2] };
-          })
-          .filter(Boolean) as RemoteInfo[];
-        setRemotes(remotesList);
-      } catch {
-        setRemotes([]);
-        remotesList = [];
-      }
+      const remotesList = parseRemotes(await gitAdapter.raw(['remote', '-v']));
+      setRemotes(remotesList);
 
       const statusMap = await gitAdapter.getAllAheadBehind();
       setBranchStatus(statusMap);
@@ -360,13 +358,36 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
       return;
     try {
       const list = await gitAdapter.listWorktrees();
-      setWorktrees(list);
+      // Returning the previous array when nothing changed skips the re-render,
+      // which matters now this also runs whenever the window regains focus.
+      setWorktrees(prev => sameJson(prev, list) ? prev : list);
       // Keep the on-disk cache in sync so a cold open shows the latest worktrees.
       const cacheData = cacheManager.loadCache(repoPath) || {};
-      cacheData.worktrees = list;
-      cacheManager.saveCache(repoPath, cacheData);
+      if (!sameJson(cacheData.worktrees, list)) {
+        cacheData.worktrees = list;
+        cacheManager.saveCache(repoPath, cacheData);
+      }
     } catch (err) {
       console.error('Error refreshing worktrees:', err);
+    }
+  }, [gitAdapter, repoPath]);
+
+  // Remotes aren't refs, so the ref watcher can't see one added, removed or
+  // re-pointed outside ugit; this re-reads them.
+  const refreshRemotes = useCallback(async () => {
+    if (!gitAdapter)
+      return;
+    const [list, url] = await Promise.all([
+      gitAdapter.raw(['remote', '-v']).then(parseRemotes),
+      gitAdapter.getOriginUrl()
+    ]);
+    setRemotes(prev => sameJson(prev, list) ? prev : list);
+    setOriginUrl(url);
+    const cacheData = cacheManager.loadCache(repoPath) || {};
+    if (!sameJson(cacheData.remotes, list) || cacheData.originUrl !== url) {
+      cacheData.remotes = list;
+      cacheData.originUrl = url;
+      cacheManager.saveCache(repoPath, cacheData);
     }
   }, [gitAdapter, repoPath]);
 
@@ -403,6 +424,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
     loadRepoData,
     refreshStashes,
     refreshWorktrees,
+    refreshRemotes,
     updateBranchCache,
     clearBranchCache,
     dropBranchCaches,

@@ -70,6 +70,8 @@ const REMOTE_POLL_MAX_BACKOFF_MS = 60 * 60 * 1000;
 // Coming back to the window re-asks the remote early, but no more often than this:
 // returning from a terminal or browser is a good sign something was pushed.
 const REMOTE_FOCUS_RECHECK_MS = 2 * 60 * 1000;
+// Floor between re-reads of remotes and worktrees on focus.
+const CONFIG_RECHECK_MS = 10 * 1000;
 
 /** Short stand-in for a ref snapshot, persisted so a cold open can tell if refs moved. */
 function refsFingerprint(raw: string): string {
@@ -175,6 +177,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     loadRepoData,
     refreshStashes,
     refreshWorktrees,
+    refreshRemotes,
     updateBranchCache,
     clearBranchCache,
     dropBranchCaches,
@@ -519,6 +522,29 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       document.removeEventListener('visibilitychange', handleVisible);
     };
   }, [loading, isActiveTab, settings, getSetting, refreshFileStatus, refreshRebaseStatus]);
+
+  // Remotes and worktrees aren't refs, so the ref watcher misses ones added or
+  // removed outside ugit. They change rarely, so re-read them only when the tab
+  // becomes active or the window regains focus, at most every few seconds.
+  const lastConfigCheck = useRef(0);
+  useEffect(() => {
+    if (loading || !isActiveTab)
+      return;
+
+    const refreshConfig = () => {
+      if (document.hidden || Date.now() - lastConfigCheck.current < CONFIG_RECHECK_MS)
+        return;
+      lastConfigCheck.current = Date.now();
+      Promise.allSettled([refreshRemotes(), refreshWorktrees()]);
+    };
+    refreshConfig();
+    window.addEventListener('focus', refreshConfig);
+    document.addEventListener('visibilitychange', refreshConfig);
+    return () => {
+      window.removeEventListener('focus', refreshConfig);
+      document.removeEventListener('visibilitychange', refreshConfig);
+    };
+  }, [loading, isActiveTab, refreshRemotes, refreshWorktrees]);
 
   useEffect(() => {
     const handleBranchStatusRefresh = () => refreshBranchStatus();
