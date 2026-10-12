@@ -626,6 +626,35 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async fastForwardBranch(branchName: string): Promise<void> {
+    const startTime = performance.now();
+    let id = -1;
+    try {
+      const tracking = (await this.git.raw(['for-each-ref',
+        '--format=%(upstream:remotename)%09%(upstream:remoteref)', `refs/heads/${branchName}`])).trim();
+      const [remote, remoteRef] = tracking.split('\t');
+      const source = remote && remoteRef ? { remote, ref: remoteRef } : { remote: 'origin', ref: `refs/heads/${branchName}` };
+
+      // `git pull` only ever updates the checked-out branch, merging into it -
+      // asking it for another branch merges that branch into the current one.
+      // A fetch into the local ref moves the branch itself, and git refuses
+      // anything but a fast-forward, or a branch checked out in any worktree.
+      id = this._startCommand(`git fetch ${source.remote} ${source.ref}:refs/heads/${branchName}`, startTime);
+      await withGitLock(await this.getObjectStoreKey(), () =>
+        this.git.raw(['-c', 'gc.auto=0', 'fetch', source.remote, `${source.ref}:refs/heads/${branchName}`]));
+    } catch (error) {
+      const message = (error as Error).message || '';
+      if (/non-fast-forward|rejected/i.test(message)) {
+        throw new Error(`'${branchName}' has commits the remote doesn't, so it can't be fast-forwarded. ` +
+          'Check it out to merge or rebase instead.');
+      }
+      throw error;
+    } finally {
+      if (id >= 0)
+        this._endCommand(id, startTime);
+    }
+  }
+
   async merge(branchName: string): Promise<void> {
     const startTime = performance.now();
     const id = this._startCommand(`git merge ${branchName}`, startTime);

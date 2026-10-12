@@ -24,6 +24,9 @@ const PullDialog: React.FC<PullDialogProps> = ({ onClose, onPull, branches, curr
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  // Another branch is fast-forwarded in place, so stash and rebase don't apply.
+  const otherBranch = selectedBranch !== currentBranch;
+
   const handlePull = (): void => {
     onPull(selectedBranch, stashAndReapply, rebase);
   };
@@ -50,13 +53,21 @@ const PullDialog: React.FC<PullDialogProps> = ({ onClose, onPull, branches, curr
                 </option>
               ))}
             </select>
+            {otherBranch && (
+              <small className="dialog-hint">
+                '{selectedBranch}' isn't checked out. It will be fast-forwarded to its
+                remote branch without switching to it, and only if it has no commits
+                the remote lacks.
+              </small>
+            )}
           </div>
 
           <div className="dialog-field">
             <label className="dialog-checkbox-label">
               <input
                 type="checkbox"
-                checked={stashAndReapply}
+                checked={stashAndReapply && !otherBranch}
+                disabled={otherBranch}
                 onChange={(e) => setStashAndReapply(e.target.checked)}
                 className="dialog-checkbox"
               />
@@ -68,7 +79,8 @@ const PullDialog: React.FC<PullDialogProps> = ({ onClose, onPull, branches, curr
             <label className="dialog-checkbox-label">
               <input
                 type="checkbox"
-                checked={rebase}
+                checked={rebase && !otherBranch}
+                disabled={otherBranch}
                 onChange={(e) => setRebase(e.target.checked)}
                 className="dialog-checkbox"
               />

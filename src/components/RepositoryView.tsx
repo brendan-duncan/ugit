@@ -250,6 +250,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     hideCheckoutCommitDialog,
     showCreateWorktreeDialog,
     hideCreateWorktreeDialog,
+    setPullingBranch,
   } = useRepositoryViewDialogs();
 
   const loading = gitLoading || repoLoading;
@@ -780,10 +781,38 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     }
   }, [gitAdapter, showAlert, showConfirm, setErrorWithDialog]);
 
+  // Pulling a branch that isn't checked out: move it to its upstream in place.
+  const handleFastForwardBranch = useCallback(async (branch: string) => {
+    if (!gitAdapter)
+      return;
+
+    try {
+      setIsBusy(true);
+      setPullingBranch(branch);
+      setBusyMessage(`Fast-forwarding ${branch}`);
+      await gitAdapter.fastForwardBranch(branch);
+      clearBranchCache(branch);
+      await reloadAfterCommand();
+    } catch (error) {
+      console.error('Error fast-forwarding branch:', error);
+      setErrorWithDialog(`Pull failed: ${(error as Error).message}`);
+    } finally {
+      setPullingBranch(null);
+      setIsBusy(false);
+      setBusyMessage('');
+    }
+  }, [gitAdapter, clearBranchCache, reloadAfterCommand, setPullingBranch, setErrorWithDialog]);
+
   const handlePull = useCallback(async (branch: string, stashAndReapply: boolean, rebase: boolean) => {
     hidePullDialog();
     if (!gitAdapter)
       return;
+
+    // `git pull origin <other>` would merge that branch into the checked-out one.
+    if (branch !== currentBranch) {
+      await handleFastForwardBranch(branch);
+      return;
+    }
 
     try {
       setIsBusy(true);
@@ -806,7 +835,8 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       setIsBusy(false);
       setBusyMessage('');
     }
-  }, [gitAdapter, hidePullDialog, hasLocalChanges, clearBranchCache, reloadAfterCommand, refreshRebaseStatus, setErrorWithDialog]);
+  }, [gitAdapter, hidePullDialog, currentBranch, handleFastForwardBranch, hasLocalChanges, clearBranchCache,
+      reloadAfterCommand, refreshRebaseStatus, setErrorWithDialog]);
 
   // Tags origin already has at a different commit can only be reconciled by
   // overwriting one side. A plain fetch never updates a tag that already exists
@@ -1559,7 +1589,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         if (branchName === currentBranch) {
           showPullDialog();
         } else {
-          await handleFetchClick();
+          await handleFastForwardBranch(branchName);
         }
         break;
       case 'push-to-origin':
@@ -1614,7 +1644,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         }
         break;
     }
-  }, [gitAdapter, currentBranch, originUrl, handleBranchSwitch, handleFetchClick, showPullDialog,
+  }, [gitAdapter, currentBranch, originUrl, handleBranchSwitch, handleFastForwardBranch, showPullDialog,
       showPushDialog, showMergeBranchDialog, showRebaseBranchDialog, showCreateBranchDialog,
       showCreateTagFromCommitDialog, showRenameBranchDialog, showDeleteBranchDialog, showCreateWorktreeDialog]);
 

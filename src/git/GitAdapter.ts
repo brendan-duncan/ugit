@@ -568,6 +568,13 @@ export abstract class GitAdapter {
    */
   abstract getTrackedRemoteBranches(remote: string): Promise<Record<string, string>>;
 
+  /**
+   * Bring a branch that isn't checked out up to date with its upstream (else
+   * origin/<name>) without switching to it. Only fast-forwards; throws if the
+   * branch has commits the remote doesn't, or is checked out in a worktree.
+   */
+  abstract fastForwardBranch(branchName: string): Promise<void>;
+
   /** Whether this process has a git command queued or running for this repository. */
   abstract isRepoBusy(): Promise<boolean>;
 

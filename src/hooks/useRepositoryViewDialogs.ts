@@ -84,6 +84,8 @@ interface UseRepositoryViewDialogsResult {
   hideCheckoutCommitDialog: () => void;
   showCreateWorktreeDialog: (prefillBranch?: string | null) => void;
   hideCreateWorktreeDialog: () => void;
+  // Marks the branch row being fast-forwarded with a spinner.
+  setPullingBranch: (branch: string | null) => void;
 }
 
 export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
@@ -225,6 +227,7 @@ export function useRepositoryViewDialogs(): UseRepositoryViewDialogsResult {
       pullRequestBranch,
       worktreePrefillBranch,
     },
+    setPullingBranch,
     showPullDialog: useCallback(() => setShowPullDialog(true), []),
     hidePullDialog,
     showPushDialog: useCallback((branch: string | null) => setShowPushDialog(branch), []),

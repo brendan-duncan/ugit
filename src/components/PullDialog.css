@@ -29,3 +29,10 @@
   border-color: #ce9178;
   background-color: rgba(206, 145, 120, 0.1);
 }
+
+.dialog-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
