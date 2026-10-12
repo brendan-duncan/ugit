@@ -240,6 +240,57 @@ export class SimpleGitAdapter extends GitAdapter {
     }
   }
 
+  async getAllAheadBehind(): Promise<Record<string, { ahead: number; behind: number }>> {
+    const startTime = performance.now();
+    const id = this._startCommand('git for-each-ref --format=%(upstream:track) refs/heads', startTime);
+    const result: Record<string, { ahead: number; behind: number }> = {};
+    try {
+      // One process counts every branch against its upstream, where a rev-list per
+      // branch costs a process each - hundreds on a branch-heavy repository.
+      const out = await this.git.raw(['for-each-ref',
+        '--format=%(refname)%09%(upstream:lstrip=2)%09%(upstream:track,nobracket)',
+        'refs/heads', 'refs/remotes/origin']);
+
+      const remoteBranches = new Set<string>();
+      const withoutUpstream: string[] = [];
+      for (const line of out.split('\n')) {
+        if (!line.trim())
+          continue;
+        const [ref, upstream, track] = line.split('\t');
+        if (ref.startsWith('refs/remotes/')) {
+          remoteBranches.add(ref.slice('refs/remotes/'.length));
+          continue;
+        }
+        const name = ref.slice('refs/heads/'.length);
+        if (!upstream) {
+          withoutUpstream.push(name);
+          continue;
+        }
+        // 'gone' means the upstream was deleted; there's nothing to compare with.
+        const ahead = parseInt(/ahead (\d+)/.exec(track)?.[1] ?? '0', 10);
+        const behind = parseInt(/behind (\d+)/.exec(track)?.[1] ?? '0', 10);
+        if (ahead > 0 || behind > 0)
+          result[name] = { ahead, behind };
+      }
+
+      // Branches pushed without -u (ugit's own push among them) have no upstream,
+      // but are still compared with origin/<name> when that exists.
+      await Promise.all(withoutUpstream
+        .filter(name => remoteBranches.has(`origin/${name}`))
+        .map(async name => {
+          const out = await this.git.raw(['rev-list', '--left-right', '--count', `${name}...origin/${name}`]);
+          const [ahead, behind] = out.trim().split('\t').map(Number);
+          if (ahead > 0 || behind > 0)
+            result[name] = { ahead, behind };
+        }));
+    } catch (error) {
+      console.error('Error reading branch ahead/behind:', error);
+    } finally {
+      this._endCommand(id, startTime);
+    }
+    return result;
+  }
+
   async getOriginUrl(): Promise<string> {
     const startTime = performance.now();
     let id: number;

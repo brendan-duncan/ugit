@@ -283,21 +283,7 @@ export function useRepositoryData(repoPath: string, gitAdapter: GitAdapter | nul
         remotesList = [];
       }
 
-      const statusPromises = branchSummary.all.map(async (branchName) => {
-        const { ahead, behind } = await gitAdapter.getAheadBehind(branchName, `origin/${branchName}`);
-        if (ahead > 0 || behind > 0) {
-          return { branchName, ahead, behind };
-        }
-        return null;
-      });
-
-      const statusResults = await Promise.all(statusPromises);
-      const statusMap: { [branchName: string]: { ahead: number; behind: number } } = {};
-      statusResults.forEach(result => {
-        if (result) {
-          statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
-        }
-      });
+      const statusMap = await gitAdapter.getAllAheadBehind();
       setBranchStatus(statusMap);
 
       const stashList = await gitAdapter.stashList();

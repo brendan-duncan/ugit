@@ -484,6 +484,13 @@ export abstract class GitAdapter {
   abstract getAheadBehind(localBranch: string, remoteBranch: string): Promise<AheadBehind>;
 
   /**
+   * Ahead/behind for every local branch that differs from its counterpart, keyed by
+   * branch name. The counterpart is the branch's upstream, or origin/<same name>
+   * for a branch with no upstream configured.
+   */
+  abstract getAllAheadBehind(): Promise<Record<string, AheadBehind>>;
+
+  /**
    * Get remote origin URL
    */
   abstract getOriginUrl(): Promise<string>;

@@ -372,18 +372,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       return;
 
     try {
-      const branchSummary = await gitAdapter.branchLocal();
-      const statusPromises = branchSummary.all.map(async (branchName) => {
-        const { ahead, behind } = await gitAdapter.getAheadBehind(branchName, `origin/${branchName}`);
-        return (ahead > 0 || behind > 0) ? { branchName, ahead, behind } : null;
-      });
-
-      const statusResults = await Promise.all(statusPromises);
-      const statusMap: { [key: string]: { ahead: number; behind: number } } = {};
-      statusResults.forEach(result => {
-        if (result) statusMap[result.branchName] = { ahead: result.ahead, behind: result.behind };
-      });
-      setBranchStatus(statusMap);
+      setBranchStatus(await gitAdapter.getAllAheadBehind());
     } catch (error) {
       console.error('Error refreshing branch status:', error);
     }
@@ -571,28 +560,11 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
     };
 
     const updateLocalStatus = async () => {
-      let status: { ahead: number; behind: number } | null = null;
-      try {
-        // Compares local refs only - no network.
-        const { ahead, behind } = await gitAdapter.getAheadBehind(currentBranch, `origin/${currentBranch}`);
-        if (ahead > 0 || behind > 0) {
-          status = { ahead, behind };
-        }
-      } catch {
-        status = null;
-      }
+      // Compares local refs only - no network.
+      const statusMap = await gitAdapter.getAllAheadBehind();
       if (cancelled)
         return;
-
-      setBranchStatus(prev => {
-        const next = { ...prev };
-        if (status) {
-          next[currentBranch] = status;
-        } else {
-          delete next[currentBranch];
-        }
-        return next;
-      });
+      setBranchStatus(statusMap);
       // No direct onTabStatusChange call — the branchStatus useEffect above
       // mirrors current-branch status to the tab indicator on every change.
     };
@@ -1982,26 +1954,17 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
         setBranches(branchNames);
       }
 
-      // Only the branches that moved: re-counting every branch on every change
-      // would cost a process per branch on a repository with hundreds of them.
-      const counts = await Promise.all([...affectedLocal]
-        .filter(name => `refs/heads/${name}` in next.refs)
-        .map(async name => ({ name, ...(await gitAdapter.getAheadBehind(name, `origin/${name}`)) })));
-
-      const statusMap = { ...branchStatusRef.current };
-      for (const name of affectedLocal)
-        delete statusMap[name];
-      for (const { name, ahead, behind } of counts) {
-        if (ahead > 0 || behind > 0)
-          statusMap[name] = { ahead, behind };
-      }
-      if (affectedLocal.size > 0)
+      // Any branch or remote ref moving can change a count - a branch's upstream
+      // needn't share its name - and one for-each-ref recounts them all.
+      const countsStale = localChanged.size > 0 || remoteChanged.size > 0;
+      const statusMap = countsStale ? await gitAdapter.getAllAheadBehind() : null;
+      if (statusMap)
         setBranchStatus(statusMap);
 
       const cacheData = cacheManager.loadCache(repoPath) || {};
       if (branchNames)
         cacheData.branches = branchNames;
-      if (affectedLocal.size > 0)
+      if (statusMap)
         cacheData.branchStatus = statusMap;
       cacheData.refsFingerprint = fingerprint;
       cacheManager.saveCache(repoPath, cacheData);
