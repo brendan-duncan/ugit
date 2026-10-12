@@ -28,11 +28,12 @@ interface BranchViewProps {
   pageSize: number;
   search?: CommitSearchState;
   onLoadPage: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   onSearch: (query: SearchQuery) => void;
   onClearSearch: () => void;
 }
 
-function BranchView({ branchName, commits, stashCommits, onStashContextMenu, loading, gitAdapter, onRefresh, onContextMenu, onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch }: BranchViewProps) {
+function BranchView({ branchName, commits, stashCommits, onStashContextMenu, loading, gitAdapter, onRefresh, onContextMenu, onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onPageSizeChange, onSearch, onClearSearch }: BranchViewProps) {
   const [selectedCommit, setSelectedCommit] = useState<Commit | null>(null);
   const [commitFiles, setCommitFiles] = useState([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -112,6 +113,7 @@ function BranchView({ branchName, commits, stashCommits, onStashContextMenu, loa
               pageSize={pageSize}
               search={search}
               onLoadPage={onLoadPage}
+              onPageSizeChange={onPageSizeChange}
               onSearch={onSearch}
               onClearSearch={onClearSearch}
             />

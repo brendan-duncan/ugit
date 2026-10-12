@@ -53,7 +53,7 @@ function BranchStashPanel({ branches, currentBranch, branchStatus, onBranchSwitc
       onOpenWorktree, onAddWorktree, onWorktreeAction, onAddBranch, onStashAll, canStash,
       originUrl }: BranchStashPanelProps) {
   const [branchesCollapsed, setBranchesCollapsed] = useState(false);
-  const [worktreesCollapsed, setWorktreesCollapsed] = useState(false);
+  const [worktreesCollapsed, setWorktreesCollapsed] = useState(true);
   const [remotesCollapsed, setRemotesCollapsed] = useState(false);
   const [stashesCollapsed, setStashesCollapsed] = useState(false);
   // Most repositories have no submodules, so that section starts out of the way.

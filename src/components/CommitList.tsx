@@ -28,9 +28,14 @@ interface CommitListProps {
   pageSize: number;
   search?: CommitSearchState;
   onLoadPage: (page: number) => void;
+  // Changes the maxCommits setting, which is the page size.
+  onPageSizeChange?: (pageSize: number) => void;
   onSearch: (query: SearchQuery) => void;
   onClearSearch: () => void;
 }
+
+// Choices for the page-size picker under the list.
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500, 1000];
 
 interface CommitFilters {
   author: string;
@@ -86,7 +91,7 @@ function filtersToQuery(f: CommitFilters): SearchQuery {
 
 function CommitList({
   commits, stashCommits, onStashContextMenu, selectedCommit, onSelectCommit, onContextMenu,
-  onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onSearch, onClearSearch
+  onDoubleClick, currentBranch, page, totalCount, pageSize, search, onLoadPage, onPageSizeChange, onSearch, onClearSearch
 }: CommitListProps) {
   const { getSetting } = useSettings();
   const commitActions = actionsFor(getSetting('customActions'), 'commit');
@@ -232,7 +237,12 @@ function CommitList({
 
   const searchActive = !!search;
   const totalPages = totalCount !== undefined ? Math.max(1, Math.ceil(totalCount / pageSize)) : undefined;
-  const showPagination = !searchActive && (totalCount === undefined || totalCount > pageSize);
+  // Shown even for a single page when the size can be changed from it.
+  const hasMultiplePages = totalCount === undefined || totalCount > pageSize;
+  const showPagination = !searchActive && (hasMultiplePages || (!!onPageSizeChange && commits.length > 0));
+  const pageSizeOptions = PAGE_SIZE_OPTIONS.includes(pageSize)
+    ? PAGE_SIZE_OPTIONS
+    : [...PAGE_SIZE_OPTIONS, pageSize].sort((a, b) => a - b);
   const canPrev = !searchActive && page > 0;
   const canNext = !searchActive && (totalCount === undefined || (page + 1) * pageSize < totalCount);
 
@@ -454,6 +464,19 @@ function CommitList({
               </span>
             )}
           </span>
+          {onPageSizeChange && (
+            <label className="commit-pagination-size" title="Commits per page (Max Display Commits setting)">
+              <select
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(parseInt(e.target.value, 10))}
+              >
+                {pageSizeOptions.map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+              per page
+            </label>
+          )}
           <button
             type="button"
             className="commit-pagination-button"

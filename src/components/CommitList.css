@@ -327,6 +327,24 @@
   color: var(--text-secondary);
 }
 
+.commit-pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.commit-pagination-size select {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 3px 4px;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* Search-mode toggle inside the filter panel */
 .commit-search-mode-toggle {
   display: flex;

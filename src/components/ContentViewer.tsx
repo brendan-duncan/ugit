@@ -24,6 +24,7 @@ interface ContentViewerProps {
   onStashCreated?: () => Promise<void>;
   pageSize: number;
   onLoadCommitPage: (page: number) => void;
+  onCommitPageSizeChange?: (pageSize: number) => void;
   onSearchCommits: (query: SearchQuery) => void;
   onClearCommitSearch: () => void;
   // Stashes to show against the commits they were made on.
@@ -31,7 +32,7 @@ interface ContentViewerProps {
   onStashContextMenu?: (action: string, stash: StashCommit) => void;
 }
 
-function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, onStashCreated, pageSize, onLoadCommitPage, onSearchCommits, onClearCommitSearch, stashCommits, onStashContextMenu }: ContentViewerProps): React.ReactElement {
+function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, onRefresh, onBranchStatusRefresh, onContextMenu, onCommitDoubleClick, currentBranch, branchStatus, onError, onBusyChange, onBusyMessageChange, onCommitCreated, onStashCreated, pageSize, onLoadCommitPage, onCommitPageSizeChange, onSearchCommits, onClearCommitSearch, stashCommits, onStashContextMenu }: ContentViewerProps): React.ReactElement {
   if (!selectedItem) {
     return (
       <div className="content-viewer">
@@ -88,6 +89,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           pageSize={pageSize}
           search={selectedItem.search}
           onLoadPage={onLoadCommitPage}
+          onPageSizeChange={onCommitPageSizeChange}
           onSearch={onSearchCommits}
           onClearSearch={onClearCommitSearch}
         />
@@ -107,6 +109,7 @@ function ContentViewer({ selectedItem, unstagedFiles, stagedFiles, gitAdapter, o
           pageSize={pageSize}
           search={selectedItem.search}
           onLoadPage={onLoadCommitPage}
+          onPageSizeChange={onCommitPageSizeChange}
           onSearch={onSearchCommits}
           onClearSearch={onClearCommitSearch}
         />

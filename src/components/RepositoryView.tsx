@@ -1171,9 +1171,11 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
 
     try {
       const offset = targetPage * pageSize;
+      // The count only changes when the branch moves, and moving drops its cache
+      // entry, so a cached count is still right when paging to a new page.
       const [commits, totalCount] = await Promise.all([
         gitAdapter.log(branchName, pageSize, offset),
-        gitAdapter.getCommitCount(branchName)
+        cached?.totalCount ?? gitAdapter.getCommitCount(branchName)
       ]);
       const existing = branchCommitsCache.current.get(branchName);
       updateBranchCache(branchName, {
@@ -1765,7 +1767,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
       const offset = targetPage * pageSize;
       const [commits, totalCount] = await Promise.all([
         gitAdapter.log(fullName, pageSize, offset),
-        gitAdapter.getCommitCount(fullName)
+        cached?.totalCount ?? gitAdapter.getCommitCount(fullName)
       ]);
       const existing = branchCommitsCache.current.get(fullName);
       updateBranchCache(fullName, {
@@ -2002,6 +2004,25 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
   useEffect(() => {
     checkRefsRef.current = checkRefs;
   }, [checkRefs]);
+
+  // Cached pages were cut at the old page size, so a new size (from the commit
+  // list or the settings dialog) drops them and reloads the page that holds the
+  // first commit that was on screen.
+  const maxCommits = getSetting('maxCommits') || 100;
+  const prevMaxCommits = useRef(maxCommits);
+  useEffect(() => {
+    if (prevMaxCommits.current === maxCommits)
+      return;
+    const sel = selectedItemRef.current;
+    const firstIndex = (sel?.page ?? 0) * prevMaxCommits.current;
+    prevMaxCommits.current = maxCommits;
+    clearBranchCache();
+    const page = Math.floor(firstIndex / maxCommits);
+    if (sel?.type === 'branch')
+      handleBranchSelect(sel.branchName, page, true);
+    else if (sel?.type === 'remote-branch')
+      loadRemoteBranchCommits(sel.remoteName, sel.branchName, sel.fullName, page, true);
+  }, [maxCommits]);
 
   const handleLoadCommitPage = useCallback((page: number) => {
     if (!selectedItem)
@@ -3006,6 +3027,7 @@ function RepositoryView({ repoPath, isActiveTab, onTabStatusChange, refreshSigna
                 onStashCreated={refreshStashes}
                 pageSize={getSetting('maxCommits') || 100}
                 onLoadCommitPage={handleLoadCommitPage}
+                onCommitPageSizeChange={(size) => updateSetting('maxCommits', size)}
                 onSearchCommits={handleSearchCommits}
                 onClearCommitSearch={handleClearSearch}
               />

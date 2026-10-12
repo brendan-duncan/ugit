@@ -1192,18 +1192,22 @@ export class SimpleGitAdapter extends GitAdapter {
       commit.tags = tagMap.get(commit.hash) || [];
     });
 
-    const isRemoteBranch = branchName.startsWith('origin/');
-    await Promise.all(commits.map(async (commit) => {
-      try {
-        if (!isRemoteBranch) {
-          const refToCheck = `origin/${branchName}`;
-          const unpushedCommits = await this.git.raw(['log', `${refToCheck}..${commit.hash}`]);
-          commit.onOrigin = unpushedCommits.trim().length === 0;
-        }
-      } catch (error) {
+    if (branchName.startsWith('origin/') || commits.length === 0)
+      return;
+
+    // One rev-list for the whole page rather than a `git log` per commit: the
+    // commits not yet on origin are exactly those reachable from the branch but
+    // not from its origin counterpart.
+    try {
+      const out = await this.git.raw(['rev-list', `origin/${branchName}..${branchName}`, '--']);
+      const unpushed = new Set(out.split('\n').map(line => line.trim()).filter(Boolean));
+      for (const commit of commits)
+        commit.onOrigin = !unpushed.has(commit.hash);
+    } catch {
+      // No origin counterpart: nothing on this branch has been pushed under its name.
+      for (const commit of commits)
         commit.onOrigin = false;
-      }
-    }));
+    }
   }
 
   async getCommitCount(branchName: string): Promise<number> {
