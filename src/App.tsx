@@ -13,7 +13,7 @@ import { SettingsDialog } from './components/SettingsDialog';
 import UpdateNotification from './components/UpdateNotification';
 import { useAlert } from './contexts/AlertContext';
 import { useSettings } from './contexts/SettingsContext';
-import { getRecentRepos, addRecentRepo, setRecentRepos } from './utils/recentRepos';
+import { getRecentRepos, addRecentRepo, setRecentRepos, getOpenTabs, setOpenTabs } from './utils/recentRepos';
 import { cloneLoreRepositoryStreaming, writeTempViewFile, resolveLoreBin, createLoreRepository, setLoreBinOverride, setLoreServerOverride } from './lore';
 import { CloneParams } from './components/CloneDialog';
 import { InitParams } from './components/InitRepositoryDialog';
@@ -174,16 +174,18 @@ function App(): React.ReactElement {
         ipcRenderer.send('update-recent-repos', validRecent);
       }
 
+      // Reopen the tabs from last time. Installs from before tabs had their own
+      // list only have the recent list, which is newest-first, so reverse it.
+      const savedTabs = getOpenTabs();
+      const orderedRepos = savedTabs !== null ? filterValidRepos(savedTabs) : [...validRecent].reverse();
+
       // Auto-open last opened repos
-      if (validRecent.length > 0) {
+      if (orderedRepos.length > 0) {
         const newTabs: Tab[] = [];
         let activeTabIdToSet: string | null = null;
 
         // Get saved active tab path
         const savedActiveTabPath = localStorage.getItem(ACTIVE_TAB_KEY);
-
-        // Reverse recent repos to restore original tab order
-        const orderedRepos = [...validRecent].reverse();
 
         orderedRepos.forEach((repoPath, index) => {
           const tabId = String(Date.now() + index);
@@ -588,13 +590,15 @@ function App(): React.ReactElement {
       // path may not exist on disk yet, so they must not pollute the recent list.
       const persistableTabs = tabs.filter(tab => !tab.cloning && !tab.cloneError);
       if (persistableTabs.length > 0) {
-        // Set recent repos to exactly match current tabs (most recent first), filtering out invalid paths
-        const tabPaths = persistableTabs.map(tab => tab.path).reverse();
-        const validPaths = filterValidRepos(tabPaths);
-        const recent = setRecentRepos(validPaths);
+        // Every open tab is saved for the next launch; only the recent list
+        // (most recent first) is capped.
+        const validPaths = filterValidRepos(persistableTabs.map(tab => tab.path));
+        setOpenTabs(validPaths);
+        const recent = setRecentRepos([...validPaths].reverse());
         ipcRenderer.send('update-recent-repos', recent);
       } else {
         // No tabs open, clear recent repos
+        setOpenTabs([]);
         const recent = setRecentRepos([]);
         ipcRenderer.send('update-recent-repos', recent);
       }

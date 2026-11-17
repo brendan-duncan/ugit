@@ -53,3 +53,29 @@ export function clearRecentRepos(): void {
     console.error('Error clearing recent repos:', error);
   }
 }
+// Open tabs are kept apart from the recent list: the recent list is capped at
+// MAX_RECENT_REPOS, but every tab that was open should come back on restart.
+// Stored in tab order (left to right).
+const OPEN_TABS_KEY = 'ugit-open-tabs';
+
+// null when nothing has been saved yet (an install from before this key existed).
+export function getOpenTabs(): string[] | null {
+  try {
+    const stored = localStorage.getItem(OPEN_TABS_KEY);
+    if (stored === null)
+      return null;
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (error) {
+    console.error('Error loading open tabs:', error);
+    return null;
+  }
+}
+
+export function setOpenTabs(repoPaths: string[]): void {
+  try {
+    localStorage.setItem(OPEN_TABS_KEY, JSON.stringify([...new Set(repoPaths)]));
+  } catch (error) {
+    console.error('Error saving open tabs:', error);
+  }
+}
