@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { clipboard } from 'electron';
+import { clipboard } from '../utils/clipboard';
 import './Toolbar.css';
 
 interface RunningCommand {

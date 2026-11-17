@@ -8,7 +8,8 @@ import { actionsFor, describeResult, runCustomAction } from '../utils/customActi
 import { useSettings } from '../contexts/SettingsContext';
 import { convertGitSshToHttps } from '../utils/utils';
 import { exec } from 'child_process';
-import { shell, clipboard, ipcRenderer } from 'electron';
+import { shell, ipcRenderer } from 'electron';
+import { clipboard } from '../utils/clipboard';
 import './RepoInfo.css';
 
 interface SelectedItem {

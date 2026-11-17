@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ipcRenderer, clipboard } from 'electron';
+import { ipcRenderer } from 'electron';
+import { clipboard } from '../utils/clipboard';
 import { resolveLoreServerBin } from '../lore';
 import { useSettings } from '../contexts/SettingsContext';
 import './Dialog.css';

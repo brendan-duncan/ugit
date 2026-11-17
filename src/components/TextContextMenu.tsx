@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { clipboard, ipcRenderer } from 'electron';
+import { ipcRenderer } from 'electron';
+import { clipboard } from '../utils/clipboard';
 import './TextContextMenu.css';
 
 type TextField = HTMLInputElement | HTMLTextAreaElement;
@@ -50,7 +51,11 @@ export function useTextContextMenu() {
       field,
       hasSelection: end > start,
       isEditable: !field.disabled && !field.readOnly,
-      canPaste: clipboard.readText().length > 0
+      canPaste: true
+    });
+    // The clipboard is only reachable asynchronously; settle Paste once it answers.
+    clipboard.readText().then(text => {
+      setMenu(m => (m && m.field === field ? { ...m, canPaste: text.length > 0 } : m));
     });
   }, []);
 

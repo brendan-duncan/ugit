@@ -14,7 +14,7 @@ import LoreApplyStashDialog from './LoreApplyStashDialog';
 import MetadataDialog from './MetadataDialog';
 import DependenciesDialog from './DependenciesDialog';
 import { showInExplorer, openInEditor, openInConsole } from '../utils/osActions';
-import { clipboard } from 'electron';
+import { clipboard } from '../utils/clipboard';
 import { LoreTreeNode, LoreFileInfo, LoreFileHistoryEntry, LoreStash, LoreStashFile, StashInput, LoreBisectStep, LoreMetadataEntry } from '../lore';
 import './LoreRepositoryView.css';
 import './Toolbar.css';

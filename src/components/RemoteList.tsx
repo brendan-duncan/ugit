@@ -6,7 +6,8 @@ import EditRemoteDialog from './EditRemoteDialog';
 import DeleteRemoteDialog from './DeleteRemoteDialog';
 import { convertGitSshToHttps } from '../utils/utils';
 import { SelectedItem, RemoteInfo } from './types';
-import { shell, clipboard } from 'electron';
+import { shell } from 'electron';
+import { clipboard } from '../utils/clipboard';
 import './RemoteList.css';
 
 interface RemoteListProps {

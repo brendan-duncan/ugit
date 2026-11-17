@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, Menu, dialog, ipcMain, clipboard } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import fixPath from 'fix-path';
 
@@ -574,6 +574,15 @@ ipcMain.on('update-recent-repos', (event: any, repos: string[]) => {
 ipcMain.handle('get-git-backend', () => {
   return gitBackend;
 });
+
+// Electron 44 no longer exposes `clipboard` to renderer processes, so the
+// renderer reaches it through here (see src/utils/clipboard.ts). These must stay
+// async: answering a sendSync with a clipboard call deadlocks the renderer.
+ipcMain.handle('clipboard-write-text', (_event: any, text: string) => {
+  clipboard.writeText(text ?? '');
+});
+
+ipcMain.handle('clipboard-read-text', () => clipboard.readText());
 
 // Provide user data path to renderer process for cache initialization
 ipcMain.handle('get-user-data-path', () => {
