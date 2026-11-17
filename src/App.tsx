@@ -171,8 +171,9 @@ function App(): React.ReactElement {
       if (validRecent.length !== recent.length) {
         // Update recent repos with only valid paths
         setRecentRepos(validRecent);
-        ipcRenderer.send('update-recent-repos', validRecent);
       }
+      // The main process builds the File menu's recent list from this.
+      ipcRenderer.send('update-recent-repos', validRecent);
 
       // Reopen the tabs from last time. Installs from before tabs had their own
       // list only have the recent list, which is newest-first, so reverse it.
@@ -583,25 +584,15 @@ function App(): React.ReactElement {
     startLoreClone(tabId, url, parentFolder, repoName, viewContent, bare, useSharedStore);
   };
 
-  // Save open tabs to recent repos when tabs change
+  // Save the open tabs for the next launch whenever they change. The recent list
+  // is separate: it records repos as they're opened (addRecentRepo), so closing a
+  // tab leaves it there.
   useEffect(() => {
     if (hasLoadedRecent) {
       // Exclude tabs that are still cloning (or whose clone failed): their target
-      // path may not exist on disk yet, so they must not pollute the recent list.
+      // path may not exist on disk yet, so they can't be reopened.
       const persistableTabs = tabs.filter(tab => !tab.cloning && !tab.cloneError);
-      if (persistableTabs.length > 0) {
-        // Every open tab is saved for the next launch; only the recent list
-        // (most recent first) is capped.
-        const validPaths = filterValidRepos(persistableTabs.map(tab => tab.path));
-        setOpenTabs(validPaths);
-        const recent = setRecentRepos([...validPaths].reverse());
-        ipcRenderer.send('update-recent-repos', recent);
-      } else {
-        // No tabs open, clear recent repos
-        setOpenTabs([]);
-        const recent = setRecentRepos([]);
-        ipcRenderer.send('update-recent-repos', recent);
-      }
+      setOpenTabs(filterValidRepos(persistableTabs.map(tab => tab.path)));
     }
   }, [tabs, hasLoadedRecent]);
 
